@@ -6,6 +6,7 @@ pub const NAME: &str = env!("CARGO_PKG_NAME");
 
 mod claude;
 mod claude_prompt;
+mod codex;
 mod context;
 mod events;
 mod http;
@@ -17,6 +18,9 @@ mod time;
 mod tools;
 
 pub use claude::{ClaudeCodeOptions, find_claude};
+pub use codex::{CodexOptions, find_codex};
+pub use model::{Answer, Call, Model, Piece};
+pub use ollama::ANY_MODEL;
 pub use options::{DEFAULT_BASE_URL, LocalBrainOptions};
 pub use store::STATE_FILE;
 
@@ -32,7 +36,7 @@ use serde_json::Value;
 
 use crate::events::{completed, delta, started, tool_call};
 use crate::http::Endpoint;
-use crate::model::{Answer, Model, Piece};
+
 use crate::ollama::Ollama;
 use crate::store::{State, Waiting, invalid, not_found};
 use crate::time::rfc3339;
@@ -71,7 +75,7 @@ impl LocalBrain {
         let endpoint = Endpoint::parse(&options.base_url)?;
         options.check_agent()?;
         let model = options.model.clone();
-        let ollama = Ollama { endpoint, model };
+        let ollama = Ollama::new(endpoint, model);
         Self::with_backend(folder.as_ref().to_path_buf(), Box::new(ollama), options)
     }
 
@@ -85,6 +89,26 @@ impl LocalBrain {
         let options = LocalBrainOptions::new(claude.model.as_deref().unwrap_or("claude"));
         let backend = claude::ClaudeCode::new(claude, folder.clone());
         Self::with_backend(folder, Box::new(backend), options)
+    }
+
+    /// The brain whose answers come from the person's Codex CLI (`codex exec` in a read-only
+    /// sandbox, the recipe of ADR 0109) and whose state lives in `folder`, also the program's.
+    pub fn codex(folder: impl AsRef<Path>, codex: CodexOptions) -> Result<Self, String> {
+        let folder = folder.as_ref().to_path_buf();
+        let options = LocalBrainOptions::new(codex.model.as_deref().unwrap_or("codex"));
+        let backend = codex::Codex::new(codex, folder.clone());
+        Self::with_backend(folder, Box::new(backend), options)
+    }
+
+    /// The brain whose answers come from `model`, named `name`, its state in `folder`: a model
+    /// another crate brings (the desk's endue AI Eris, desk-boot).
+    pub fn with_model(
+        folder: impl AsRef<Path>,
+        name: &str,
+        model: Box<dyn Model>,
+    ) -> Result<Self, String> {
+        let folder = folder.as_ref().to_path_buf();
+        Self::with_backend(folder, model, LocalBrainOptions::new(name))
     }
 
     fn with_backend(

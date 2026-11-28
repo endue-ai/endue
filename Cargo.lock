@@ -1913,6 +1913,7 @@ dependencies = [
  "desk-crash",
  "desk-ipc",
  "desk-mcp-client",
+ "desk-platform",
  "desk-sys",
  "desk-trace",
  "desk-update",

@@ -88,3 +88,21 @@ fn uses_the_space_binding_and_keeps_incomplete_streams_out_of_the_answer() {
         assert_eq!(result.text, None);
     }
 }
+
+#[test]
+fn erises_conversation_is_the_accounts_own_and_a_turn_runs_on_it() {
+    let fake = FakePlatform::start();
+    let platform = Platform::new(fake.url(), Arc::new(Token)).unwrap();
+    assert!(
+        platform.eris().unwrap().is_none(),
+        "an account without Eris"
+    );
+    fake.state().eris = Some(("ag_eris".into(), "cnv_eris".into()));
+    let eris = platform.eris().unwrap().expect("her conversation");
+    assert_eq!(
+        (eris.id.as_str(), eris.agent_id.as_str()),
+        ("cnv_eris", "ag_eris")
+    );
+    let turn = platform.chat_turn(&eris, "hello", "desk_m1").unwrap();
+    assert_eq!(turn.text.as_deref(), Some("The outline is ready."));
+}

@@ -1,5 +1,6 @@
-//! A fake Ollama on std's TcpListener for the brain-choice tests: `/api/version` answers, and every
-//! `/api/chat` streams "Hi from <model>" and stops. It runs until the test process ends.
+//! A fake Ollama on std's TcpListener for the brain-choice tests: `/api/version` answers,
+//! `/api/tags` lists an embedding model and `HELD`, and every `/api/chat` streams
+//! "Hi from <model>" and stops. It runs until the test process ends.
 #![allow(dead_code)]
 
 use std::io::{BufRead, BufReader, Read, Write};
@@ -7,6 +8,9 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 
 use serde_json::{Value, json};
+
+/// The chat model the fake holds: what answers when no model is set.
+pub const HELD: &str = "qwen3:8b";
 
 pub struct FakeOllama {
     pub url: String,
@@ -29,8 +33,14 @@ fn answer(mut stream: TcpStream) {
     let Some((path, body)) = read_request(&stream) else {
         return;
     };
-    if path.ends_with("/api/version") {
-        let body = json!({ "version": "0.12.0" }).to_string();
+    let listed = json!({ "models": [{ "name": "qwen3-embedding:8b" }, { "name": HELD }] });
+    let plain = match () {
+        _ if path.ends_with("/api/version") => Some(json!({ "version": "0.12.0" })),
+        _ if path.ends_with("/api/tags") => Some(listed),
+        _ => None,
+    };
+    if let Some(body) = plain {
+        let body = body.to_string();
         let head = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\
              Connection: close\r\n\r\n",

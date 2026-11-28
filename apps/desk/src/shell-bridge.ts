@@ -63,8 +63,13 @@ function permissionOf(scope: string): { permission: Permission; reason: string }
 /** The runtime's BrainStatus from the core's: credits the brain does not report count as none. */
 function statusOf(status: BrainStatusResult): BrainStatus {
   if (status.mode !== "cloud") return status;
-  const { credits, brain } = status;
-  return { mode: "cloud", credits: credits ?? 0, ...(brain ? { brain } : {}) };
+  const { credits, brain, answering } = status;
+  return {
+    mode: "cloud",
+    credits: credits ?? 0,
+    ...(brain ? { brain } : {}),
+    ...(answering ? { answering } : {}),
+  };
 }
 
 /** A directory answer, which the bridge passes through as the brain contract's type. */

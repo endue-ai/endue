@@ -12,7 +12,7 @@ use desk_brain::{
     Brain, BrainErrorCode, BrainFailure, ClientInfo, CreateSessionRequest, LeaseHolder,
     ToolResultRequest, TurnRequest,
 };
-use desk_bridge::{BrainDesk, BrainTurnKind, BrainTurnTool};
+use desk_bridge::{BrainDesk, BrainName, BrainTurnKind, BrainTurnTool};
 
 use crate::agent_tools::echo;
 use crate::conversation_sink::Sink;
@@ -39,12 +39,29 @@ pub(crate) struct Conversation {
     tools: OnceLock<Weak<dyn Tools>>,
 }
 
-/// Where a turn goes when its brain cannot be reached (ADR 0094): the local brain, and whether
-/// Eris has said so since the chosen brain last answered.
+/// Where a turn goes when its brain cannot be reached (ADR 0094, amended for FT-01): the brains
+/// after it in the desk's order, each tried once, and whether Eris has said so since the chosen
+/// brain last answered.
 #[derive(Clone)]
 pub(crate) struct Fallback {
-    pub to: Arc<Conversation>,
+    pub chain: Vec<(BrainName, Arc<Conversation>)>,
     pub said: Arc<AtomicBool>,
+    /// The chain of a brain that stands in: its answers do not mean the chosen one is back.
+    pub standing_in: bool,
+}
+
+impl Fallback {
+    /// The first brain of the chain that can answer now, and the chain after it.
+    pub(crate) fn next(&self) -> Option<(BrainName, Arc<Conversation>, Fallback)> {
+        let at = self.chain.iter().position(|(_, to)| to.reachable())?;
+        let (name, to) = self.chain[at].clone();
+        let rest = Fallback {
+            chain: self.chain[at + 1..].to_vec(),
+            said: Arc::clone(&self.said),
+            standing_in: true,
+        };
+        Some((name, to, rest))
+    }
 }
 
 struct State {
@@ -209,21 +226,30 @@ impl Conversation {
                     }
                     // Only now, with the episode kept, does the turn say completed (#575).
                     held.release(&sink);
-                    if let Some(fallback) = fallback {
+                    if let Some(fallback) = fallback.filter(|f| !f.standing_in) {
                         fallback.said.store(false, Ordering::SeqCst);
                     }
                     return;
                 }
                 Err(Stop::Again) if again < 3 => again += 1,
-                // The chosen brain is out of reach and the local brain is not (ADR 0094).
-                Err(Stop::Unreachable) if fallback.is_some_and(|f| f.to.reachable()) => {
+                // The chosen brain is out of reach and a brain after it is not (ADR 0094).
+                Err(Stop::Unreachable) if fallback.is_some_and(|f| !f.chain.is_empty()) => {
+                    let Some((_, to, rest)) = fallback.and_then(Fallback::next) else {
+                        // None of them answers either: wait for the chosen one, as before.
+                        if !sink.offline {
+                            sink.offline = true;
+                            sink.publish(BrainTurnKind::Offline, Some(OFFLINE_LINE));
+                        }
+                        drop(state);
+                        thread::sleep(wait);
+                        wait = (wait * 2).min(self.options.max_retry);
+                        state = self.lock();
+                        continue;
+                    };
                     sink.reached();
                     drop(state);
-                    let fallback = fallback.expect("checked above");
-                    let first = !fallback.said.swap(true, Ordering::SeqCst);
-                    fallback
-                        .to
-                        .run(turn, line, None, first.then_some(FALLBACK_LINE));
+                    let first = !rest.said.swap(true, Ordering::SeqCst);
+                    to.run(turn, line, Some(&rest), first.then_some(FALLBACK_LINE));
                     return;
                 }
                 Err(Stop::Unreachable) => {

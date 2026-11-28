@@ -35,9 +35,9 @@ impl Core {
             )
         })?;
         // An ask goes to the local brain while the chosen one is out of reach (ADR 0094).
-        let conversation = match picked.fallback {
-            Some(fallback) if !picked.conversation.reachable() && fallback.to.reachable() => {
-                fallback.to
+        let conversation = match picked.fallback.as_ref() {
+            Some(fallback) if !picked.conversation.reachable() => {
+                fallback.next().map_or(picked.conversation, |(_, to, _)| to)
             }
             _ => picked.conversation,
         };

@@ -5056,7 +5056,7 @@ pub enum BrainStatusResult {
     BrainStatusOffline(BrainStatusOffline),
 }
 
-/// A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo) or claude (the person's own Claude Code, asked without its tools, ADR 0109).
+/// A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo), claude (the person's own Claude Code, asked without its tools, ADR 0109) or codex (the person's own Codex CLI, asked the same way). A chosen brain that cannot answer hands the turn to the next of endue, codex, claude and local that can.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BrainName {
     #[serde(rename = "endue")]
@@ -5067,6 +5067,8 @@ pub enum BrainName {
     Echo,
     #[serde(rename = "claude")]
     Claude,
+    #[serde(rename = "codex")]
+    Codex,
 }
 
 /// A brain on this machine, named by the model it runs. fallback is true when it answers in place of the chosen brain, which cannot be reached now (ADR 0094).
@@ -5093,6 +5095,9 @@ pub struct BrainStatusCloud {
     /// The brain the desk chose. Absent from desks that cannot choose.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brain: Option<BrainName>,
+    /// The brain that answers in place of the chosen one, which cannot answer now. Absent while the chosen brain answers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answering: Option<BrainName>,
 }
 
 /// The brain cannot be reached now, or the desk has none.
