@@ -35,8 +35,8 @@ export function wheelPan(
  * The canvas under the normal windows: Shift + drag on the empty background or on a window's title
  * bar moves it, and the normal windows with it; floating windows stay where they are. A wheel over
  * the empty background moves it too. Windows' contents, inputs and plugin scroll areas keep their
- * input, and a plain drag never pans. Over the empty canvas the pointer shows how (the root's title,
- * only there). The window manager (crates/desk-wm on the compositor, ADR 0153) pans from the press
+ * input, and a plain drag never pans. Over the empty canvas the pointer shows how once (the root's
+ * title, only there). The window manager (crates/desk-wm on the compositor, ADR 0153) pans from the press
  * the page found, and publishes the pan; the wheel's pan is the page's. The way back to the origin
  * is the strip's under the canvas map (`MapStrip.ts`, issue 296).
  */
@@ -50,6 +50,16 @@ export function mountPan(root: HTMLElement, ctx: ShellCtx): () => void {
   /** Holding Shift shows the hand over what a drag would pan. */
   const shift = (e: KeyboardEvent | FocusEvent) =>
     root.classList.toggle("pan-ready", e instanceof KeyboardEvent && e.shiftKey);
+  /**
+   * The hint shows once in a shell's life: the first time the pointer rests on the empty canvas.
+   * Shown again, it covered the window beside every gap the pointer crossed; after a pan the person
+   * knows how. The keys window and the palette keep teaching it.
+   */
+  let hint: "unseen" | "showing" | "done" = "unseen";
+  const hintDone = () => {
+    hint = "done";
+    root.removeAttribute("title");
+  };
   const draw = () => {
     const pan = panOf(ctx.store.get());
     root.classList.add("has-canvas");
@@ -59,7 +69,10 @@ export function mountPan(root: HTMLElement, ctx: ShellCtx): () => void {
   const off = [
     draggable(root, {
       accept: (e) => e.shiftKey && (background(e.target) || titleBar(e.target)),
-      press: (e) => ctx.wm.grab({ kind: "pan" }, { x: e.clientX, y: e.clientY }),
+      press: (e) => {
+        hintDone();
+        return ctx.wm.grab({ kind: "pan" }, { x: e.clientX, y: e.clientY });
+      },
       move: () => undefined,
       end: () => undefined,
     }),
@@ -74,14 +87,17 @@ export function mountPan(root: HTMLElement, ctx: ShellCtx): () => void {
         )
           return;
         e.preventDefault();
+        hintDone();
         wheelPan(ctx, e, root.clientHeight);
       },
       { passive: false },
     ),
     // The hint is the empty canvas's alone: as the root's title it was every control's tooltip.
     listen(root, "pointerover", (e) => {
-      if (background(e.target)) root.title = ctx.tr("panHint");
-      else root.removeAttribute("title");
+      if (background(e.target) && hint === "unseen") {
+        hint = "showing";
+        root.title = ctx.tr("panHint");
+      } else if (!background(e.target) && hint === "showing") hintDone();
     }),
     ctx.store.watch((s) => [s.pan, s.desktop], draw),
     listen(window, "keydown", shift),
