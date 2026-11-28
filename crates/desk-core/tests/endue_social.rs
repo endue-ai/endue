@@ -355,3 +355,77 @@ fn publish_reply_and_delete_are_irreversible_commands() {
     assert_ne!(key(&publish[0]), key(&publish[1]), "one key per invocation");
     assert_ne!(key(&publish[1]), key(&delete[0]));
 }
+
+/// A JPEG whose EXIF holds where it was taken: IFD0 points to a GPS IFD with a latitude.
+fn located_jpeg() -> Vec<u8> {
+    let mut tiff = b"MM\0\x2a\0\0\0\x08\0\x01".to_vec();
+    tiff.extend([0x88, 0x25, 0, 4, 0, 0, 0, 1, 0, 0, 0, 26, 0, 0, 0, 0]);
+    tiff.extend([0, 1, 0, 2, 0, 5, 0, 0, 0, 1, 0, 0, 0, 44, 0, 0, 0, 0]);
+    tiff.extend([0, 0, 0, 37, 0, 0, 0, 1]);
+    let mut out = vec![0xFF, 0xD8, 0xFF, 0xE1];
+    out.extend(u16::try_from(tiff.len() + 8).unwrap().to_be_bytes());
+    out.extend(b"Exif\0\0");
+    out.extend(tiff);
+    out.extend([0xFF, 0xDA, 0, 2, 1, 2, 0xFF, 0xD9]);
+    out
+}
+
+#[test]
+fn a_picture_from_a_file_goes_up_once_without_where_it_was_taken() {
+    let (fake, desk, ig, rd) = synced();
+    fs::write(desk.home.join("jacket.jpg"), located_jpeg()).unwrap();
+    fs::write(desk.home.join("notes.pdf"), b"%PDF-1.7").unwrap();
+    let publish = "endue.social.post.publish";
+    let done = |id: &str| vec![ok(json!({ "id": id, "status": "published" }))];
+    queue(&fake, &ig, "instagram__social_publish", done("18040"));
+    queue(&fake, &rd, "reddit__social_publish", done("t3_n"));
+    let media = json!([{ "path": "~/jacket.jpg", "alt": "A green jacket" }]);
+    let args = |instance: &str| json!({ "instance": instance, "text": "Autumn", "media": media });
+
+    let refused = invoke(&desk, publish, args(&ig));
+    assert_eq!(
+        refused["ok"], false,
+        "a file the caller may not read: {refused}"
+    );
+    assert!(
+        fake.state().connectors.uploads.is_empty(),
+        "nothing went up"
+    );
+
+    desk.grant("desk", json!({ "permission": "fs:read", "paths": ["~/*"] }));
+    for instance in [&ig, &rd] {
+        let answered = invoke(&desk, publish, args(instance));
+        assert_eq!(answered["ok"], true, "{answered}");
+    }
+    let uploads = fake.state().connectors.uploads.clone();
+    assert_eq!(uploads.len(), 1, "one upload serves both accounts");
+    assert_eq!(uploads[0].mime, "image/jpeg");
+    assert!(
+        !uploads[0].bytes.windows(2).any(|w| w == [0x88, 0x25]),
+        "the GPS pointer is gone"
+    );
+    assert!(
+        uploads[0]
+            .bytes
+            .ends_with(&[0xFF, 0xDA, 0, 2, 1, 2, 0xFF, 0xD9])
+    );
+    let sent = fake.seen_at(
+        "POST",
+        &format!("/api/public/v1/connectors/{ig}/tools/instagram__social_publish/call"),
+    );
+    let media_id = uploads[0].media_id.clone();
+    assert_eq!(
+        sent.last().unwrap().body["arguments"]["media"],
+        json!([{ "media_id": media_id, "alt": "A green jacket" }])
+    );
+
+    let pdf = json!({ "instance": ig, "media": [{ "path": "~/notes.pdf" }] });
+    let answered = invoke(&desk, publish, pdf);
+    assert!(
+        answered
+            .to_string()
+            .contains("notes.pdf is not a picture or a video"),
+        "{answered}"
+    );
+    assert_eq!(fake.state().connectors.uploads.len(), 1);
+}
