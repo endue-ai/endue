@@ -176,6 +176,8 @@
         { "$ref": "studio.schema.json#/$defs/StudioCatalogRecommendRequest" },
         { "$ref": "studio.schema.json#/$defs/StudioCatalogUseRequest" },
         { "$ref": "studio.schema.json#/$defs/StudioConversationsListRequest" },
+        { "$ref": "studio.schema.json#/$defs/StudioTopicsListRequest" },
+        { "$ref": "studio.schema.json#/$defs/StudioRoutinesListRequest" },
         { "$ref": "studio-chat.schema.json#/$defs/StudioChatAskRequest" },
         { "$ref": "studio-chat.schema.json#/$defs/StudioMessagesListRequest" },
         { "$ref": "studio-chat.schema.json#/$defs/StudioChatSendRequest" },

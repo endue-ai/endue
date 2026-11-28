@@ -43,7 +43,7 @@ test("an agent's window reads its thread, sends a line, and stops a run", async 
     return r ? { w: r.width, h: r.height } : null;
   });
   expect(box?.w).toBeGreaterThan(600);
-  await expect(view.locator("[role=tab]")).toHaveText(["Home", "Studio"]);
+  await expect(view.locator(".thread-head [role=tab]")).toHaveText(["Home", "Studio"]);
   await expect(view.locator(".thread-side-row[aria-current=true] .thread-side-title")).toHaveText(
     "Move Friday's dentist",
   );

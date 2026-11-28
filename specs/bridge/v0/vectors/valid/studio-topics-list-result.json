@@ -1,0 +1,20 @@
+{
+  "target": "StudioTopicsListResult",
+  "description": "topics with their thread counts, one never active",
+  "instance": {
+    "topics": [
+      {
+        "id": "tp_launch",
+        "name": "launch",
+        "threadCount": 3,
+        "lastActivityAt": "2026-11-29T09:00:00Z",
+        "mainConversationId": "cnv_main"
+      },
+      {
+        "id": "tp_misc",
+        "name": "misc",
+        "threadCount": 0
+      }
+    ]
+  }
+}

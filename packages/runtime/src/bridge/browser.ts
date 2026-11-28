@@ -163,6 +163,15 @@ function studioShell(stub: StudioStub, opened: string[], thread: ThreadStub): St
     space: async (spaceId) => on("studio.spaces.get")({ spaceId, scope }, "desk"),
     ask: async (question) => on("studio.chat.ask")({ ...question, scope }, "desk"),
     thread: thread.bridge,
+    side: {
+      topics: async (agentId) =>
+        (await on("studio.topics.list")({ agentId, scope }, "desk")).topics,
+      threads: async (agentId, topicId) =>
+        (await on("studio.conversations.list")({ agentId, topicId, limit: 50, scope }, "desk"))
+          .conversations,
+      routines: async (agentId) =>
+        on("studio.routines.list")({ agentId, limit: 50, scope }, "desk"),
+    },
     async open(url) {
       opened.push(url);
     },
@@ -206,6 +215,7 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
     : undefined;
   const wallNow = () => (options.epoch === undefined ? Date.now() : options.epoch + options.now());
   const thread = threadStub(options.studio?.conversations ?? [], wallNow);
+  for (const c of options.studio?.side.threads ?? []) thread.seed(c);
   const turns = turnsOf(options.errand ?? sampleErrand, (text) => wordTimes(text));
 
   return {

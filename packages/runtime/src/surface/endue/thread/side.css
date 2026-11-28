@@ -1,0 +1,32 @@
+/* The side's tabs, topics, Home box and the list a Home row shows in the thread's place
+   (ADR 0411, FT-07), on the desk's tokens. The side holds at 200 px. */
+.thread-side { min-width: 200px; }
+.thread-side-tabs { display: flex; flex: none; }
+.thread-side-tab { flex: 1; justify-content: center; height: 32px; font-size: var(--text-xs); }
+.thread-side-headrow { display: flex; align-items: center; gap: var(--space-1); }
+.thread-side-count { color: var(--desk-text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.thread-side-headrow .thread-side-add { margin-left: auto; }
+.thread-topic .thread-chevron { transform: rotate(-90deg); }
+.thread-topic[aria-expanded="true"] .thread-chevron { transform: none; }
+.thread-topic-threads { padding-left: var(--space-4); }
+.thread-new-thread { color: var(--desk-text-muted); }
+.thread-side-skeleton { display: grid; gap: var(--space-1); }
+.thread-side-skeleton .thread-skeleton { height: var(--space-5); }
+.thread-side-unread { display: grid; justify-items: start; gap: var(--space-1); color: var(--desk-text-muted); font-size: var(--text-xs); }
+.thread-side-unread p { margin: 0; overflow-wrap: anywhere; }
+.thread-home-box { display: grid; padding: 2px; border: var(--desk-border-width) solid var(--desk-border); border-radius: var(--radius-md); }
+.thread-home-row.menu-item { height: 30px; }
+.thread-home-row .thread-side-title { flex: 1; text-align: start; }
+
+.thread-panel { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: var(--space-3); min-height: 0; padding: var(--space-4); overflow-y: auto; }
+.thread-panel[hidden] { display: none; }
+.thread-panel-title { margin: 0; font-size: var(--text-base); font-weight: 600; }
+.thread-panel-list { display: grid; gap: var(--space-1); width: 100%; max-width: 860px; margin: 0; padding: 0; list-style: none; }
+.thread-panel-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; max-width: 860px; padding: var(--space-2) var(--space-3); border: var(--desk-border-width) solid var(--desk-border); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.thread-panel-sub { color: var(--desk-text-muted); font-size: var(--text-xs); }
+.thread-routine-state { flex: none; color: var(--desk-text-muted); }
+.thread-routine-state.is-on { color: var(--desk-success-text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .thread-topic .thread-chevron { transition: none; }
+}

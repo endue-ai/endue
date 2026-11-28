@@ -3582,6 +3582,8 @@ export type BridgeRequest =
   | StudioCatalogRecommendRequest
   | StudioCatalogUseRequest
   | StudioConversationsListRequest
+  | StudioTopicsListRequest
+  | StudioRoutinesListRequest
   | StudioChatAskRequest
   | StudioMessagesListRequest
   | StudioChatSendRequest
@@ -7013,11 +7015,12 @@ export interface StudioChatSendRequest {
   params: StudioChatSendParams;
 }
 
-/** Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window. */
+/** Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window. topicId makes a new conversation a thread of that topic. */
 export interface StudioChatSendParams {
   agentId: StudioAgentId;
   conversationId?: StudioAgentId;
   spaceId?: StudioSpaceId;
+  topicId?: StudioTopicId;
   text: string;
   messageId: string;
   scope: StudioManagePermission;
@@ -7846,6 +7849,7 @@ export interface StudioConversation {
   id: string;
   agentId: StudioAgentId;
   spaceId?: string;
+  topicId?: StudioTopicId;
   title?: string;
   status: StudioConversationStatus;
   messageCount: number;
@@ -7869,7 +7873,7 @@ export interface StudioConversationsListRequest {
   params: StudioConversationsListParams;
 }
 
-/** Parameters of studio.conversations.list. page starts at 1; limit is 20 unless given. */
+/** Parameters of studio.conversations.list. page starts at 1; limit is 20 unless given; topicId narrows it to one topic's threads (ADR 0411). */
 export interface StudioConversationsListParams {
   agentId?: StudioAgentId;
   awaitingInput?: boolean;
@@ -7877,6 +7881,7 @@ export interface StudioConversationsListParams {
   page?: number;
   limit?: number;
   scope: StudioManagePermission;
+  topicId?: StudioTopicId;
 }
 
 /** Result of studio.conversations.list: one page, how many match in all, and whether a page follows. */
@@ -7885,6 +7890,76 @@ export interface StudioConversationsListResult {
   total: number;
   hasMore: boolean;
 }
+
+/** An agent's topic on endue AI. */
+export type StudioTopicId = string;
+
+/** One of an agent's topics as the side of its window shows it: its name, how many threads it holds, when it was last active, and its main conversation. Nothing else of a topic crosses. */
+export interface StudioTopic {
+  id: StudioTopicId;
+  name: string;
+  threadCount: number;
+  lastActivityAt?: string;
+  mainConversationId?: StudioAgentId;
+}
+
+/** An agent's topics, the most recently active first (ADR 0411). */
+export interface StudioTopicsListRequest {
+  id: RequestId;
+  method: "studio.topics.list";
+  params: StudioTopicsListParams;
+}
+
+/** Parameters of studio.topics.list. */
+export interface StudioTopicsListParams {
+  agentId: StudioAgentId;
+  scope: StudioManagePermission;
+}
+
+/** Result of studio.topics.list. */
+export interface StudioTopicsListResult {
+  topics: StudioTopic[];
+}
+
+/** What starts a routine: a schedule (text is the schedule as endue AI words it), a webhook or an event. A webhook's address and secret never cross. */
+export interface StudioRoutineTrigger {
+  kind: StudioRoutineTriggerKind;
+  text?: string;
+}
+
+/** One of an agent's routines as the side of its window lists it: its name, whether it is on, what starts it, and when it last ran with how that ended. Its prompt and run history never cross. */
+export interface StudioRoutine {
+  id: StudioAgentId;
+  name: string;
+  enabled: boolean;
+  trigger: StudioRoutineTrigger;
+  lastRunAt?: string;
+  lastRunStatus?: string;
+}
+
+/** One page of an agent's routines (ADR 0411); read-only here. */
+export interface StudioRoutinesListRequest {
+  id: RequestId;
+  method: "studio.routines.list";
+  params: StudioRoutinesListParams;
+}
+
+/** Parameters of studio.routines.list. page starts at 1; limit is 20 unless given. */
+export interface StudioRoutinesListParams {
+  agentId: StudioAgentId;
+  page?: number;
+  limit?: number;
+  scope: StudioManagePermission;
+}
+
+/** Result of studio.routines.list: one page and how many the agent has in all. */
+export interface StudioRoutinesListResult {
+  routines: StudioRoutine[];
+  total: number;
+}
+
+/** What kind of thing starts a routine. */
+export type StudioRoutineTriggerKind = "schedule" | "webhook" | "event";
 
 /** One of the theme's font or image files, given inline. */
 export interface ThemeSaveFile {
@@ -8931,6 +9006,8 @@ export interface BridgeMethodMap {
     params: StudioConversationsListParams;
     result: StudioConversationsListResult;
   };
+  "studio.topics.list": { params: StudioTopicsListParams; result: StudioTopicsListResult };
+  "studio.routines.list": { params: StudioRoutinesListParams; result: StudioRoutinesListResult };
   "studio.chat.ask": { params: StudioChatAskParams; result: StudioChatAskResult };
   "studio.messages.list": { params: StudioMessagesListParams; result: StudioMessagesListResult };
   "studio.chat.send": { params: StudioChatSendParams; result: StudioChatSendResult };
@@ -9134,6 +9211,8 @@ export const BRIDGE_METHODS = [
   "studio.catalog.recommend",
   "studio.catalog.use",
   "studio.conversations.list",
+  "studio.topics.list",
+  "studio.routines.list",
   "studio.chat.ask",
   "studio.messages.list",
   "studio.chat.send",

@@ -56,7 +56,7 @@ describe("an endue agent's window (ADR 0411)", () => {
     // The side: New chat, then Miso's conversations, the newest first and open.
     const side = el.querySelector(".thread-side");
     expect(side?.querySelector("[data-action=new-chat]")?.textContent).toBe("New chat");
-    expect(texts(side, ".thread-side-title")).toEqual([
+    expect(texts(side, "[data-section^=thread] .thread-side-title")).toEqual([
       "Move Friday's dentist",
       "Sort this week's mail",
     ]);
@@ -189,7 +189,7 @@ describe("an endue agent's window (ADR 0411)", () => {
 
   it("home_and_studio_are_tabs", async () => {
     const { el, store } = await mounted("agent", MISO);
-    expect(texts(el, "[role=tab]")).toEqual(["Home", "Studio"]);
+    expect(texts(el, ".thread-head [role=tab]")).toEqual(["Home", "Studio"]);
     expect(el.querySelector("[data-tab=home]")?.getAttribute("aria-selected")).toBe("true");
     expect(studioPanel(el)?.hidden).toBe(true);
     tab(el, "studio");
@@ -266,9 +266,11 @@ describe("an endue agent's window (ADR 0411)", () => {
   it("speaks the desk's language", async () => {
     const { el } = await mounted("agent", MISO, "ko");
     await settle();
-    expect(texts(el, "[role=tab]")).toEqual(["홈", "스튜디오"]);
+    expect(texts(el, ".thread-head [role=tab]")).toEqual(["홈", "스튜디오"]);
     expect(el.querySelector("[data-action=new-chat]")?.textContent).toBe("새 대화");
-    expect(el.querySelector(".thread-side-heading")?.textContent).toBe("최근");
+    expect(el.querySelector("[data-section=threadRecent] .thread-side-heading")?.textContent).toBe(
+      "최근",
+    );
     expect(el.querySelector<HTMLTextAreaElement>(".thread-field")?.placeholder).toBe("답장");
     expect(el.querySelector(".thread-send")?.textContent).toBe("보내기");
     expect(el.querySelector(".thread-new")?.textContent).toBe("새 메시지");

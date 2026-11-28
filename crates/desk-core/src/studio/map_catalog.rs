@@ -162,6 +162,7 @@ pub(crate) fn conversation(c: Conversation) -> StudioConversation {
         id: c.id,
         agent_id: c.agent_id,
         space_id: some(c.space_id, 128),
+        topic_id: c.topic_id.filter(|t| topic_id_ok(t)),
         title: some(c.title, 500),
         status,
         message_count: c.message_count,
@@ -181,4 +182,12 @@ pub(crate) fn conversation(c: Conversation) -> StudioConversation {
         created_at: c.created_at,
         updated_at: c.updated_at,
     }
+}
+
+/// A topic id as the bridge takes one: a letter or digit, then letters, digits, `_` or `-`, at most 128.
+fn topic_id_ok(id: &str) -> bool {
+    let mut chars = id.chars();
+    id.len() <= 128
+        && chars.next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }

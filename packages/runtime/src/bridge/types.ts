@@ -25,8 +25,10 @@ import type {
   StudioChatSendResult,
   StudioConversation,
   StudioMessagesListResult,
+  StudioRoutinesListResult,
   StudioSpace,
   StudioSpacesGetResult,
+  StudioTopic,
 } from "@endue-ai/bridge";
 
 /**
@@ -257,6 +259,20 @@ export interface StudioThreadBridge {
   onEvent(listener: (event: StudioChatEventData) => void): () => void;
 }
 
+/**
+ * The side of an agent's window beyond its conversations (ADR 0411, FT-07): the agent's topics, a
+ * topic's threads read when it unfolds, and its routines. Read-only; a new thread is a send with
+ * its `topicId`.
+ */
+export interface StudioSideBridge {
+  /** The agent's topics, the most recently active first. */
+  topics(agentId: string): Promise<StudioTopic[]>;
+  /** One topic's threads: conversations, the most recently active first. */
+  threads(agentId: string, topicId: string): Promise<StudioConversation[]>;
+  /** The first page of the agent's routines and how many it has. */
+  routines(agentId: string): Promise<StudioRoutinesListResult>;
+}
+
 export interface StudioShellBridge {
   /** Every agent of the person's that is not deleted, the newest first. */
   agents(): Promise<StudioAgent[]>;
@@ -274,6 +290,8 @@ export interface StudioShellBridge {
   ask?(question: StudioQuestion): Promise<StudioChatAskResult>;
   /** An agent's conversation (ADR 0411); absent on an older host, which keeps the ask form. */
   thread?: StudioThreadBridge;
+  /** An agent's topics and routines (ADR 0411); absent on an older host, whose side lists conversations only. */
+  side?: StudioSideBridge;
   /** Open one of endue.ai's pages (an https URL) in the system browser. */
   open(url: string): Promise<void>;
 }

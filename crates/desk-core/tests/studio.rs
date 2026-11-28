@@ -14,6 +14,8 @@ mod chat;
 mod faces;
 #[path = "studio/rows.rs"]
 mod rows;
+#[path = "studio/side.rs"]
+mod side;
 #[path = "studio/spaces.rs"]
 mod spaces;
 #[path = "studio/thread.rs"]

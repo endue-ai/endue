@@ -1,0 +1,15 @@
+{
+  "target": "BridgeRequest",
+  "description": "an agent's routines, a page of 20",
+  "instance": {
+    "id": 2,
+    "method": "studio.routines.list",
+    "params": {
+      "agentId": "ag_1",
+      "limit": 20,
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

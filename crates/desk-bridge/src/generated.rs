@@ -5707,6 +5707,8 @@ pub enum BridgeRequest {
     StudioCatalogRecommend(StudioCatalogRecommendRequest),
     StudioCatalogUse(StudioCatalogUseRequest),
     StudioConversationsList(StudioConversationsListRequest),
+    StudioTopicsList(StudioTopicsListRequest),
+    StudioRoutinesList(StudioRoutinesListRequest),
     StudioChatAsk(StudioChatAskRequest),
     StudioMessagesList(StudioMessagesListRequest),
     StudioChatSend(StudioChatSendRequest),
@@ -10974,7 +10976,7 @@ pub struct StudioChatSendRequest {
     pub params: StudioChatSendParams,
 }
 
-/// Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window.
+/// Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window. topicId makes a new conversation a thread of that topic.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StudioChatSendParams {
@@ -10988,6 +10990,8 @@ pub struct StudioChatSendParams {
     pub conversation_id: Option<StudioAgentId>,
     #[serde(rename = "spaceId", default, skip_serializing_if = "Option::is_none")]
     pub space_id: Option<StudioSpaceId>,
+    #[serde(rename = "topicId", default, skip_serializing_if = "Option::is_none")]
+    pub topic_id: Option<StudioTopicId>,
     pub text: String,
     #[serde(rename = "messageId")]
     pub message_id: String,
@@ -12392,6 +12396,8 @@ pub struct StudioConversation {
     pub agent_id: StudioAgentId,
     #[serde(rename = "spaceId", default, skip_serializing_if = "Option::is_none")]
     pub space_id: Option<String>,
+    #[serde(rename = "topicId", default, skip_serializing_if = "Option::is_none")]
+    pub topic_id: Option<StudioTopicId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     pub status: StudioConversationStatus,
@@ -12457,7 +12463,7 @@ pub struct StudioConversationsListRequest {
     pub params: StudioConversationsListParams,
 }
 
-/// Parameters of studio.conversations.list. page starts at 1; limit is 20 unless given.
+/// Parameters of studio.conversations.list. page starts at 1; limit is 20 unless given; topicId narrows it to one topic's threads (ADR 0411).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StudioConversationsListParams {
@@ -12476,6 +12482,8 @@ pub struct StudioConversationsListParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u64>,
     pub scope: StudioManagePermission,
+    #[serde(rename = "topicId", default, skip_serializing_if = "Option::is_none")]
+    pub topic_id: Option<StudioTopicId>,
 }
 
 /// Result of studio.conversations.list: one page, how many match in all, and whether a page follows.
@@ -12486,6 +12494,124 @@ pub struct StudioConversationsListResult {
     pub total: u64,
     #[serde(rename = "hasMore")]
     pub has_more: bool,
+}
+
+/// An agent's topic on endue AI.
+pub type StudioTopicId = String;
+
+/// One of an agent's topics as the side of its window shows it: its name, how many threads it holds, when it was last active, and its main conversation. Nothing else of a topic crosses.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioTopic {
+    pub id: StudioTopicId,
+    pub name: String,
+    #[serde(rename = "threadCount")]
+    pub thread_count: u64,
+    #[serde(
+        rename = "lastActivityAt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_activity_at: Option<String>,
+    #[serde(
+        rename = "mainConversationId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub main_conversation_id: Option<StudioAgentId>,
+}
+
+/// An agent's topics, the most recently active first (ADR 0411).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioTopicsListRequest {
+    pub id: RequestId,
+    pub method: StudioTopicsListRequestMethod,
+    pub params: StudioTopicsListParams,
+}
+
+/// Parameters of studio.topics.list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioTopicsListParams {
+    #[serde(rename = "agentId")]
+    pub agent_id: StudioAgentId,
+    pub scope: StudioManagePermission,
+}
+
+/// Result of studio.topics.list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioTopicsListResult {
+    pub topics: Vec<StudioTopic>,
+}
+
+/// What starts a routine: a schedule (text is the schedule as endue AI words it), a webhook or an event. A webhook's address and secret never cross.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioRoutineTrigger {
+    pub kind: StudioRoutineTriggerKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+}
+
+/// One of an agent's routines as the side of its window lists it: its name, whether it is on, what starts it, and when it last ran with how that ended. Its prompt and run history never cross.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioRoutine {
+    pub id: StudioAgentId,
+    pub name: String,
+    pub enabled: bool,
+    pub trigger: StudioRoutineTrigger,
+    #[serde(rename = "lastRunAt", default, skip_serializing_if = "Option::is_none")]
+    pub last_run_at: Option<String>,
+    #[serde(
+        rename = "lastRunStatus",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_run_status: Option<String>,
+}
+
+/// One page of an agent's routines (ADR 0411); read-only here.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioRoutinesListRequest {
+    pub id: RequestId,
+    pub method: StudioRoutinesListRequestMethod,
+    pub params: StudioRoutinesListParams,
+}
+
+/// Parameters of studio.routines.list. page starts at 1; limit is 20 unless given.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioRoutinesListParams {
+    #[serde(rename = "agentId")]
+    pub agent_id: StudioAgentId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u64>,
+    pub scope: StudioManagePermission,
+}
+
+/// Result of studio.routines.list: one page and how many the agent has in all.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioRoutinesListResult {
+    pub routines: Vec<StudioRoutine>,
+    pub total: u64,
+}
+
+/// What kind of thing starts a routine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StudioRoutineTriggerKind {
+    #[serde(rename = "schedule")]
+    Schedule,
+    #[serde(rename = "webhook")]
+    Webhook,
+    #[serde(rename = "event")]
+    Event,
 }
 
 /// One of the theme's font or image files, given inline.
@@ -15811,6 +15937,22 @@ pub enum StudioConversationsListRequestMethod {
     #[default]
     #[serde(rename = "studio.conversations.list")]
     StudioConversationsList,
+}
+
+/// The `method` of [`StudioTopicsListRequest`]: always `"studio.topics.list"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioTopicsListRequestMethod {
+    #[default]
+    #[serde(rename = "studio.topics.list")]
+    StudioTopicsList,
+}
+
+/// The `method` of [`StudioRoutinesListRequest`]: always `"studio.routines.list"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioRoutinesListRequestMethod {
+    #[default]
+    #[serde(rename = "studio.routines.list")]
+    StudioRoutinesList,
 }
 
 /// The `method` of [`ThemeSaveRequest`]: always `"theme.save"`.

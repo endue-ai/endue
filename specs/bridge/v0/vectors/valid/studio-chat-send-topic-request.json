@@ -1,0 +1,17 @@
+{
+  "target": "BridgeRequest",
+  "description": "a new thread in a topic",
+  "instance": {
+    "id": 4,
+    "method": "studio.chat.send",
+    "params": {
+      "agentId": "ag_1",
+      "topicId": "tp_launch",
+      "text": "Kick off the launch plan",
+      "messageId": "desk_0123456789ab",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

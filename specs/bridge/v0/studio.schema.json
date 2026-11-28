@@ -1215,7 +1215,10 @@
         }
       ],
       "not": {
-        "properties": { "content": true, "restore": true },
+        "properties": {
+          "content": true,
+          "restore": true
+        },
         "required": ["content", "restore"]
       }
     },
@@ -1720,6 +1723,9 @@
           "type": "string",
           "maxLength": 128
         },
+        "topicId": {
+          "$ref": "#/$defs/StudioTopicId"
+        },
         "title": {
           "type": "string",
           "maxLength": 500
@@ -1794,7 +1800,7 @@
       "additionalProperties": false
     },
     "StudioConversationsListParams": {
-      "description": "Parameters of studio.conversations.list. page starts at 1; limit is 20 unless given.",
+      "description": "Parameters of studio.conversations.list. page starts at 1; limit is 20 unless given; topicId narrows it to one topic's threads (ADR 0411).",
       "type": "object",
       "properties": {
         "agentId": {
@@ -1817,6 +1823,9 @@
         },
         "scope": {
           "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        },
+        "topicId": {
+          "$ref": "#/$defs/StudioTopicId"
         }
       },
       "required": ["scope"],
@@ -1842,6 +1851,193 @@
       },
       "required": ["conversations", "total", "hasMore"],
       "additionalProperties": false
+    },
+    "StudioTopicId": {
+      "description": "An agent's topic on endue AI.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+    },
+    "StudioTopic": {
+      "description": "One of an agent's topics as the side of its window shows it: its name, how many threads it holds, when it was last active, and its main conversation. Nothing else of a topic crosses.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/StudioTopicId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "threadCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastActivityAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "mainConversationId": {
+          "$ref": "#/$defs/StudioAgentId"
+        }
+      },
+      "required": ["id", "name", "threadCount"],
+      "additionalProperties": false
+    },
+    "StudioTopicsListRequest": {
+      "description": "An agent's topics, the most recently active first (ADR 0411).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.topics.list"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioTopicsListParams"
+        }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "StudioTopicsListParams": {
+      "description": "Parameters of studio.topics.list.",
+      "type": "object",
+      "properties": {
+        "agentId": {
+          "$ref": "#/$defs/StudioAgentId"
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
+      },
+      "required": ["agentId", "scope"],
+      "additionalProperties": false
+    },
+    "StudioTopicsListResult": {
+      "description": "Result of studio.topics.list.",
+      "type": "object",
+      "properties": {
+        "topics": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/$defs/StudioTopic"
+          }
+        }
+      },
+      "required": ["topics"],
+      "additionalProperties": false
+    },
+    "StudioRoutineTrigger": {
+      "description": "What starts a routine: a schedule (text is the schedule as endue AI words it), a webhook or an event. A webhook's address and secret never cross.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/StudioRoutineTriggerKind"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "StudioRoutine": {
+      "description": "One of an agent's routines as the side of its window lists it: its name, whether it is on, what starts it, and when it last ran with how that ended. Its prompt and run history never cross.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/StudioAgentId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/$defs/StudioRoutineTrigger"
+        },
+        "lastRunAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastRunStatus": {
+          "type": "string",
+          "maxLength": 32
+        }
+      },
+      "required": ["id", "name", "enabled", "trigger"],
+      "additionalProperties": false
+    },
+    "StudioRoutinesListRequest": {
+      "description": "One page of an agent's routines (ADR 0411); read-only here.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.routines.list"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioRoutinesListParams"
+        }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "StudioRoutinesListParams": {
+      "description": "Parameters of studio.routines.list. page starts at 1; limit is 20 unless given.",
+      "type": "object",
+      "properties": {
+        "agentId": {
+          "$ref": "#/$defs/StudioAgentId"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
+      },
+      "required": ["agentId", "scope"],
+      "additionalProperties": false
+    },
+    "StudioRoutinesListResult": {
+      "description": "Result of studio.routines.list: one page and how many the agent has in all.",
+      "type": "object",
+      "properties": {
+        "routines": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/StudioRoutine"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["routines", "total"],
+      "additionalProperties": false
+    },
+    "StudioRoutineTriggerKind": {
+      "description": "What kind of thing starts a routine.",
+      "type": "string",
+      "enum": ["schedule", "webhook", "event"]
     }
   }
 }

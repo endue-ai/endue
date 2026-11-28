@@ -237,6 +237,7 @@ impl Core {
         let limit = params.limit.unwrap_or(CONVERSATIONS).clamp(1, 100);
         let query = ConversationQuery {
             agent_id: params.agent_id,
+            topic_id: params.topic_id,
             awaiting_input: params.awaiting_input,
             running: params.running,
             page: Some(page),

@@ -51,6 +51,9 @@ pub(super) fn answer(state: &mut State, seen: &Seen) -> Answer {
     if let Some(answer) = super::board::answer(state, seen, &parts) {
         return answer;
     }
+    if let Some(answer) = super::side::answer(state, seen, &parts) {
+        return answer;
+    }
     if let Some(answer) = super::chat::answer(state, seen, &parts) {
         return answer;
     }
@@ -362,6 +365,11 @@ fn conversations(state: &State, seen: &Seen) -> Answer {
             seen.query
                 .get("agent_id")
                 .is_none_or(|id| c["agent_id"] == id.as_str())
+        })
+        .filter(|c| {
+            seen.query
+                .get("topic_id")
+                .is_none_or(|id| c["topic_id"] == id.as_str())
         })
         .filter(|c| !wants("awaiting_input") || c["awaiting_input"] == true)
         .filter(|c| !wants("running") || c["last_run_status"] == "running")

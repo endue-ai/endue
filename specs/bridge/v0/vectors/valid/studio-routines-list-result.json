@@ -1,0 +1,28 @@
+{
+  "target": "StudioRoutinesListResult",
+  "description": "a scheduled routine that ran and a webhook routine that is off",
+  "instance": {
+    "routines": [
+      {
+        "id": "rt_1",
+        "name": "Morning brief",
+        "enabled": true,
+        "trigger": {
+          "kind": "schedule",
+          "text": "Every weekday at 9:00"
+        },
+        "lastRunAt": "2026-11-29T00:00:00Z",
+        "lastRunStatus": "completed"
+      },
+      {
+        "id": "rt_2",
+        "name": "New order",
+        "enabled": false,
+        "trigger": {
+          "kind": "webhook"
+        }
+      }
+    ],
+    "total": 2
+  }
+}

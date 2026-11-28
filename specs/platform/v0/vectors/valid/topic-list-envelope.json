@@ -1,0 +1,30 @@
+{
+  "target": "TopicListEnvelope",
+  "description": "an agent's active topics: one with threads, one whose main conversation is gone",
+  "instance": {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": "top_1",
+          "agent_id": "ag_01JC0Q4MR00000000000000001",
+          "name": "launch",
+          "status": "active",
+          "main_conversation_id": "cnv_1",
+          "thread_count": 2,
+          "last_activity_at": "2026-11-28T09:00:00.000Z"
+        },
+        {
+          "id": "top_2",
+          "agent_id": "ag_01JC0Q4MR00000000000000001",
+          "name": "hiring",
+          "status": "active",
+          "main_conversation_id": null,
+          "thread_count": 0,
+          "last_activity_at": null
+        }
+      ],
+      "total": 2
+    }
+  }
+}

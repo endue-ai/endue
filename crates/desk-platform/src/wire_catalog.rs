@@ -177,6 +177,9 @@ pub struct Conversation {
     pub agent_id: String,
     #[serde(default)]
     pub space_id: Option<String>,
+    /// The topic it is a thread (or the main conversation) of; none outside a topic.
+    #[serde(default)]
+    pub topic_id: Option<String>,
     #[serde(default)]
     pub title: Option<String>,
     pub status: String,
@@ -215,6 +218,8 @@ pub struct ConversationPage {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ConversationQuery {
     pub agent_id: Option<String>,
+    /// A topic's conversations alone: its main conversation and its threads.
+    pub topic_id: Option<String>,
     pub awaiting_input: Option<bool>,
     pub running: Option<bool>,
     pub page: Option<u64>,

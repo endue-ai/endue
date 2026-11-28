@@ -149,4 +149,30 @@ describe("studio for the shell (ADR 0129)", () => {
       { method: "studio.conversations.read", params: { conversationId: "cnv_1", scope: STUDIO } },
     ]);
   });
+
+  test("an agent's side reads its topics, a topic's threads and its routines (ADR 0411)", async () => {
+    const stub = browserStub({
+      "studio.topics.list": () => ({ topics: [{ id: "tp_1", name: "Launch", threadCount: 2 }] }),
+      "studio.conversations.list": () => ({ conversations: [], total: 0, hasMore: false }),
+      "studio.routines.list": () => ({ routines: [], total: 0 }),
+    });
+    const client = new BridgeClient({
+      name: "test",
+      call: (request, caller) => stub.call(request, caller),
+      onEvent: (listener) => stub.onEvent(listener),
+    });
+    const side = studioShell(client).side;
+    if (!side) throw new Error("no side");
+    expect(await side.topics("ag_1")).toEqual([{ id: "tp_1", name: "Launch", threadCount: 2 }]);
+    expect(await side.threads("ag_1", "tp_1")).toEqual([]);
+    expect(await side.routines("ag_1")).toEqual({ routines: [], total: 0 });
+    expect(stub.calls.map(({ method, params }) => ({ method, params }))).toEqual([
+      { method: "studio.topics.list", params: { agentId: "ag_1", scope: STUDIO } },
+      {
+        method: "studio.conversations.list",
+        params: { agentId: "ag_1", topicId: "tp_1", limit: 50, scope: STUDIO },
+      },
+      { method: "studio.routines.list", params: { agentId: "ag_1", limit: 50, scope: STUDIO } },
+    ]);
+  });
 });

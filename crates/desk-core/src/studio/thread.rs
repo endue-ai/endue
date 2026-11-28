@@ -248,6 +248,11 @@ impl Core {
             .as_deref()
             .map(|id| id_of(id).ok_or_else(|| invalid("Choose a space ID.")))
             .transpose()?;
+        let topic = params
+            .topic_id
+            .as_deref()
+            .map(|id| id_of(id).ok_or_else(|| invalid("Choose a topic ID.")))
+            .transpose()?;
         let text = words(&params.text, "text", 8000)?;
         let message = params.message_id.clone();
         if !(8..=64).contains(&message.len()) || id_of(&message).is_none() {
@@ -264,7 +269,11 @@ impl Core {
             (None, Some(space)) => platform.space_conversation(space).map_err(failed)?,
             (None, None) => {
                 active_agent(&platform, &agent_id)?;
-                platform.new_agent_conversation(&agent_id).map_err(failed)?
+                match topic.as_deref() {
+                    Some(topic) => platform.new_topic_conversation(&agent_id, topic),
+                    None => platform.new_agent_conversation(&agent_id),
+                }
+                .map_err(failed)?
             }
         };
         if conversation.agent_id != agent_id {

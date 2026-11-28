@@ -1,0 +1,18 @@
+{
+  "target": "StudioRoutinesListResult",
+  "description": "a webhook's address never crosses",
+  "instance": {
+    "routines": [
+      {
+        "id": "rt_1",
+        "name": "Brief",
+        "enabled": true,
+        "trigger": {
+          "kind": "webhook",
+          "url": "https://hooks.example/x"
+        }
+      }
+    ],
+    "total": 1
+  }
+}

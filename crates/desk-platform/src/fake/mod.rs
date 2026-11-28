@@ -1,6 +1,6 @@
 //! An in-process fake of endue AI's platform subset (specs/platform/v0), for tests only (feature
 //! `fake`): a small HTTP/1.1 server on 127.0.0.1 that keeps agents, their facets, one catalog agent,
-//! conversations and the person's own account in memory, checks the bearer token, answers the
+//! conversations, topics, routines and the person's own account in memory, checks the bearer token, answers the
 //! platform's envelopes and error
 //! envelopes, and records every request it saw. Nothing leaves this machine.
 
@@ -18,6 +18,7 @@ mod board;
 mod chat;
 mod connectors;
 mod routes;
+mod side;
 mod spaces;
 mod state;
 mod stream;

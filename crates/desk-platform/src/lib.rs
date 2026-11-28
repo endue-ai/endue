@@ -1,6 +1,7 @@
 //! endue AI's platform API (`/api/v1`), the subset specs/platform/v0 writes down: the person's endue
 //! AI agents, what Studio shows of them, the agent catalog, the conversations of the Home board
-//! (ADR 0122) and an agent's conversation read and written as endue.ai's thread does, the spaces the person can open (ADR 0129), the person's own account settings (ADR
+//! (ADR 0122) and an agent's conversation read and written as endue.ai's thread does, its topics
+//! and routines as the side of its window lists them, the spaces the person can open (ADR 0129), the person's own account settings (ADR
 //! 0130), an agent's face and the rest of what Studio's board shows (ADR 0232), and the account's
 //! connectors through the desk's own key (ADR 0407, `Connectors`). Every other call
 //! carries the endue ID access token `Tokens` hands out, sends no Origin header, waits 15 s at most
@@ -24,15 +25,19 @@ mod http;
 mod me;
 mod messages;
 mod pictures;
+mod routines;
 mod run;
+mod schedule;
 mod spaces;
 mod stream;
+mod topics;
 pub mod wire;
 pub mod wire_account;
 pub mod wire_board;
 pub mod wire_catalog;
 pub mod wire_chat;
 pub mod wire_connectors;
+pub mod wire_side;
 pub mod wire_spaces;
 mod work;
 
@@ -43,7 +48,9 @@ pub use connectors::{Answer, Connectors, KEY_REFUSED, RateLimit};
 pub use error::{DEFAULT_WAIT_SECS, ErrorKind, PlatformError, Result, SIGN_IN};
 pub use messages::{ChatMessage, ChatRole, MAX_MESSAGES, MessagePage};
 pub use pictures::{DRAWN_URL, Face, MAX_PICTURE, Picture};
+pub use routines::{MAX_ROUTINES, Routine, RoutinePage, RoutineTrigger, TriggerKind};
 pub use run::{ChatEvent, MAX_STREAM, RUN_CUT};
+pub use topics::{MAX_TOPICS, Topic};
 pub use work::{ChatWork, ChatWorkGroup, MAX_GROUPS};
 
 pub const NAME: &str = env!("CARGO_PKG_NAME");

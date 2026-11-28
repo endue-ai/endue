@@ -29,6 +29,8 @@ export interface Run {
 
 export interface Thread {
   conversationId?: string;
+  /** The topic a new thread is made in (ADR 0411, FT-07). */
+  topicId?: string;
   messages: StudioMessage[];
   hasMore: boolean;
   previousReadAt?: string;
@@ -38,8 +40,9 @@ export interface Thread {
   stopped: boolean;
 }
 
-export const emptyThread = (conversationId?: string): Thread => ({
+export const emptyThread = (conversationId?: string, topicId?: string): Thread => ({
   ...(conversationId ? { conversationId } : {}),
+  ...(topicId ? { topicId } : {}),
   messages: [],
   hasMore: false,
   reading: conversationId !== undefined,

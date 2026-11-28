@@ -39,6 +39,8 @@ export interface ThreadStub {
   held(): HeldRun | undefined;
   /** The ids of the runs stopped, oldest first. */
   stopped: string[];
+  /** Give a conversation the stub did not start with (a topic's thread) its sample messages. */
+  seed(conversation: StudioConversation): void;
 }
 
 const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -173,13 +175,14 @@ export function threadStub(conversations: StudioConversation[], now: () => numbe
       const page = all.slice(Math.max(0, end - 30), Math.max(0, end));
       return { messages: structuredClone(page).reverse(), hasMore: end > 30 };
     },
-    async send({ agentId, conversationId, text }) {
+    async send({ agentId, conversationId, text, topicId }) {
       const id = conversationId ?? `cnv_new_${++count}`;
       if (!conversationId) {
         const at = iso(now());
         conversations.unshift({
           id,
           agentId,
+          ...(topicId ? { topicId } : {}),
           title: text.slice(0, 60),
           status: "active",
           messageCount: 0,
@@ -224,5 +227,9 @@ export function threadStub(conversations: StudioConversation[], now: () => numbe
       holding = true;
     },
     held: () => held,
+    seed(c) {
+      messages[c.id] ??= sampleThread(c);
+      readAt[c.id] ??= iso(Date.parse(c.lastMessageAt ?? c.updatedAt) - 90_000);
+    },
   };
 }

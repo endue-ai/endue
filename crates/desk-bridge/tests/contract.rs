@@ -426,6 +426,12 @@ fn valid_vectors_roundtrip_through_generated_types() {
                     roundtrip::<desk_bridge::StudioChatAttachResult>(vector)
                 }
                 "StudioChatStopResult" => roundtrip::<desk_bridge::StudioChatStopResult>(vector),
+                "StudioTopicsListResult" => {
+                    roundtrip::<desk_bridge::StudioTopicsListResult>(vector)
+                }
+                "StudioRoutinesListResult" => {
+                    roundtrip::<desk_bridge::StudioRoutinesListResult>(vector)
+                }
                 "StudioConversationsReadResult" => {
                     roundtrip::<desk_bridge::StudioConversationsReadResult>(vector)
                 }
