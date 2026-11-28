@@ -62,6 +62,33 @@ describe("the canvas hint", () => {
     over(control);
     expect(control.closest("[title]")).toBeNull();
   });
+
+  it("the_hint_shows_once_a_session", () => {
+    over(root);
+    expect(root.title).toBe("panHint");
+    over(control);
+    // Back over the canvas between windows: it no longer covers the window next to the pointer.
+    over(root);
+    expect(root.hasAttribute("title")).toBe(false);
+  });
+});
+
+describe("the canvas hint after a pan", () => {
+  it("it_never_shows_after_a_pan", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const ctx = {
+      store: new Store(sampleState("en", 0)),
+      tr: (key: string) => key,
+      wm: { edit: () => Promise.resolve([]) },
+    } as unknown as ShellCtx;
+    const dispose = mountPan(root, ctx);
+    root.dispatchEvent(new WheelEvent("wheel", { deltaY: 10, bubbles: true, cancelable: true }));
+    root.dispatchEvent(new Event("pointerover", { bubbles: true }));
+    expect(root.hasAttribute("title")).toBe(false);
+    dispose();
+    root.remove();
+  });
 });
 
 describe("the pan", () => {
