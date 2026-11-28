@@ -100,7 +100,12 @@ pub fn gadget(fake: &FakePlatform, display: &str, endings: &[(&str, &str)]) -> S
 }
 
 /// An account connector of type `kind` offering `endings` (`<kind>__<ending>`); its id.
-pub fn connector(fake: &FakePlatform, kind: &str, display: &str, endings: &[(&str, &str)]) -> String {
+pub fn connector(
+    fake: &FakePlatform,
+    kind: &str,
+    display: &str,
+    endings: &[(&str, &str)],
+) -> String {
     let mut state = fake.state();
     let id = format!("conn_{}", state.connectors.connectors.len() + 1);
     let tools = endings.iter().map(|(ending, risk)| {

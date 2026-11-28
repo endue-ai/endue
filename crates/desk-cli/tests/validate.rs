@@ -75,7 +75,11 @@ fn the_social_connector_validates_as_an_endue_connector_with_no_code() {
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .collect();
     files.sort();
-    assert_eq!(files, ["README.md", "plugin.json"], "no script, wasm or page");
+    assert_eq!(
+        files,
+        ["README.md", "plugin.json"],
+        "no script, wasm or page"
+    );
 }
 
 #[test]
