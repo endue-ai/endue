@@ -1,0 +1,18 @@
+{
+  "target": "MessageListEnvelope",
+  "description": "a tool row answers one call",
+  "instance": {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": "msg_3",
+          "run_id": "run_1",
+          "role": "tool",
+          "name": "web_search",
+          "content": "x"
+        }
+      ]
+    }
+  }
+}

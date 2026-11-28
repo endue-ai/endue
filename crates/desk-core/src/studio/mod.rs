@@ -16,6 +16,7 @@ mod picture;
 mod rows;
 mod serve;
 mod spaces;
+mod thread;
 
 /// The account's token as the platform client takes it.
 struct AccountTokens(Arc<Account>);

@@ -1,0 +1,12 @@
+{
+  "target": "BridgeEvent",
+  "description": "an event kind the shell does not know",
+  "instance": {
+    "event": "studio.chat.event",
+    "data": {
+      "conversationId": "cnv_fixture",
+      "kind": "reasoning",
+      "text": "thinking"
+    }
+  }
+}

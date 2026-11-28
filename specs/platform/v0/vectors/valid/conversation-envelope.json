@@ -1,0 +1,15 @@
+{
+  "target": "ConversationEnvelope",
+  "description": "a conversation the person read before",
+  "instance": {
+    "success": true,
+    "data": {
+      "id": "cnv_1",
+      "agent_id": "ag_01JC0Q4MR00000000000000001",
+      "title": "Mail",
+      "status": "active",
+      "last_read_at": "2026-11-01T08:00:00.000Z",
+      "last_run_status": "completed"
+    }
+  }
+}

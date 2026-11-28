@@ -1,0 +1,10 @@
+{
+  "target": "RunPresentationEvent",
+  "description": "a run's phase is one of six",
+  "instance": {
+    "presentation": {
+      "run_id": "run_1",
+      "phase": "sleeping"
+    }
+  }
+}

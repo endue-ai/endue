@@ -1,0 +1,32 @@
+{
+  "target": "RunPresentationEvent",
+  "description": "the run's summary while it goes",
+  "instance": {
+    "presentation": {
+      "run_id": "run_1",
+      "revision": 1,
+      "phase": "running",
+      "coverage": "complete",
+      "started_at": "2026-11-01T09:00:00.000Z",
+      "ended_at": null,
+      "counts": {
+        "attempted": 2,
+        "succeeded": 1,
+        "failed": 1,
+        "awaiting_input": 0,
+        "results": 0
+      },
+      "references": [
+        {
+          "key": "connector:gmail",
+          "kind": "connector",
+          "provider": "gmail",
+          "href": "https://endue.ai/connectors/gmail",
+          "label": "Gmail",
+          "usage": "called"
+        }
+      ],
+      "results": []
+    }
+  }
+}

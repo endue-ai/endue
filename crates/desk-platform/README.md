@@ -18,7 +18,9 @@ bridge as `studio.*`, `account.settings.*` and `account.connectors.*`.
 - Facets: `identity`, `settings`, `update_settings`, `prompt`, `save_prompt`, `restore_prompt`,
   `prompt_revisions`, `skills`, `connectors`, `traits`; for Studio's board (ADR 0232, `wire_board`):
   `channel_pairings`, `os_devices`, `workspaces`, `theme`, `memories`, `api_keys`, `outputs`.
-- Catalog and conversations: `catalog`, `recommend`, `use_catalog` (30 s), `conversations`.
+- Catalog and conversations: `catalog`, `recommend`, `use_catalog` (30 s), `conversations`. A thread:
+  `messages` (`MessagePage` of `ChatMessage` with each turn's `ChatWork`), `mark_read`,
+  `new_agent_conversation`, `stream_turn` and `attach` (`ChatEvent`s as they come), `cancel_run`.
 - Spaces, read only: `spaces(archived)` (with summaries), `space`, `space_overview`, `space_rooms`.
 - Account: `me`, `update_me`, `preferences`, `update_preferences`, `notifications`,
   `update_notifications` (`wire_account`).
@@ -33,8 +35,8 @@ bridge as `studio.*`, `account.settings.*` and `account.connectors.*`.
 - `fake::FakePlatform` (feature `fake`, tests only): the platform on 127.0.0.1, in memory; `FakeSpace`,
   `FakeConnectors` (keys, connectors, call answers, limits).
 
-Requests go over desk-sys's fetch: rustls, the system proxy, and a host allowlist of the base's
-host alone. No Origin header is sent.
+Requests go over desk-sys's fetch, a run's stream over `stream.rs` (connected as desk-sys does):
+rustls, the system proxy, and a host allowlist of the base's host alone. No Origin header is sent.
 
 ## Test
 

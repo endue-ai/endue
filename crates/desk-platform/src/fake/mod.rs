@@ -20,6 +20,7 @@ mod connectors;
 mod routes;
 mod spaces;
 mod state;
+mod stream;
 
 pub use account::FakeAccount;
 pub use connectors::{FakeConnector, FakeConnectors, FakeKey};
@@ -93,31 +94,42 @@ fn serve(stream: TcpStream, state: &Mutex<State>) {
     let Some(seen) = read_request(&mut reader) else {
         return;
     };
-    let (delay, picture, extra, (status, body)) = {
+    let (delay, picture, extra, script, (status, body)) = {
         let mut state = state.lock().unwrap_or_else(|p| p.into_inner());
         state.seen.push(seen.clone());
-        let mut bytes = state.pictures.get(&seen.path).cloned();
+        let bytes = state.pictures.get(&seen.path).cloned();
         let answer = match bytes {
             Some(_) => (200, None),
             None => routes::answer(&mut state, &seen),
         };
-        if answer.0 == 200 && chat::is_run(&seen) {
-            bytes = Some((
-                "text/event-stream".to_owned(),
-                state.chat_stream.as_bytes().to_vec(),
-            ));
-        }
+        let script = match chat::stream_of(&seen) {
+            Some((conversation, run)) if answer.0 == 200 => Some(stream::Script {
+                conversation: conversation.to_owned(),
+                text: if run {
+                    state.chat_stream.clone()
+                } else {
+                    state.attach_stream.clone().unwrap_or_default()
+                },
+                gap: state.chat_gap,
+                hold: state.chat_hold,
+            }),
+            _ => None,
+        };
         let extra = if seen.path.starts_with("/api/public/v1/connectors") {
             state.connectors.headers.clone()
         } else {
             BTreeMap::new()
         };
-        (state.delay, bytes, extra, answer)
+        (state.delay, bytes, extra, script, answer)
     };
     if let Some(delay) = delay {
         thread::sleep(delay);
     }
-    // A picture or run stream uses its own media type; the other answers are JSON.
+    if let Some(script) = script {
+        stream::write(writer, state, script);
+        return;
+    }
+    // A picture uses its own media type; the other answers are JSON.
     let (kind, payload) = match picture {
         Some((kind, bytes)) => (kind, bytes),
         None => (

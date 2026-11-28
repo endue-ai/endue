@@ -1,0 +1,18 @@
+{
+  "target": "RunInteractionEvent",
+  "description": "the run stops for the person's choice",
+  "instance": {
+    "run_id": "run_1",
+    "correlation_id": "cor_1",
+    "interaction_type": "choice",
+    "payload": {
+      "question": "Reply to which mail?",
+      "options": [
+        {
+          "value": "a",
+          "label": "The first"
+        }
+      ]
+    }
+  }
+}

@@ -418,6 +418,17 @@ fn valid_vectors_roundtrip_through_generated_types() {
                 "DialogSaveResult" => roundtrip::<desk_bridge::DialogSaveResult>(vector),
                 "BrainDesk" => roundtrip::<BrainDesk>(vector),
                 "BrainStopResult" => roundtrip::<desk_bridge::BrainStopResult>(vector),
+                "StudioMessagesListResult" => {
+                    roundtrip::<desk_bridge::StudioMessagesListResult>(vector)
+                }
+                "StudioChatSendResult" => roundtrip::<desk_bridge::StudioChatSendResult>(vector),
+                "StudioChatAttachResult" => {
+                    roundtrip::<desk_bridge::StudioChatAttachResult>(vector)
+                }
+                "StudioChatStopResult" => roundtrip::<desk_bridge::StudioChatStopResult>(vector),
+                "StudioConversationsReadResult" => {
+                    roundtrip::<desk_bridge::StudioConversationsReadResult>(vector)
+                }
                 "MessageCatalog" => roundtrip::<desk_bridge::MessageCatalog>(vector),
                 "AccountConnectors" => roundtrip::<desk_bridge::AccountConnectors>(vector),
                 other => panic!("{}: no Rust type mapped for {other}", vector.file),

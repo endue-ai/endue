@@ -38,6 +38,10 @@ describe("the shared design system", () => {
       "desk-dot",
       "desk-star",
       "desk-skeleton",
+      "desk-thread",
+      "desk-bubble",
+      "desk-work",
+      "desk-composer",
       "desk-spinner",
     ])
       expect(css).toContain(`.${name}`);

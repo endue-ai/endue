@@ -1,0 +1,33 @@
+{
+  "target": "StudioMessagesListResult",
+  "description": "a tool group carries no arguments",
+  "instance": {
+    "messages": [
+      {
+        "id": "msg_2",
+        "role": "assistant",
+        "text": "Done.",
+        "createdAt": "2026-11-29T09:00:14Z",
+        "work": {
+          "phase": "completed",
+          "startedAt": "2026-11-29T09:00:00Z",
+          "endedAt": "2026-11-29T09:00:14Z",
+          "attempted": 3,
+          "succeeded": 2,
+          "failed": 1,
+          "groups": [
+            {
+              "label": "Search",
+              "calls": 1,
+              "failed": 0,
+              "arguments": {
+                "q": "x"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "hasMore": false
+  }
+}

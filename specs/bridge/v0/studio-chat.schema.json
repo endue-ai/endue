@@ -1,15 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://endue.ai/specs/bridge/v0/studio-chat.schema.json",
-  "title": "endue bridge v0: Studio agent questions",
-  "description": "The runtime sends one reviewed question to the selected endue AI agent or space Front Desk using the signed-in account.",
+  "title": "endue bridge v0: Studio conversations",
+  "description": "The runtime sends one reviewed question to the selected endue AI agent or space Front Desk using the signed-in account (studio.chat.ask), and the shell keeps an agent's conversation going in its window: it reads the messages, sends the person's lines, follows the run as studio.chat.event, stops it and marks it read (FT-03, ADR 0411). Only what the thread shows crosses: text, times, the run's phase and counts, and each tool group's label, provider and counts.",
   "$defs": {
     "StudioChatAskRequest": {
       "type": "object",
       "properties": {
-        "id": { "$ref": "bridge.schema.json#/$defs/RequestId" },
-        "method": { "const": "studio.chat.ask" },
-        "params": { "$ref": "#/$defs/StudioChatAskParams" }
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.chat.ask"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioChatAskParams"
+        }
       },
       "required": ["id", "method", "params"],
       "additionalProperties": false
@@ -17,10 +23,20 @@
     "StudioChatAskParams": {
       "type": "object",
       "properties": {
-        "agentId": { "$ref": "studio.schema.json#/$defs/StudioAgentId" },
-        "spaceId": { "$ref": "studio-spaces.schema.json#/$defs/StudioSpaceId" },
-        "question": { "type": "string", "minLength": 1, "maxLength": 8000 },
-        "scope": { "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission" }
+        "agentId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "spaceId": {
+          "$ref": "studio-spaces.schema.json#/$defs/StudioSpaceId"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
       },
       "required": ["agentId", "question", "scope"],
       "additionalProperties": false
@@ -32,14 +48,419 @@
     "StudioChatAskResult": {
       "type": "object",
       "properties": {
-        "agentId": { "$ref": "studio.schema.json#/$defs/StudioAgentId" },
-        "spaceId": { "$ref": "studio-spaces.schema.json#/$defs/StudioSpaceId" },
-        "conversationId": { "$ref": "studio.schema.json#/$defs/StudioAgentId" },
-        "runId": { "$ref": "studio.schema.json#/$defs/StudioAgentId" },
-        "state": { "$ref": "#/$defs/StudioChatState" },
-        "text": { "type": "string", "maxLength": 12000 }
+        "agentId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "spaceId": {
+          "$ref": "studio-spaces.schema.json#/$defs/StudioSpaceId"
+        },
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "runId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "state": {
+          "$ref": "#/$defs/StudioChatState"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 12000
+        }
       },
       "required": ["agentId", "conversationId", "state"],
+      "additionalProperties": false
+    },
+    "StudioMessageRole": {
+      "type": "string",
+      "enum": ["user", "assistant"]
+    },
+    "StudioWorkGroup": {
+      "description": "One group of a turn's tool calls: its label, the connector or plugin that provides it, how many calls and how many failed. No argument or result.",
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["label", "calls", "failed"],
+      "additionalProperties": false
+    },
+    "StudioWork": {
+      "description": "The work of one turn: its phase, when it started and ended, how many tool calls were attempted, succeeded and failed, and at most 50 groups.",
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attempted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "succeeded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "groups": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/StudioWorkGroup"
+          }
+        }
+      },
+      "required": ["phase", "attempted", "succeeded", "failed", "groups"],
+      "additionalProperties": false
+    },
+    "StudioMessage": {
+      "description": "One message of a conversation as the thread shows it: the person's or the agent's text, when, and for an answer the run and its work.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "role": {
+          "$ref": "#/$defs/StudioMessageRole"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 12000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "runId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "work": {
+          "$ref": "#/$defs/StudioWork"
+        }
+      },
+      "required": ["id", "role", "text", "createdAt"],
+      "additionalProperties": false
+    },
+    "StudioMessagesListRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.messages.list"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioMessagesListParams"
+        }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "StudioMessagesListParams": {
+      "description": "Parameters of studio.messages.list: a conversation's messages before the message `before` (the newest without it), at most `limit` (20 unless given).",
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "before": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
+      },
+      "required": ["conversationId", "scope"],
+      "additionalProperties": false
+    },
+    "StudioMessagesListResult": {
+      "description": "Result of studio.messages.list: the messages, oldest first, and whether older ones are left.",
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/StudioMessage"
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["messages", "hasMore"],
+      "additionalProperties": false
+    },
+    "StudioChatSendRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.chat.send"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioChatSendParams"
+        }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "StudioChatSendParams": {
+      "description": "Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window.",
+      "type": "object",
+      "properties": {
+        "agentId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "spaceId": {
+          "$ref": "studio-spaces.schema.json#/$defs/StudioSpaceId"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "messageId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{8,64}$"
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
+      },
+      "required": ["agentId", "text", "messageId", "scope"],
+      "additionalProperties": false
+    },
+    "StudioChatSendResult": {
+      "description": "Result of studio.chat.send: the conversation the line went into and the run it started; the run's events follow as studio.chat.event.",
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "runId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        }
+      },
+      "required": ["conversationId"],
+      "additionalProperties": false
+    },
+    "StudioChatAttachRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.chat.attach"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioChatAttachParams"
+        }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "StudioChatAttachParams": {
+      "description": "Parameters of studio.chat.attach: follow the run in flight in a conversation; its events follow as studio.chat.event.",
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "agentId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
+      },
+      "required": ["conversationId", "agentId", "scope"],
+      "additionalProperties": false
+    },
+    "StudioChatAttachResult": {
+      "description": "Result of studio.chat.attach: whether a run was in flight to follow.",
+      "type": "object",
+      "properties": {
+        "attached": {
+          "type": "boolean"
+        }
+      },
+      "required": ["attached"],
+      "additionalProperties": false
+    },
+    "StudioChatStopRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.chat.stop"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioChatStopParams"
+        }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "StudioChatStopParams": {
+      "description": "Parameters of studio.chat.stop: cancel the run.",
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "runId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
+      },
+      "required": ["conversationId", "runId", "scope"],
+      "additionalProperties": false
+    },
+    "StudioChatStopResult": {
+      "description": "Result of studio.chat.stop.",
+      "type": "object",
+      "properties": {
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "required": ["stopped"],
+      "additionalProperties": false
+    },
+    "StudioConversationsReadRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "bridge.schema.json#/$defs/RequestId"
+        },
+        "method": {
+          "const": "studio.conversations.read"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioConversationsReadParams"
+        }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "StudioConversationsReadParams": {
+      "description": "Parameters of studio.conversations.read: the person has read the conversation.",
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/StudioManagePermission"
+        }
+      },
+      "required": ["conversationId", "scope"],
+      "additionalProperties": false
+    },
+    "StudioConversationsReadResult": {
+      "description": "Result of studio.conversations.read: when it was read before, where the new-messages line falls.",
+      "type": "object",
+      "properties": {
+        "previousReadAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "StudioChatEventKind": {
+      "type": "string",
+      "enum": ["started", "delta", "work", "needsInput", "completed", "failed", "cancelled"]
+    },
+    "StudioChatEventData": {
+      "description": "One step of a run the shell follows: started (runId), delta (text is the new text), work (the turn's work so far), needsInput (message: what the run asks, when the desk can say it), completed (text is the final answer), failed (message: what failed), cancelled.",
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "runId": {
+          "$ref": "studio.schema.json#/$defs/StudioAgentId"
+        },
+        "kind": {
+          "$ref": "#/$defs/StudioChatEventKind"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 12000
+        },
+        "work": {
+          "$ref": "#/$defs/StudioWork"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": ["conversationId", "kind"],
+      "additionalProperties": false
+    },
+    "StudioChatEvent": {
+      "description": "A step of a run the shell sent or attached to, to that caller only.",
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "studio.chat.event"
+        },
+        "data": {
+          "$ref": "#/$defs/StudioChatEventData"
+        }
+      },
+      "required": ["event", "data"],
       "additionalProperties": false
     }
   }

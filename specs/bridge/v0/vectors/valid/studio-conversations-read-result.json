@@ -1,0 +1,7 @@
+{
+  "target": "StudioConversationsReadResult",
+  "description": "when it was read before",
+  "instance": {
+    "previousReadAt": "2026-11-28T18:00:00Z"
+  }
+}

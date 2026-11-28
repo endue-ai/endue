@@ -1,0 +1,16 @@
+{
+  "target": "BridgeRequest",
+  "description": "read a conversation's messages before one",
+  "instance": {
+    "id": 11,
+    "method": "studio.messages.list",
+    "params": {
+      "conversationId": "cnv_fixture",
+      "before": "msg_40",
+      "limit": 50,
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

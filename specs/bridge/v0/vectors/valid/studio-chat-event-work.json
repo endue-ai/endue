@@ -1,0 +1,32 @@
+{
+  "target": "BridgeEvent",
+  "description": "the turn's work so far",
+  "instance": {
+    "event": "studio.chat.event",
+    "data": {
+      "conversationId": "cnv_fixture",
+      "runId": "run_2",
+      "kind": "work",
+      "work": {
+        "phase": "running",
+        "startedAt": "2026-11-29T09:00:00Z",
+        "attempted": 3,
+        "succeeded": 2,
+        "failed": 1,
+        "groups": [
+          {
+            "label": "Search the web",
+            "provider": "web",
+            "calls": 2,
+            "failed": 1
+          },
+          {
+            "label": "Read a page",
+            "calls": 1,
+            "failed": 0
+          }
+        ]
+      }
+    }
+  }
+}

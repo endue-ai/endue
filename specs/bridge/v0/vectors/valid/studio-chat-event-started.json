@@ -1,0 +1,12 @@
+{
+  "target": "BridgeEvent",
+  "description": "a run started",
+  "instance": {
+    "event": "studio.chat.event",
+    "data": {
+      "conversationId": "cnv_fixture",
+      "runId": "run_2",
+      "kind": "started"
+    }
+  }
+}

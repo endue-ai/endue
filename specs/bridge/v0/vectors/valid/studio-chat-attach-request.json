@@ -1,0 +1,15 @@
+{
+  "target": "BridgeRequest",
+  "description": "follow the run in flight",
+  "instance": {
+    "id": 14,
+    "method": "studio.chat.attach",
+    "params": {
+      "conversationId": "cnv_fixture",
+      "agentId": "ag_fixture",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

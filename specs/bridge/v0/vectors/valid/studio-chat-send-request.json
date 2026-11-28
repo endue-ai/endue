@@ -1,0 +1,17 @@
+{
+  "target": "BridgeRequest",
+  "description": "the person's line into the conversation the window shows",
+  "instance": {
+    "id": 12,
+    "method": "studio.chat.send",
+    "params": {
+      "agentId": "ag_fixture",
+      "conversationId": "cnv_fixture",
+      "text": "And tomorrow?",
+      "messageId": "desk_0123456789abcdef",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

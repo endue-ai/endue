@@ -1,0 +1,24 @@
+{
+  "target": "RunStepEvent",
+  "description": "a step whose second call failed; arguments and results are never read",
+  "instance": {
+    "run_id": "run_1",
+    "tool_calls": [
+      {
+        "id": "call_1",
+        "name": "gmail__search",
+        "arguments": "{\"q\":\"is:unread\"}",
+        "result": "[2 messages]",
+        "ok": true,
+        "duration_ms": 812
+      },
+      {
+        "id": "call_2",
+        "name": "web_search",
+        "arguments": "{}",
+        "result": "timeout",
+        "ok": false
+      }
+    ]
+  }
+}

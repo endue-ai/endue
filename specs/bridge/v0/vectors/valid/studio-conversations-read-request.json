@@ -1,0 +1,14 @@
+{
+  "target": "BridgeRequest",
+  "description": "the person read the conversation",
+  "instance": {
+    "id": 16,
+    "method": "studio.conversations.read",
+    "params": {
+      "conversationId": "cnv_fixture",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

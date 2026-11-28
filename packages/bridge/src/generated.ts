@@ -3583,6 +3583,11 @@ export type BridgeRequest =
   | StudioCatalogUseRequest
   | StudioConversationsListRequest
   | StudioChatAskRequest
+  | StudioMessagesListRequest
+  | StudioChatSendRequest
+  | StudioChatAttachRequest
+  | StudioChatStopRequest
+  | StudioConversationsReadRequest
   | StudioSpacesListRequest
   | StudioSpacesGetRequest
   | ComputerPermissionsStatusRequest
@@ -3697,6 +3702,7 @@ export type BridgeEvent =
   | UpdateChangedEvent
   | AccountChangedEvent
   | AgentsRunEvent
+  | StudioChatEvent
   | AgentsChangedEvent
   | MemoryChangedEvent
   | AgentCancelledEvent
@@ -6950,6 +6956,157 @@ export interface StudioChatAskResult {
   text?: string;
 }
 
+export type StudioMessageRole = "user" | "assistant";
+
+/** One group of a turn's tool calls: its label, the connector or plugin that provides it, how many calls and how many failed. No argument or result. */
+export interface StudioWorkGroup {
+  label: string;
+  provider?: string;
+  calls: number;
+  failed: number;
+}
+
+/** The work of one turn: its phase, when it started and ended, how many tool calls were attempted, succeeded and failed, and at most 50 groups. */
+export interface StudioWork {
+  phase: string;
+  startedAt?: string;
+  endedAt?: string;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  groups: StudioWorkGroup[];
+}
+
+/** One message of a conversation as the thread shows it: the person's or the agent's text, when, and for an answer the run and its work. */
+export interface StudioMessage {
+  id: string;
+  role: StudioMessageRole;
+  text: string;
+  createdAt: string;
+  runId?: StudioAgentId;
+  work?: StudioWork;
+}
+
+export interface StudioMessagesListRequest {
+  id: RequestId;
+  method: "studio.messages.list";
+  params: StudioMessagesListParams;
+}
+
+/** Parameters of studio.messages.list: a conversation's messages before the message `before` (the newest without it), at most `limit` (20 unless given). */
+export interface StudioMessagesListParams {
+  conversationId: StudioAgentId;
+  before?: string;
+  limit?: number;
+  scope: StudioManagePermission;
+}
+
+/** Result of studio.messages.list: the messages, oldest first, and whether older ones are left. */
+export interface StudioMessagesListResult {
+  messages: StudioMessage[];
+  hasMore: boolean;
+}
+
+export interface StudioChatSendRequest {
+  id: RequestId;
+  method: "studio.chat.send";
+  params: StudioChatSendParams;
+}
+
+/** Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window. */
+export interface StudioChatSendParams {
+  agentId: StudioAgentId;
+  conversationId?: StudioAgentId;
+  spaceId?: StudioSpaceId;
+  text: string;
+  messageId: string;
+  scope: StudioManagePermission;
+}
+
+/** Result of studio.chat.send: the conversation the line went into and the run it started; the run's events follow as studio.chat.event. */
+export interface StudioChatSendResult {
+  conversationId: StudioAgentId;
+  runId?: StudioAgentId;
+}
+
+export interface StudioChatAttachRequest {
+  id: RequestId;
+  method: "studio.chat.attach";
+  params: StudioChatAttachParams;
+}
+
+/** Parameters of studio.chat.attach: follow the run in flight in a conversation; its events follow as studio.chat.event. */
+export interface StudioChatAttachParams {
+  conversationId: StudioAgentId;
+  agentId: StudioAgentId;
+  scope: StudioManagePermission;
+}
+
+/** Result of studio.chat.attach: whether a run was in flight to follow. */
+export interface StudioChatAttachResult {
+  attached: boolean;
+}
+
+export interface StudioChatStopRequest {
+  id: RequestId;
+  method: "studio.chat.stop";
+  params: StudioChatStopParams;
+}
+
+/** Parameters of studio.chat.stop: cancel the run. */
+export interface StudioChatStopParams {
+  conversationId: StudioAgentId;
+  runId: StudioAgentId;
+  scope: StudioManagePermission;
+}
+
+/** Result of studio.chat.stop. */
+export interface StudioChatStopResult {
+  stopped: boolean;
+}
+
+export interface StudioConversationsReadRequest {
+  id: RequestId;
+  method: "studio.conversations.read";
+  params: StudioConversationsReadParams;
+}
+
+/** Parameters of studio.conversations.read: the person has read the conversation. */
+export interface StudioConversationsReadParams {
+  conversationId: StudioAgentId;
+  scope: StudioManagePermission;
+}
+
+/** Result of studio.conversations.read: when it was read before, where the new-messages line falls. */
+export interface StudioConversationsReadResult {
+  previousReadAt?: string;
+}
+
+export type StudioChatEventKind =
+  | "started"
+  | "delta"
+  | "work"
+  | "needsInput"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+/** One step of a run the shell follows: started (runId), delta (text is the new text), work (the turn's work so far), needsInput (message: what the run asks, when the desk can say it), completed (text is the final answer), failed (message: what failed), cancelled. */
+export interface StudioChatEventData {
+  conversationId: StudioAgentId;
+  runId?: StudioAgentId;
+  kind: StudioChatEventKind;
+  text?: string;
+  work?: StudioWork;
+  message?: string;
+}
+
+/** A step of a run the shell sent or attached to, to that caller only. */
+export interface StudioChatEvent {
+  event: "studio.chat.event";
+  data: StudioChatEventData;
+}
+
 /** A space's id on endue AI. */
 export type StudioSpaceId = string;
 
@@ -8775,6 +8932,14 @@ export interface BridgeMethodMap {
     result: StudioConversationsListResult;
   };
   "studio.chat.ask": { params: StudioChatAskParams; result: StudioChatAskResult };
+  "studio.messages.list": { params: StudioMessagesListParams; result: StudioMessagesListResult };
+  "studio.chat.send": { params: StudioChatSendParams; result: StudioChatSendResult };
+  "studio.chat.attach": { params: StudioChatAttachParams; result: StudioChatAttachResult };
+  "studio.chat.stop": { params: StudioChatStopParams; result: StudioChatStopResult };
+  "studio.conversations.read": {
+    params: StudioConversationsReadParams;
+    result: StudioConversationsReadResult;
+  };
   "studio.spaces.list": { params: StudioSpacesListParams; result: StudioSpacesListResult };
   "studio.spaces.get": { params: StudioSpaceParams; result: StudioSpacesGetResult };
   "computer.permissions.status": {
@@ -8970,6 +9135,11 @@ export const BRIDGE_METHODS = [
   "studio.catalog.use",
   "studio.conversations.list",
   "studio.chat.ask",
+  "studio.messages.list",
+  "studio.chat.send",
+  "studio.chat.attach",
+  "studio.chat.stop",
+  "studio.conversations.read",
   "studio.spaces.list",
   "studio.spaces.get",
   "computer.permissions.status",

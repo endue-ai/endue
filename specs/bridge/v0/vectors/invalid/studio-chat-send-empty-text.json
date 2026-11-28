@@ -1,0 +1,16 @@
+{
+  "target": "BridgeRequest",
+  "description": "a send needs text",
+  "instance": {
+    "id": 17,
+    "method": "studio.chat.send",
+    "params": {
+      "agentId": "ag_fixture",
+      "text": "",
+      "messageId": "desk_0123456789abcdef",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

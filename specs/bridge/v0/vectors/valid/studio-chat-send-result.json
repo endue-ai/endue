@@ -1,0 +1,8 @@
+{
+  "target": "StudioChatSendResult",
+  "description": "the conversation and the run it started",
+  "instance": {
+    "conversationId": "cnv_fixture",
+    "runId": "run_2"
+  }
+}

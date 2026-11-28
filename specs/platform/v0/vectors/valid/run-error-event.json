@@ -1,0 +1,9 @@
+{
+  "target": "RunErrorEvent",
+  "description": "the run was stopped",
+  "instance": {
+    "run_id": "run_1",
+    "code": "RUN_CANCELLED",
+    "message": "Run cancelled"
+  }
+}

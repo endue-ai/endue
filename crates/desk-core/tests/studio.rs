@@ -16,6 +16,8 @@ mod faces;
 mod rows;
 #[path = "studio/spaces.rs"]
 mod spaces;
+#[path = "studio/thread.rs"]
+mod thread;
 
 use std::fs;
 use std::sync::Arc;

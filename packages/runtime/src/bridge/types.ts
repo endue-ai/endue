@@ -20,7 +20,11 @@ import type {
   StudioAgentsPictureResult,
   StudioChatAskParams,
   StudioChatAskResult,
+  StudioChatEventData,
+  StudioChatSendParams,
+  StudioChatSendResult,
   StudioConversation,
+  StudioMessagesListResult,
   StudioSpace,
   StudioSpacesGetResult,
 } from "@endue-ai/bridge";
@@ -231,6 +235,27 @@ export interface LocalAgentsBridge {
  * desk is signed in (studio.*, ADR 0122 and ADR 0129). The token stays in the core.
  */
 export type StudioQuestion = Omit<StudioChatAskParams, "scope">;
+/** The person's line in an agent's window (ADR 0411). */
+export type StudioLine = Omit<StudioChatSendParams, "scope">;
+
+/**
+ * An agent's conversation as its window reads and writes it (ADR 0411). Only the shell sends, as
+ * the person's own act, so a send asks nothing; a run's steps come back to the shell alone.
+ */
+export interface StudioThreadBridge {
+  /** Messages before the message `before`, the newest first page without it. */
+  messages(conversationId: string, before?: string): Promise<StudioMessagesListResult>;
+  /** Send the person's line; its steps arrive through `onEvent`. */
+  send(line: StudioLine): Promise<StudioChatSendResult>;
+  /** Follow a run already going in the conversation. */
+  attach(conversationId: string, agentId: string): Promise<void>;
+  /** Stop a run in flight. */
+  stop(conversationId: string, runId: string): Promise<void>;
+  /** Mark the conversation read; returns when it was last read before. */
+  read(conversationId: string): Promise<string | undefined>;
+  /** Hear each step of the runs this shell sent or attached to; returns the unsubscribe. */
+  onEvent(listener: (event: StudioChatEventData) => void): () => void;
+}
 
 export interface StudioShellBridge {
   /** Every agent of the person's that is not deleted, the newest first. */
@@ -247,6 +272,8 @@ export interface StudioShellBridge {
   space(spaceId: string): Promise<StudioSpacesGetResult>;
   /** Ask one agent or the selected space's Front Desk through the runtime. */
   ask?(question: StudioQuestion): Promise<StudioChatAskResult>;
+  /** An agent's conversation (ADR 0411); absent on an older host, which keeps the ask form. */
+  thread?: StudioThreadBridge;
   /** Open one of endue.ai's pages (an https URL) in the system browser. */
   open(url: string): Promise<void>;
 }

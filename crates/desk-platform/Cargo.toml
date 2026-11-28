@@ -17,6 +17,9 @@ fake = []
 desk-sys = { workspace = true, features = ["net"] }
 serde.workspace = true
 serde_json.workspace = true
+# A run's event stream is a POST read as it arrives, which desk-sys's fetch (whole bodies) and sse
+# (GETs) do not offer; `stream.rs` connects as desk-sys does (allowlist, system proxy, OS trust).
+ureq = { version = "3.5", default-features = false, features = ["rustls", "platform-verifier"] }
 
 [dev-dependencies]
 # The crate's own tests run against its fake.
