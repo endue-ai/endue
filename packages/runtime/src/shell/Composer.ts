@@ -17,6 +17,8 @@ import { match } from "./commands";
 import type { ShellCtx } from "./context";
 import { deskSnapshot } from "./desk-view";
 import { h, listen, render } from "./dom";
+import { AGENT_LINE, addressBook, type TalkAddress, windowsOf } from "./talk-address";
+import { addressName } from "./talk-chip";
 
 const ABSORB_MS = 1400;
 const absorbEase = cubicBezier(0.55, 0, 0.85, 0.35);
@@ -61,6 +63,11 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
     const from = height;
     const to = open ? 48 : 2;
     el.classList.toggle("is-open", open);
+    // The talk pill lays its field out itself (bottom.css, ADR 0407).
+    if (el.classList.contains("talk-pill")) {
+      field.style.removeProperty("height");
+      return Promise.resolve();
+    }
     return ctx.ticker.animate(ctx.reduced() ? 0 : 220, easeOutExpo, (t) => {
       if (id !== animation) return;
       height = from + (to - from) * t;
@@ -134,8 +141,37 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
     close();
   };
 
+  /**
+   * A line to an agent goes to that agent and nowhere else (FT-04, ADR 0407): a local agent's run
+   * (`desk.agents.ask`, with ADR 0099's approval), or an endue agent's window, which takes it once it
+   * holds a conversation (FT-03); until then the desk says where to write.
+   */
+  const toAgent = async (address: Extract<TalkAddress, { kind: "agent" }>, text: string) => {
+    if (address.local) {
+      await runGesture(ctx.runtime, "desk.agents.ask", {
+        agent: address.agent,
+        prompt: text.trim(),
+      });
+      return;
+    }
+    const line = new CustomEvent(AGENT_LINE, {
+      detail: { agent: address.agent, view: address.view, text: text.trim() },
+      cancelable: true,
+    });
+    document.dispatchEvent(line);
+    if (!line.defaultPrevented) {
+      const x = addressName(ctx, address);
+      ctx.runtime.notify({ caller: "desk", title: ctx.tr("talkAgentLater", { x }), level: "info" });
+    }
+  };
+
   /** The sent line floats from the input into Eris and dissolves there: soul text in reverse. */
   const send = async (text: string) => {
+    const address = addressBook(ctx.store).current(ctx.store.get());
+    if (address.kind === "agent") {
+      await toAgent(address, text);
+      return;
+    }
     // The line crosses the whole desk, so it lives on the shell, not inside the bottom edge.
     const host = shell();
     const frame = host.getBoundingClientRect();
@@ -192,7 +228,12 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
     errands.ask(arrived);
     let reply: Awaited<ReturnType<typeof ctx.bridge.brain.say>>;
     try {
-      const desk = await deskSnapshot(ctx);
+      // What the line is about: "this" is that window, and its plugin's tools come first (ADR 0407).
+      const about = windowsOf(addressBook(ctx.store).current(ctx.store.get())).slice(0, 16);
+      const desk = {
+        ...(await deskSnapshot(ctx)),
+        ...(about.length ? { about: { windows: about } } : {}),
+      };
       // What a sweep handed her goes with this line, once (ADR 0296).
       const context = ctx.store.get().sweep.context;
       if (context) ctx.store.set((s) => ({ sweep: { ...s.sweep, context: null } }));

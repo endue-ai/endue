@@ -340,6 +340,7 @@ impl Desk {
             desktops: Some(desktops),
             closed: None,
             capabilities: None,
+            about: None,
         }
     }
 }

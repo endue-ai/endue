@@ -7,6 +7,7 @@ import { takeDesk } from "../wm/view";
 import { mountComposer } from "./Composer";
 import type { ShellCtx } from "./context";
 import { Store, sampleState } from "./state";
+import { AGENT_LINE, addressBook } from "./talk-address";
 
 /** Any desk snapshot: what the composer sends with every line. */
 const DESK = expect.objectContaining({ screen: expect.any(Object), windows: expect.any(Array) });
@@ -158,5 +159,44 @@ describe("the talk line", () => {
     expect(key("Escape").defaultPrevented).toBe(true);
     expect(store.get().composer.open).toBe(false);
     expect(input.value).toBe("");
+  });
+
+  it("a_line_about_a_window_sends_about", async () => {
+    await wm.edit([{ op: "adopt", id: "endue.notes", title: "Notes" }]);
+    store.set({ focused: "endue.notes" });
+    type("summarise this");
+    key("Enter");
+    await vi.waitFor(() => expect(brainSay).toHaveBeenCalledOnce());
+    // An address grants nothing: the line and its permission are as before, with `about`.
+    expect(brainSay.mock.calls[0]?.[0]).toBe("summarise this");
+    expect(brainSay.mock.calls[0]?.[2].about).toEqual({ windows: ["endue.notes"] });
+  });
+
+  it("a_line_to_an_agent_does_not_reach_brain_say", async () => {
+    await wm.edit([{ op: "adopt", id: "agent:mira", title: "Mira" }]);
+    addressBook(store).pin(store.get(), {
+      kind: "agent",
+      agent: "mira",
+      local: false,
+      window: "agent:mira",
+      view: "agent:mira",
+    });
+    const heard = vi.fn((e: Event) => e.preventDefault());
+    document.addEventListener(AGENT_LINE, heard);
+    try {
+      type("are you there?");
+      key("Enter");
+      await vi.waitFor(() => expect(heard).toHaveBeenCalledOnce());
+      const line = heard.mock.calls[0]?.[0] as CustomEvent | undefined;
+      expect(line?.detail).toEqual({
+        agent: "mira",
+        view: "agent:mira",
+        text: "are you there?",
+      });
+      expect(brainSay).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener(AGENT_LINE, heard);
+    }
   });
 });

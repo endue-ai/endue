@@ -116,6 +116,12 @@
         "kind": "object",
         "default": {},
         "description": "Where the talk line sits once the person moved it: its bottom centre as shares of the app's width and height ({ x, y }, 0 to 1). Empty: centred on the bottom edge."
+      },
+      "desk.shell.talk-link": {
+        "kind": "string",
+        "default": "always",
+        "choices": ["always", "hover", "off"],
+        "description": "The link from the talk line to the window its next line is about: always (faint at rest), only under the pointer or while open, or never."
       }
     },
     "themes": [

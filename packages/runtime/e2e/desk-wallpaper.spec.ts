@@ -18,18 +18,19 @@ test("Eris has idle, hover and editing states with keyboard and pointer input", 
   await openShell(page, "?lang=en");
   const pill = page.locator(".talk-pill");
   await expect(pill).toHaveAttribute("data-state", "idle");
-  // At rest 440 by 40 (issue 297, ADR 0254); hovering lights its border and keeps its size.
+  // At rest 440 by 40 (issue 297, ADR 0254); under the pointer it lights its border and widens
+  // to 560 (ADR 0407).
   await expect(pill).toHaveCSS("width", "440px");
   await page.screenshot({ path: info.outputPath("talk-idle.png") });
   await pill.hover();
   await expect(pill).toHaveAttribute("data-state", "hover");
-  await expect(pill).toHaveCSS("width", "440px");
+  await expect(pill).toHaveCSS("width", "560px");
   await expect(page.locator(".composer-input")).not.toBeFocused();
   await page.screenshot({ path: info.outputPath("talk-hover.png") });
   await page.getByRole("button", { name: "Talk to Eris", exact: true }).click();
   await step(page, 240);
   await expect(pill).toHaveAttribute("data-state", "edit");
-  await expect(pill).toHaveCSS("height", "72px");
+  await expect(pill).toHaveCSS("height", "96px");
   await expect(page.locator(".composer-input")).toBeFocused();
   await page.screenshot({ path: info.outputPath("talk-edit.png") });
   await page.keyboard.type("hello pond");

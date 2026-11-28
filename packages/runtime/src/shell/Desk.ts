@@ -158,6 +158,7 @@ export function mountDesk(options: DeskOptions): Desk {
       say: (text, words) => pending.say(text, words),
       fail: (text, reason) => pending.fail?.(text, reason),
       setState: (s) => pending.setState(s),
+      talk: () => pending.talk?.(),
     },
   };
 
@@ -201,6 +202,7 @@ export function mountDesk(options: DeskOptions): Desk {
   const eris = mountEris(modeLayer, ctx, () => layoutOf(store.get()).eris);
   pending.say = eris.say;
   pending.fail = eris.fail;
+  pending.talk = eris.talk;
   pending.setState = eris.setState;
   parts.push(mountPan(root, ctx));
   // Cmd+drag on the empty desk: Pan, Arrange, Ask Eris or Select (ADR 0296).

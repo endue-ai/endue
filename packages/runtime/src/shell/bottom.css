@@ -2,7 +2,7 @@
    with the desktop's name, the drawer and the way back to the origin. */
 
 /* What lies left of the map's strip ends 12 before it: the running chips, the open talk line. */
-/* The talk pill at rest (issue 297, ADR 0254): with the default theme 440 by 40, Eris's small orb 18;
+/* The talk pill at rest (issue 297, ADR 0254): with the default theme 440 by 40, Eris's small orb 24;
    narrower where 440 would not keep 12 clear of the map's strip on both sides (issue 367). */
 .bottom {
   --running-right: calc(var(--map-right) + var(--map-width) + var(--space-3));
@@ -13,7 +13,7 @@
     calc(100vw - 2 * var(--running-right))
   );
   --talk-rest-height: var(--desk-control-md);
-  --talk-orb: calc(var(--desk-space-4) + var(--desk-space-1) / 2);
+  --talk-orb: var(--desk-space-6);
   position: absolute;
   inset: auto 0 0;
   pointer-events: none;
@@ -156,55 +156,86 @@
 .composer-option:hover,
 .composer-option.is-selected { background: var(--desk-hover); }
 
-/* The talk bar has a quiet pill (Eris's place at rest: her small orb, the hint and the key), an
-   unfocused hover preview of the same size, and a full editing state. It is a pill
-   while buttons have corners and square where the design system or the theme makes them square
-   (Blueprint, Amber CRT): a square button's radius times anything is 0. */
+/* The talk line (ADR 0254, ADR 0407). At rest and under the pointer one row, every part on its
+   centre line: [orb] [Talk to Eris] [chip] … [key]. Under the pointer, or with the keyboard on it,
+   it widens to 560 from its centre and the chip takes the room. Open, two rows: [grip] [chip] …
+   [who answers] over [orb] [field] [agents] [microphone] [key]. No part is placed by offsets. It is
+   a pill while buttons have corners and square where the design system or the theme makes them
+   square (Blueprint, Amber CRT): a square button's radius times anything is 0. */
 .talk-pill {
+  --talk-hover-width: calc(var(--desk-control-md) * 14);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   width: var(--talk-rest-shown);
   height: var(--talk-rest-height);
+  padding: 0 var(--space-3);
   border: 1px solid var(--desk-primary-border);
   border-radius: calc(var(--desk-button-radius) * 999);
   background: var(--desk-card);
   box-shadow: var(--desk-shadow-md);
-  transition: width var(--motion-base) ease, height var(--motion-base) ease, border-radius var(--motion-base) ease;
+  transition: width var(--motion-base) var(--desk-easing), height var(--motion-base) var(--desk-easing),
+    border-radius var(--motion-base) var(--desk-easing);
 }
-.talk-pill[data-state="hover"] { z-index: var(--z-float-top); border-color: var(--desk-accent); }
-.talk-pill.is-open { width: min(640px, calc(100vw - 280px), calc(100vw - 2 * var(--running-right))); height: 72px; border-radius: min(var(--radius-lg), calc(var(--desk-button-radius) * 999)); border-color: var(--desk-accent); }
+.talk-pill:not(.is-open) { overflow: hidden; }
+.talk-pill[data-state="hover"] {
+  z-index: var(--z-float-top);
+  width: min(var(--talk-hover-width), calc(100vw - 280px), calc(100vw - 2 * var(--running-right)));
+  border-color: var(--desk-accent);
+}
+.talk-pill.is-open {
+  display: grid;
+  grid-template-columns: var(--talk-orb) minmax(0, 1fr) auto auto auto;
+  grid-template-rows: var(--space-6) var(--desk-control-md);
+  grid-template-areas: "grip chip who who who" "orb field agents mic key";
+  gap: var(--space-2);
+  width: min(640px, calc(100vw - 280px), calc(100vw - 2 * var(--running-right)));
+  height: auto;
+  /* 96 high with its border: 11 + 24 + 8 + 40 + 11, and 1 + 1. */
+  padding: calc(var(--space-3) - 1px) var(--space-3);
+  border-radius: min(var(--radius-lg), calc(var(--desk-button-radius) * 999));
+  border-color: var(--desk-accent);
+}
+@media (prefers-reduced-motion: reduce) { .talk-pill { transition: none; } }
+[data-motion="reduce"] .talk-pill { transition: none; }
 .talk-pill .composer-hint { display: none; }
+/* Folded, the field stays focusable but takes no room; open, it is row 2's middle. */
 .talk-pill .composer-field {
   position: absolute;
-  left: 268px;
-  right: 76px;
-  bottom: 12px;
-  overflow: visible;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
   border: 0;
   background: transparent;
   opacity: 0;
   pointer-events: none;
 }
 .talk-pill.is-open .composer-field {
-  left: calc(var(--desk-space-16) + var(--desk-space-1));
-  opacity: 1;
-  pointer-events: auto;
+  position: static;
+  grid-area: field;
+  width: auto;
+  height: auto;
+  overflow: visible;
   border: 0;
   background: transparent;
+  opacity: 1;
+  pointer-events: auto;
 }
 .talk-pill.is-open .composer-field:focus-within { outline: none; }
 .talk-pill:focus-within { outline: 1px solid var(--desk-accent); outline-offset: 0; }
-.talk-pill .composer-input { padding: 0; font-size: var(--text-base); }
+.talk-pill .composer-input { height: var(--desk-control-md); padding: 0; font-size: var(--text-base); }
 .talk-pill .composer-input:focus-visible { outline: none; }
 .talk-launch {
-  position: absolute;
-  inset: 0 auto 0 0;
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 10px;
-  width: 158px;
-  padding: 0 12px;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 100%;
+  padding: 0;
   border: 0;
-  border-radius: inherit;
   background: transparent;
+  color: inherit;
   white-space: nowrap;
 }
 .talk-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -218,51 +249,47 @@
 @keyframes talk-orb-turn { to { transform: rotate(1turn); } }
 [data-motion="reduce"] .talk-orb path { animation: none; }
 @media (prefers-reduced-motion: reduce) { .talk-orb path { animation: none; } }
-.talk-preview {
-  position: absolute;
-  left: 150px;
-  right: 82px;
-  top: 8px;
-  height: 22px;
-  padding: 2px 9px;
-  overflow: hidden;
-  border-radius: calc(var(--desk-button-radius) * 999);
-  background: var(--desk-muted);
-  color: var(--desk-text-muted);
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0;
-}
-.talk-pill[data-state="hover"] .talk-preview { opacity: 1; }
-.talk-pill.is-open .talk-preview { display: none; }
+.talk-field-orb { display: none; grid-area: orb; }
+.talk-pill.is-open .talk-field-orb { display: flex; }
+/* The chip: what the next line is about. Cut at 180 at rest; the whole title under the pointer
+   and open, as far as the row has room. */
+.talk-chip { display: inline-flex; flex: 0 1 auto; align-items: center; min-width: 0; grid-area: chip; justify-self: start; }
+.talk-chip[hidden] { display: none; }
+.talk-chip-pin { min-width: 0; max-width: 180px; }
+.talk-pill:is([data-state="hover"], .is-open) .talk-chip-pin { max-width: 100%; }
+.talk-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.talk-chip-where { flex: none; white-space: nowrap; }
+.talk-chip-mark { display: inline-flex; flex: none; }
+.talk-chip-clear { flex: none; width: var(--control-xs); height: var(--control-xs); border-color: transparent; background: transparent; }
 .talk-shortcut {
-  position: absolute;
-  right: 12px;
-  top: 9px;
-  padding: 0 4px;
+  flex: none;
+  grid-area: key;
+  margin-left: auto;
+  padding: 0 var(--space-1);
   border: 1px solid var(--desk-border);
   border-radius: var(--radius-sm);
   color: var(--desk-text-muted);
   font: inherit;
   font-size: var(--text-xs);
 }
-.talk-pill.is-open .talk-shortcut { top: 25px; }
-.talk-grip { display: none; position: absolute; left: 14px; top: 24px; color: var(--desk-text-muted); cursor: grab; }
+.talk-grip { display: none; grid-area: grip; color: var(--desk-text-muted); cursor: grab; text-align: center; }
 .talk-pill.is-open .talk-grip { display: block; }
-.talk-agent-button { position: absolute; left: 32px; top: 18px; }
-.talk-agent-list { position: absolute; bottom: calc(100% + 12px); left: 0; width: 252px; max-height: 280px; overflow: auto; padding: var(--space-1); }
+.talk-who { display: none; grid-area: who; justify-self: end; min-width: 0; overflow: hidden; color: var(--desk-text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+.talk-pill.is-open .talk-who { display: block; }
+.talk-agent-button { grid-area: agents; }
+.talk-mic { grid-area: mic; }
+.talk-agent-list { position: absolute; bottom: calc(100% + var(--space-3)); left: 0; width: 252px; max-height: 280px; overflow: auto; padding: var(--space-1); }
 /* Moved by the person (talk-place.ts): drawn at its own left and bottom, gliding there when it grows
    near an edge, but never while dragged. High up, its lists open below it. */
 .talk-pill.is-placed {
   z-index: var(--z-float-top);
   transform: none;
-  transition: width var(--motion-base) ease, height var(--motion-base) ease, border-radius var(--motion-base) ease,
-    left var(--motion-base) ease, bottom var(--motion-base) ease;
+  transition: width var(--motion-base) var(--desk-easing), height var(--motion-base) var(--desk-easing),
+    border-radius var(--motion-base) var(--desk-easing), left var(--motion-base) ease, bottom var(--motion-base) ease;
 }
-.talk-pill.is-moving { transition: width var(--motion-base) ease, height var(--motion-base) ease, border-radius var(--motion-base) ease; }
+.talk-pill.is-moving { transition: width var(--motion-base) var(--desk-easing), height var(--motion-base) var(--desk-easing), border-radius var(--motion-base) var(--desk-easing); }
 .talk-pill.is-high .composer-list { top: calc(100% + var(--space-2)); bottom: auto; }
-.talk-pill.is-high .talk-agent-list { top: calc(100% + 12px); bottom: auto; }
+.talk-pill.is-high .talk-agent-list { top: calc(100% + var(--space-3)); bottom: auto; }
 
 /* Clear of the map's strip, 12 past it, and of the talk pill at rest, 16 past its half (440 / 2,
    issue 297); the pill under the pointer is drawn over them. While the line is open it reaches the
@@ -284,7 +311,7 @@
 }
 .running > li { display: flex; min-width: 0; }
 .bottom:has(.composer.is-open:not(.is-placed)) .running {
-  bottom: calc(var(--space-5) + 72px + var(--space-2));
+  bottom: calc(var(--space-5) + 96px + var(--space-2));
   max-width: calc(100% - var(--running-right) - var(--bar-reach));
 }
 /* Where the pill at rest would leave them less than 120 beside it (an app under 1188 wide, or under

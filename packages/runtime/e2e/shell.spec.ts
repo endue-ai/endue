@@ -25,7 +25,7 @@ test.describe("the desk shell", () => {
     }
     // Eris rests in the talk line, its small orb hers, until she has something to do (ADR 0254).
     await expect(page.locator(".eris")).toBeHidden();
-    await expect(page.locator(".talk-pill .talk-orb")).toBeVisible();
+    await expect(page.locator(".talk-launch .talk-orb")).toBeVisible();
     await expect(page.locator(".rail-button")).toHaveCount(7);
     await expect(page.locator(".surface")).toHaveCount(0);
     expect(await primaryFills(page)).toBeLessThanOrEqual(1);
@@ -196,10 +196,10 @@ test.describe("the desk shell", () => {
   test("typing opens the line, commands run with Enter, a message rises and is absorbed", async ({
     page,
   }) => {
-    await expect(page.locator(".composer-field")).toHaveCSS("height", "2px");
+    await expect(page.locator(".composer-field")).toHaveCSS("height", "1px");
     await page.keyboard.type("calendar");
     await step(page, 220);
-    await expect(page.locator(".composer-field")).toHaveCSS("height", "48px");
+    await expect(page.locator(".composer-field")).toHaveCSS("height", "40px");
     await expect(page.locator(".composer-input")).toHaveValue("calendar");
     await expect(page.getByRole("option").first()).toHaveText("열기 · 캘린더");
     await page.keyboard.press("Enter");
@@ -228,7 +228,7 @@ test.describe("the desk shell", () => {
     await page.keyboard.type("x");
     await page.keyboard.press("Escape");
     await step(page, 220);
-    await expect(page.locator(".composer-field")).toHaveCSS("height", "2px");
+    await expect(page.locator(".composer-field")).toHaveCSS("height", "1px");
   });
 
   // Dragging and resizing are desk-wm's (e2e/specs/windows-plugins.spec.ts, ADR 0153): the page lays

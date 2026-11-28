@@ -8,13 +8,11 @@
 //! gives the same words (desk_context_parts.rs). The person's line follows as its own part.
 
 use desk_brain::{TextPart, UserMessage};
-use desk_bridge::{
-    BrainDesk, BrainDeskDesktop, BrainDeskPane, BrainDeskResponsiveness, BrainDeskWindow,
-};
+use desk_bridge::{BrainDesk, BrainDeskDesktop, BrainDeskWindow};
 
 #[path = "desk_context_parts.rs"]
 mod parts;
-use parts::{Part, capabilities, closed, elsewhere, place, placed, what};
+use parts::{Part, about, capabilities, closed, elsewhere, pane, place, placed};
 
 /// The most tool names said beside one plugin; desk-tools lists the rest.
 const NAMES: usize = 12;
@@ -72,7 +70,15 @@ pub(crate) fn plugins(desk: &BrainDesk) -> Vec<String> {
     let here = current(desk).map(|(_, d)| d.id.as_str());
     let windows = &desk.windows;
     let shown = |w: &&BrainDeskWindow| on_screen(w, here) && w.hidden != Some(true);
-    let focused = windows.iter().filter(|w| w.focused == Some(true));
+    let named = |w: &&BrainDeskWindow| {
+        desk.about
+            .as_ref()
+            .is_some_and(|a| a.windows.contains(&w.id))
+    };
+    let focused = windows
+        .iter()
+        .filter(named)
+        .chain(windows.iter().filter(|w| w.focused == Some(true)));
     let hidden = windows.iter().filter(|w| w.hidden == Some(true));
     let elsewhere = windows.iter().filter(|w| !on_screen(w, here));
     let mut out: Vec<String> = Vec::new();
@@ -96,6 +102,7 @@ pub(crate) fn render(desk: &BrainDesk, tools_of: &dyn Fn(&str) -> Vec<String>) -
          plugin a request is for: \"this\", \"here\" or \"the window on the left\" mean a window \
          listed here, the focused one first. Hand the work to that plugin's tools.]\n",
     );
+    out.push_str(&about(desk));
     out.push_str(&screen(desk, tools_of));
     out.push_str(&elsewhere(desk));
     out.push_str(&closed(desk));
@@ -186,36 +193,10 @@ fn line(window: &BrainDeskWindow, place: Option<&str>) -> String {
     text
 }
 
-/// A pane: its title and plugin, or the view it shows; whether it is in use, and whether its
-/// plugin's frame stopped answering (#39), with the command that acts on it.
-fn pane(pane: &BrainDeskPane) -> String {
-    let mut text = match (pane.title.as_deref(), pane.plugin.as_deref()) {
-        (title, Some(plugin)) => what(title, Some(plugin)).unwrap_or_default(),
-        (Some(title), None) if !title.is_empty() => format!("{title} [{}]", pane.view),
-        _ => pane.view.clone(),
-    };
-    if pane.focused == Some(true) {
-        text.push_str(" [in use]");
-    }
-    if pane.asleep == Some(true) {
-        text.push_str(" [asleep until shown]");
-    }
-    match pane.responsiveness {
-        Some(BrainDeskResponsiveness::Late) => {
-            text.push_str(" [not responding: desk.frames.wait or desk.frames.stop]");
-        }
-        Some(BrainDeskResponsiveness::Stopped) => {
-            text.push_str(" [stopped: desk.frames.reload]");
-        }
-        None => {}
-    }
-    text
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use desk_bridge::BrainDeskSize;
+    use desk_bridge::{BrainDeskPane, BrainDeskResponsiveness, BrainDeskSize};
 
     fn window(id: &str, rect: (i64, i64, u64, u64), plugin: Option<&str>) -> BrainDeskWindow {
         BrainDeskWindow {
@@ -252,6 +233,7 @@ mod tests {
             desktops: None,
             closed: None,
             capabilities: None,
+            about: None,
         }
     }
 

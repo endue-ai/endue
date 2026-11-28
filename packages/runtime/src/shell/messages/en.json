@@ -187,5 +187,15 @@
   "shell.bar.newAgentLabel": "Create a new agent",
   "shell.bar.newSpace": "New space",
   "shell.bar.newSpaceLabel": "Create a new space",
-  "shell.talkPlaceholder": "Keep talking with Eris"
+  "shell.talkPlaceholder": "Keep talking with Eris",
+  "shell.talkAbout": "About {x}",
+  "shell.talkTo": "To {x}",
+  "shell.talkToLaunch": "Talk to {x}",
+  "shell.talkWindows": "{n} windows",
+  "shell.talkOnDesktop": "on desktop {n}",
+  "shell.talkPutAway": "put away",
+  "shell.talkClear": "Talk to Eris instead",
+  "shell.talkMic": "Speak to Eris",
+  "shell.talkAnswers": "{x} answers",
+  "shell.talkAgentLater": "{x}'s window takes lines from the talk line once it can hold a conversation. Write to {x} in its window for now."
 }
