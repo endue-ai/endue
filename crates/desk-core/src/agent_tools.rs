@@ -29,6 +29,8 @@ use crate::handler::{Core, error};
 
 /// How long a command run from a tool call may take to answer.
 const COMMAND_WAIT: Duration = Duration::from_secs(300);
+/// How often a call waiting on a command looks whether its turn was stopped.
+const STOP_POLL: Duration = Duration::from_millis(100);
 
 impl Core {
     /// Run the brain's tool calls through this core from now on, each as the agent that asks for
@@ -79,8 +81,19 @@ impl Core {
         let invocation = started["invocationId"].as_str().unwrap_or_default();
         let deadline = Instant::now() + COMMAND_WAIT;
         loop {
+            // A stopped turn waits no longer: the command was sent and cannot be taken back.
+            if self.turn_stops.stopped(turn) {
+                let sent = "stopped: the command was sent and cannot be taken back".to_owned();
+                return (json!({ "error": error(ErrorCode::Cancelled, sent) }), true);
+            }
             let left = deadline.saturating_duration_since(Instant::now());
-            match events.recv_timeout(left) {
+            match events.recv_timeout(left.min(STOP_POLL)) {
+                // A local agent run the command started is the turn's: brain.stop stops it too.
+                Ok(BridgeEvent::AgentsRun(run))
+                    if run.data.kind == desk_bridge::LocalAgentRunKind::Started =>
+                {
+                    self.turn_stops.ran(turn, &run.data.run_id);
+                }
                 Ok(BridgeEvent::CmdAnswered(answered))
                     if answered.data.invocation_id == invocation =>
                 {
@@ -91,6 +104,7 @@ impl Core {
                     };
                 }
                 Ok(_) => {}
+                Err(RecvTimeoutError::Timeout) if !left.is_zero() => {}
                 Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => {
                     let late = format!("the command did not answer within {COMMAND_WAIT:?}");
                     return (json!({ "error": error(ErrorCode::Timeout, late) }), true);
@@ -163,6 +177,7 @@ impl Tools for Core {
             provider: info.provider,
             title: Some(info.title),
             ok: None,
+            message: None,
         })
     }
 
@@ -206,6 +221,11 @@ impl Tools for Core {
 
     fn ended(&self, turn: &str) {
         self.end_task(turn);
+        self.turn_stops.ended(turn);
+    }
+
+    fn stop(&self, turn: &str) -> Option<Arc<std::sync::atomic::AtomicBool>> {
+        Some(self.turn_stops.flag(turn))
     }
 
     /// Every failed turn is in the desk's log, channel `brain` (FT-01): the turn, the brain's mode,

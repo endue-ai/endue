@@ -118,6 +118,42 @@ describe("the shell bridge over the core", () => {
     expect(listening()).toBe(before);
   });
 
+  test("deltas_reach_the_runtime_as_they_arrive", async () => {
+    const { stub, bridge, calls } = setup({
+      "brain.say": () => ({ turnId: "t7" }),
+      "brain.stop": () => ({ stopped: true }),
+    });
+    const heard: string[] = [];
+    const reply = bridge.brain.say("hello?", undefined, undefined, {
+      started: (id) => heard.push(`started ${id}`),
+      answer: (soFar) => heard.push(soFar),
+      needs: (id, waiting) => heard.push(`${id} ${waiting ? "waits" : "answered"}`),
+    });
+    await tick();
+    stub.emit(turn("t7", "delta", "hel"));
+    stub.emit(turn("t8", "delta", "nope"));
+    // An approval of this turn waits for the person; another turn's is not this card's.
+    const approval = { caller: "agent:eris", action: "fs.write", target: "/tmp/a" };
+    stub.emit({
+      event: "perm.approval",
+      data: { ...approval, approvalId: "a1", task: "t7" },
+    } as BridgeEvent);
+    stub.emit({
+      event: "perm.approval",
+      data: { ...approval, approvalId: "a2", task: "t8" },
+    } as BridgeEvent);
+    stub.emit({ event: "perm.settled", data: { kind: "approval", id: "a1" } });
+    stub.emit(turn("t7", "delta", "lo"));
+    await expect(bridge.brain.stop?.("t7")).resolves.toBe(true);
+    stub.emit(turn("t7", "completed"));
+    await expect(reply).resolves.toEqual({ text: "hello" });
+    expect(heard).toEqual(["started t7", "hel", "a1 waits", "a1 answered", "hello"]);
+    expect(calls().at(-1)).toEqual({
+      method: "brain.stop",
+      params: { turnId: "t7", scope: SCOPE },
+    });
+  });
+
   test("brain.say sends the desk the person sees with the line (ADR 0109)", async () => {
     const { stub, bridge, calls } = setup({ "brain.say": () => ({ turnId: "t7" }) });
     const desk = {

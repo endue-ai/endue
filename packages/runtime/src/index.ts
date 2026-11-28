@@ -13,6 +13,7 @@ export type {
   Bands,
   BrainStatus,
   BrainStep,
+  BrainTurnHooks,
   LocalAgentEvent,
   LocalAgentsBridge,
   LocalAsk,

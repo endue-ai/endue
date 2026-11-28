@@ -62,6 +62,8 @@ pub struct Core {
     pub(crate) prompter: Box<dyn Prompter>,
     pub(crate) prompts: Mutex<Prompts>,
     pub(crate) approvals: Mutex<Approvals>,
+    /// The turns going on, each with its stop (brain.stop, ADR 0409).
+    pub(crate) turn_stops: crate::core_turn_stop::TurnStops,
     pub(crate) subscriptions: Mutex<Subscriptions>,
     pub(crate) plugins: Mutex<PluginRegistry>,
     /// plugins.lock: its path, the digests it pins, the text last written (ADR 0079).
@@ -142,6 +144,7 @@ impl Core {
             prompter: Box::new(RefuseAll),
             prompts: Mutex::new(Prompts::default()),
             approvals: Mutex::default(),
+            turn_stops: Default::default(),
             subscriptions: Mutex::new(Subscriptions::default()),
             plugins: Mutex::new(PluginRegistry::new(None)),
             plugins_lock: Mutex::default(),

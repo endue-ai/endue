@@ -1,0 +1,14 @@
+{
+  "target": "BridgeRequest",
+  "description": "stop a turn the caller started",
+  "instance": {
+    "id": 40,
+    "method": "brain.stop",
+    "params": {
+      "turnId": "t3",
+      "scope": {
+        "permission": "brain:converse"
+      }
+    }
+  }
+}

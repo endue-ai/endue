@@ -90,6 +90,7 @@ mod core_store;
 mod core_studio;
 mod core_themes;
 mod core_tools;
+mod core_turn_stop;
 mod core_ui;
 mod core_undo;
 mod core_update;

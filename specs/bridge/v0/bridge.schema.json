@@ -92,6 +92,7 @@
         { "$ref": "init.schema.json#/$defs/InitGetRequest" },
         { "$ref": "brain.schema.json#/$defs/BrainSayRequest" },
         { "$ref": "brain.schema.json#/$defs/BrainAskRequest" },
+        { "$ref": "brain.schema.json#/$defs/BrainStopRequest" },
         { "$ref": "brain.schema.json#/$defs/BrainAgentsListRequest" },
         { "$ref": "brain.schema.json#/$defs/BrainAgentsCardRequest" },
         { "$ref": "brain.schema.json#/$defs/BrainSpacesListRequest" },

@@ -1,0 +1,7 @@
+{
+  "target": "BrainStopResult",
+  "description": "the turn was running and is now stopped",
+  "instance": {
+    "stopped": true
+  }
+}

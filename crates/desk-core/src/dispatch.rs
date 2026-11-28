@@ -56,6 +56,7 @@ impl Core {
             R::StoreSet(r) => (r.id, self.store_set(caller, r.params)),
             R::BrainSay(r) => (r.id, self.brain_say(caller, r.params)),
             R::BrainAsk(r) => (r.id, self.brain_ask(caller, r.params)),
+            R::BrainStop(r) => (r.id, self.brain_stop(caller, r.params)),
             R::BrainAgentsList(r) => (r.id, self.brain_agents_list(caller, r.params)),
             R::BrainAgentsCard(r) => (r.id, self.brain_agents_card(caller, r.params)),
             R::BrainSpacesList(r) => (r.id, self.brain_spaces_list(caller, r.params)),

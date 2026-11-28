@@ -1,0 +1,13 @@
+{
+  "target": "BridgeRequest",
+  "description": "brain.stop names the turn",
+  "instance": {
+    "id": 41,
+    "method": "brain.stop",
+    "params": {
+      "scope": {
+        "permission": "brain:converse"
+      }
+    }
+  }
+}

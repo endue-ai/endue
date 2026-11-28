@@ -273,6 +273,38 @@
       "required": ["turnId"],
       "additionalProperties": false
     },
+    "BrainStopRequest": {
+      "description": "Stop a brain.say turn the caller started (FT-06, ADR 0409): the core starts no further tool call of it, drops what the brain still streams, stops a local agent run it started, and ends it with an error whose reason is stopped. A call already sent to a command runs on; it cannot be taken back.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "bridge.schema.json#/$defs/RequestId" },
+        "method": { "const": "brain.stop" },
+        "params": { "$ref": "#/$defs/BrainStopParams" }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "BrainStopParams": {
+      "description": "Parameters of brain.stop: the turn, by the id brain.say answered. Only the caller that said the line may stop it.",
+      "type": "object",
+      "properties": {
+        "turnId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/BrainConversePermission"
+        }
+      },
+      "required": ["turnId", "scope"],
+      "additionalProperties": false
+    },
+    "BrainStopResult": {
+      "description": "Result of brain.stop: whether the turn was running and is now stopped. False for a turn that had already ended.",
+      "type": "object",
+      "properties": {
+        "stopped": { "type": "boolean" }
+      },
+      "required": ["stopped"],
+      "additionalProperties": false
+    },
     "BrainAskRequest": {
       "description": "Ask the brain one question and get the answer as structured values: the arguments it calls the caller's tool with.",
       "type": "object",
@@ -594,9 +626,9 @@
       "additionalProperties": false
     },
     "BrainTurnReason": {
-      "description": "error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people.",
+      "description": "error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; stopped: the person stopped it (brain.stop, FT-06); failed: anything else, kept in the desk's log. text stays the sentence for people.",
       "type": "string",
-      "enum": ["no_brain", "signed_out", "read_only", "too_many_steps", "failed"]
+      "enum": ["no_brain", "signed_out", "read_only", "too_many_steps", "stopped", "failed"]
     },
     "BrainTurnKind": {
       "description": "started, delta (more text), completed; error (the turn failed, for example read-only after a takeover); offline (the brain is unreachable, the turn waits) and online (it resumed); tool (Eris hands work to a plugin command: the core runs the brain's call) and tool-result (the command answered and its answer went back to the brain).",
@@ -621,6 +653,11 @@
         "ok": {
           "description": "tool-result only: whether the command answered without an error.",
           "type": "boolean"
+        },
+        "message": {
+          "description": "tool-result with ok false only: the first line of the command's error, for people (FT-06). Never its arguments or its result.",
+          "type": "string",
+          "maxLength": 200
         }
       },
       "required": ["callId", "command", "provider"],

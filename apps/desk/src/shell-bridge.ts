@@ -19,6 +19,7 @@ import type {
   AccountStatus,
   BrainStatus,
   BrainStep,
+  BrainTurnHooks,
   LocalAgentsBridge,
   ShellBridge,
 } from "@endue-ai/runtime";
@@ -99,7 +100,7 @@ function accountOf(status: CoreAccount): AccountStatus {
 /** A tool step of the turn, as the shell draws it. */
 function stepOf(data: BrainTurnData): BrainStep | undefined {
   if ((data.kind !== "tool" && data.kind !== "tool-result") || !data.tool) return undefined;
-  const { callId, command, provider, title, ok } = data.tool;
+  const { callId, command, provider, title, ok, message } = data.tool;
   return {
     kind: data.kind,
     callId,
@@ -107,18 +108,22 @@ function stepOf(data: BrainTurnData): BrainStep | undefined {
     provider,
     ...(title ? { title } : {}),
     ...(ok === undefined ? {} : { ok }),
+    ...(message ? { message } : {}),
   };
 }
 
 /**
  * brain.say, with the desk the person sees when the runtime gives it (ADR 0109), then that turn's
- * brain.turn events until it completes or fails: one reply.
+ * brain.turn events until it completes or fails: one reply. On the way `turn` hears the turn's id,
+ * her answer so far at each delta, and each approval of the turn's that waits for the person
+ * (FT-06).
  */
 function say(
   core: BridgeClient,
   text: string,
   onStep?: (step: BrainStep) => void,
   desk?: BrainDesk,
+  turn?: BrainTurnHooks,
 ): Promise<BrainReply> {
   return new Promise((resolve, reject) => {
     let turnId: string | undefined;
@@ -134,8 +139,10 @@ function say(
     const on = (data: BrainTurnData) => {
       if (done || data.turnId !== turnId) return;
       if (data.kind === "started") answer = "";
-      else if (data.kind === "delta") answer += data.text ?? "";
-      else if (data.kind === "completed") finish({ text: answer });
+      else if (data.kind === "delta") {
+        answer += data.text ?? "";
+        turn?.answer?.(answer);
+      } else if (data.kind === "completed") finish({ text: answer });
       else if (data.kind === "error")
         finish({ text: data.text ?? "", ...(data.reason ? { reason: data.reason } : {}) });
       else {
@@ -144,7 +151,20 @@ function say(
       }
       // offline and online: the core retries, and ends the turn with no_brain when none answers.
     };
+    /** The approvals of this turn still open, by id. */
+    const waiting = new Set<string>();
+    const settled = (id: string) => {
+      if (waiting.delete(id)) turn?.needs?.(id, false);
+    };
     const off = core.onEvent((event) => {
+      if (event.event === "perm.approval") {
+        if (turnId === undefined || event.data.task !== turnId) return;
+        waiting.add(event.data.approvalId);
+        turn?.needs?.(event.data.approvalId, true);
+        return;
+      }
+      if (event.event === "perm.approval.done") return settled(event.data.approvalId);
+      if (event.event === "perm.settled") return settled(event.data.id);
       if (event.event !== "brain.turn") return;
       if (turnId === undefined) early.push(event.data);
       else on(event.data);
@@ -152,6 +172,7 @@ function say(
     core.call("brain.say", { text, ...(desk ? { desk } : {}), scope: SCOPE }).then(
       (result) => {
         turnId = result.turnId;
+        turn?.started?.(result.turnId);
         for (const data of early.splice(0)) on(data);
       },
       (error: unknown) => {
@@ -319,7 +340,9 @@ export function shellBridge(core: BridgeClient): ShellBridge {
           await core.call("settings.set", { key: BRAIN_MODEL_KEYS[brain], value: model });
         },
       },
-      say: (text, onStep, desk) => say(core, text, onStep, desk),
+      say: (text, onStep, desk, turn) => say(core, text, onStep, desk, turn),
+      stop: (turnId) =>
+        core.call("brain.stop", { turnId, scope: SCOPE }).then((result) => result.stopped),
     },
     // A sweep's snapshot (ADR 0296): windows' last frames, kept under ~/.desk/snapshots.
     snapshots: {

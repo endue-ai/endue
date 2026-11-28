@@ -1,4 +1,5 @@
 import { SAMPLE_WORDS, type ScriptedWord, scriptedMic } from "./browser-mic";
+import { type Errand, type HeldTurn, turnsOf } from "./browser-turns";
 import { agentCard, type Directory, listAgents, listTasks, sampleDirectory } from "./directory";
 import userHello from "./envelopes/user-hello.json";
 import { type LocalStub, type LocalStubOptions, localAgentsStub } from "./local-agents";
@@ -7,7 +8,6 @@ import type {
   AccountStatus,
   AudioLevels,
   Bands,
-  BrainReply,
   BrainStatus,
   BrainStep,
   ShellBridge,
@@ -35,7 +35,7 @@ export interface BrowserBridgeOptions {
    * The errands Eris runs for a line before she answers (ADR 0089), or undefined for none; the
    * default sends a line about mail to the mail plugin (`sampleErrand`).
    */
-  errand?: (text: string) => { steps: BrainStep[]; reply: string } | undefined;
+  errand?: Errand;
   /**
    * The agent programs on this computer (ADR 0110): fixture ones when given (the dev page), none
    * otherwise, so the shell fixtures keep their agent bar.
@@ -70,6 +70,10 @@ export interface BrowserBridge extends ShellBridge {
     setAccount(status: AccountStatus): void;
     /** What the stub microphone's recogniser hears from the next capture on; [] for nothing. */
     hear(words: readonly ScriptedWord[]): void;
+    /** Hold Eris's next turn open, for the test to drive it (`turn`) or the person to stop it. */
+    holdTurn(): void;
+    /** The turn held open now. */
+    turn(): HeldTurn | undefined;
   };
 }
 
@@ -196,6 +200,7 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
   const local = options.localAgents
     ? localAgentsStub({ epoch: options.epoch ?? Date.now(), ...options.localAgents })
     : undefined;
+  const turns = turnsOf(options.errand ?? sampleErrand, (text) => wordTimes(text));
 
   return {
     ...(local ? { localAgents: local } : {}),
@@ -233,17 +238,8 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
             : { mode: "cloud", credits: 1200, brain: chosen };
         return brain;
       },
-      async say(text, onStep): Promise<BrainReply> {
-        const errand = (options.errand ?? sampleErrand)(text);
-        for (const step of errand?.steps ?? []) {
-          onStep?.(structuredClone(step));
-          await Promise.resolve();
-        }
-        const reply =
-          errand?.reply ??
-          (text.trim() ? `I'll look into "${text.trim()}" and tell you.` : "I'm here.");
-        return { text: reply, words: wordTimes(reply) };
-      },
+      say: turns.say,
+      stop: turns.stop,
     },
     account: {
       status: () => wire(account),
@@ -279,6 +275,8 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
           changed({ state: "signed-in", profile: { ...SAMPLE_PROFILE } });
       },
       setAccount: (status) => changed(structuredClone(status)),
+      holdTurn: () => turns.hold(),
+      turn: () => turns.held(),
       hear(words) {
         heard = words;
       },

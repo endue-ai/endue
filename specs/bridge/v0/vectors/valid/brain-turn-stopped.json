@@ -1,0 +1,13 @@
+{
+  "target": "BridgeEvent",
+  "description": "the person stopped the turn",
+  "instance": {
+    "event": "brain.turn",
+    "data": {
+      "turnId": "t3",
+      "kind": "error",
+      "text": "Stopped.",
+      "reason": "stopped"
+    }
+  }
+}

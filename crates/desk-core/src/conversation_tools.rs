@@ -22,6 +22,11 @@ pub(crate) trait Tools: Send + Sync {
     fn session_closed(&self) {}
     /// The desk's turn `turn` ended.
     fn ended(&self, _turn: &str) {}
+    /// Turn `turn`'s stop (brain.stop, ADR 0409): raised, the turn makes no further call and says
+    /// nothing more.
+    fn stop(&self, _turn: &str) -> Option<std::sync::Arc<std::sync::atomic::AtomicBool>> {
+        None
+    }
     /// The tools a turn offers the brain, those of the plugins on `desk` first; `None` offers none.
     fn offer(&self, _desk: Option<&BrainDesk>) -> Option<Vec<ToolDefinition>> {
         None

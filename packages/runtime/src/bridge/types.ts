@@ -88,7 +88,14 @@ export interface WordTime {
 }
 
 /** Why a turn failed (FT-01), for the desk to offer what fixes it; `text` is the sentence. */
-export type BrainTurnReason = "no_brain" | "signed_out" | "read_only" | "too_many_steps" | "failed";
+export type BrainTurnReason =
+  | "no_brain"
+  | "signed_out"
+  | "read_only"
+  | "too_many_steps"
+  | "failed"
+  /** The person stopped the turn (FT-06, ADR 0409). */
+  | "stopped";
 
 export interface BrainReply {
   text: string;
@@ -112,6 +119,18 @@ export interface BrainStep {
   title?: string;
   /** tool-result only: whether the command answered without an error. */
   ok?: boolean;
+  /** tool-result of a failed call only: the first line of the command's error (FT-06). */
+  message?: string;
+}
+
+/** What a turn tells as it goes, besides its steps (FT-06, ADR 0409). */
+export interface BrainTurnHooks {
+  /** The turn has its id: the one brain.stop takes. */
+  started?(turnId: string): void;
+  /** Her answer so far, each time more of it arrives. */
+  answer?(soFar: string): void;
+  /** A call of the turn waits for the person's approval (perm.approval), or no longer does. */
+  needs?(approvalId: string, waiting: boolean): void;
 }
 
 /** The desk's endue ID, as account.* answers it; no token ever reaches the runtime (ADR 0111). */
@@ -284,7 +303,17 @@ export interface ShellBridge {
      * One turn of Eris's loop: its hand-offs reach `onStep` as they happen, then the reply. `desk`
      * is what the person sees as they say it (ADR 0109), so Eris knows which plugin it is for.
      */
-    say(text: string, onStep?: (step: BrainStep) => void, desk?: BrainDesk): Promise<BrainReply>;
+    say(
+      text: string,
+      onStep?: (step: BrainStep) => void,
+      desk?: BrainDesk,
+      turn?: BrainTurnHooks,
+    ): Promise<BrainReply>;
+    /**
+     * Stop a turn this desk started (FT-06): it calls nothing more, its local agent runs stop, and
+     * it ends as `stopped`. False when the turn had already ended. Hosts without it leave it out.
+     */
+    stop?(turnId: string): Promise<boolean>;
   };
   /**
    * Pictures of windows for a sweep's snapshot, and a place to keep them (ADR 0296): `window` is a

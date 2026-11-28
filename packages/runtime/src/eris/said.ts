@@ -13,6 +13,7 @@ import { h, listen } from "../shell/dom";
 import { icon } from "../shell/icons";
 import { erisText } from "./copy";
 import { prose } from "./prose";
+import type { TurnCard } from "./turn-card";
 
 /** A line longer than this, or of more than one line, is kept in the card as text. */
 export const KEEP_CHARS = 60;
@@ -45,20 +46,84 @@ export interface Placed {
   maxHeight: number;
 }
 
-/** Where the card goes for her box on a desk of `size`. */
-export function placeSaid(eris: Box, size: { width: number; height: number }): Placed {
+/** What the card keeps clear of (FT-06): the field in use, the talk line, and whether she rests in it. */
+export interface Avoid {
+  field?: Box | null;
+  line?: Box | null;
+  /** She rests in the talk line (ADR 0254): the card opens from the line. */
+  resting?: boolean;
+}
+
+/** How tall the card is reckoned when it is checked against what it must not cover. */
+const TALL = 240;
+/** The narrowest the card goes beside her. */
+const NARROW = 280;
+
+const meets = (a: Box, b: Box) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** The box a placement takes on a desk `height` tall, reckoned `TALL` at most. */
+function boxOf(p: Placed, height: number): Box {
+  const tall = Math.min(TALL, p.maxHeight);
+  const y = p.top ?? height - (p.bottom ?? 0) - tall;
+  return { x: p.left, y, width: p.width, height: tall };
+}
+
+/**
+ * Where the card goes for her box on a desk of `size`: under her, else above her, else beside her,
+ * the first that leaves `avoid`'s field and talk line uncovered; while she rests in the talk line,
+ * from the line, above it or, when the line is high, below it.
+ */
+export function placeSaid(
+  eris: Box,
+  size: { width: number; height: number },
+  avoid: Avoid = {},
+): Placed {
   const width = Math.max(0, Math.min(WIDTH, size.width - 2 * MARGIN));
-  const centre = eris.x + eris.width / 2;
-  const left = Math.round(
-    Math.max(MARGIN, Math.min(centre - width / 2, size.width - MARGIN - width)),
+  const leftOf = (centre: number) =>
+    Math.round(Math.max(MARGIN, Math.min(centre - width / 2, size.width - MARGIN - width)));
+  const below = (b: Box): Placed => {
+    const top = b.y + b.height + GAP;
+    return {
+      left: leftOf(b.x + b.width / 2),
+      top: Math.round(top),
+      width,
+      maxHeight: Math.max(0, Math.round(size.height - MARGIN - top)),
+    };
+  };
+  const above = (b: Box): Placed => ({
+    left: leftOf(b.x + b.width / 2),
+    bottom: Math.round(size.height - b.y + GAP),
+    width,
+    maxHeight: Math.max(0, Math.round(b.y - GAP - MARGIN)),
+  });
+  const { line, field } = avoid;
+  if (avoid.resting && line)
+    return line.y + line.height / 2 < size.height / 2 ? below(line) : above(line);
+  const under = below(eris);
+  const over = above(eris);
+  const roomBelow = under.maxHeight;
+  const roomAbove = over.maxHeight;
+  const legacy = roomBelow >= ROOM || roomBelow >= roomAbove ? under : over;
+  const clear = [field, line].filter((b): b is Box => !!b);
+  if (!clear.length) return legacy;
+  const beside = (right: boolean): Placed | undefined => {
+    const room = right ? size.width - MARGIN - (eris.x + eris.width + GAP) : eris.x - GAP - MARGIN;
+    const w = Math.min(WIDTH, room);
+    if (w < NARROW) return undefined;
+    const left = right ? eris.x + eris.width + GAP : eris.x - GAP - w;
+    const top = Math.max(MARGIN, Math.min(eris.y, size.height - MARGIN - TALL));
+    return {
+      left: Math.round(left),
+      top: Math.round(top),
+      width: Math.round(w),
+      maxHeight: Math.round(size.height - MARGIN - top),
+    };
+  };
+  const options = [under, over, beside(true), beside(false)].filter(
+    (p): p is Placed => p !== undefined && p.maxHeight >= ROOM,
   );
-  const below = eris.y + eris.height + GAP;
-  const roomBelow = size.height - MARGIN - below;
-  const roomAbove = eris.y - GAP - MARGIN;
-  if (roomBelow >= ROOM || roomBelow >= roomAbove)
-    return { left, top: Math.round(below), width, maxHeight: Math.max(0, Math.round(roomBelow)) };
-  const bottom = Math.round(size.height - eris.y + GAP);
-  return { left, bottom, width, maxHeight: Math.max(0, Math.round(roomAbove)) };
+  return options.find((p) => !clear.some((b) => meets(boxOf(p, size.height), b))) ?? legacy;
 }
 
 export interface Said {
@@ -71,7 +136,7 @@ export interface Said {
   hearing(words: string): void;
   /** Show the card while it keeps text or `soul` (a soul line is on screen). */
   update(soul: boolean): void;
-  place(eris: Box, size: { width: number; height: number }): void;
+  place(eris: Box, size: { width: number; height: number }, avoid?: Avoid): void;
   /** The text the card keeps now, for her label. */
   kept(): string;
   dispose(): void;
@@ -85,7 +150,16 @@ export const FIXES: Partial<
   signed_out: { command: "desk.account.sign-in", label: "signIn" },
 };
 
-export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): Said {
+/**
+ * Her card in `root`, with the soul text `soul` and, when given, the card of her turn in flight
+ * (`turn-card.ts`, FT-06): while that card shows, her answer is in it, not kept again as text.
+ */
+export function mountSaid(
+  root: HTMLElement,
+  ctx: ShellCtx,
+  soul: HTMLElement,
+  turn?: TurnCard,
+): Said {
   const tr = (key: "label" | "close" | "title" | "none" | "chooseBrain" | "signIn") =>
     erisText(ctx.store.get().lang, `said.${key}`);
   const text = h("div", { class: "eris-said-text", hidden: true });
@@ -97,7 +171,7 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
       hidden: true,
       "aria-label": tr("close"),
       title: tr("close"),
-      onClick: () => keep(null),
+      onClick: () => closeAll(),
     },
     icon("close", 16),
   );
@@ -120,7 +194,14 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
 
   const update = (soulShown: boolean) => {
     showing = soulShown;
-    el.hidden = !kept && !soulShown && heard.hidden;
+    const card = turn?.showing() ?? false;
+    // The turn's card is in her card only while it shows, after the words she heard.
+    if (turn && card !== turn.el.isConnected) {
+      if (card) heard.after(turn.el);
+      else turn.el.remove();
+    }
+    el.hidden = !kept && !soulShown && heard.hidden && !card;
+    close.hidden = !kept && !card;
   };
   /** Keep `next` as text: an answer read from its start, her last lines from the newest. */
   const keep = (next: string[] | null, newest = false) => {
@@ -128,20 +209,24 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
     fixes.hidden = true;
     fixes.replaceChildren();
     text.hidden = !next;
-    close.hidden = !next;
     text.replaceChildren(...(next ?? []).flatMap((line) => prose(document, line)));
     update(showing);
     text.scrollTop = newest ? text.scrollHeight : 0;
+  };
+  /** The person closed her card: its text and the turn's card. */
+  const closeAll = () => {
+    turn?.close();
+    keep(null);
   };
   const recall = () => keep(lines.length ? lines.slice(-RECALL_LINES) : [tr("none")], true);
 
   const offs = [
     listen(el, "keydown", (e) => {
       const k = e as KeyboardEvent;
-      if (k.key !== "Escape" || !kept) return;
+      if (k.key !== "Escape" || (!kept && !turn?.showing())) return;
       k.preventDefault();
       k.stopPropagation();
-      keep(null);
+      closeAll();
     }),
   ];
   // A shell context without commands (a test's) keeps her card all the same.
@@ -161,6 +246,11 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
     say(line) {
       const said = line.trim();
       if (said) lines = [...lines, said].slice(-RECALL_LINES);
+      // Her answer is in the turn's card while it shows; the soul text is not for it either.
+      if (turn?.showing()) {
+        keep(null);
+        return true;
+      }
       const long = isLong(said);
       keep(long ? [said] : null);
       return long;
@@ -196,8 +286,8 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
       update(showing);
     },
     update,
-    place(eris, size) {
-      const p = placeSaid(eris, size);
+    place(eris, size, avoid) {
+      const p = placeSaid(eris, size, avoid);
       const key = JSON.stringify(p);
       if (key === placed) return;
       placed = key;

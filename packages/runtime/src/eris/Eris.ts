@@ -27,6 +27,7 @@ import { createScene } from "./scene";
 import { type ErisState, REST_MS } from "./states";
 import { defineSummon } from "./summon";
 import { Talk } from "./talk";
+import { mountTurns, type TurnHandle } from "./turn";
 import { type Cue, PULSE_TO_RIM_MS, Voice } from "./voice";
 
 const DEFAULT_TOP = 40;
@@ -43,6 +44,8 @@ export interface ErisHandle {
   /** A failed turn (FT-01): her sentence, kept with what fixes it, and her oops. */
   fail(text: string, reason: BrainTurnReason): void;
   setState(state: ErisState): void;
+  /** A typed line's turn: its card (FT-06), fed as the line goes; `about`, the windows it names. */
+  turn(line: string, about?: string[]): TurnHandle;
   /** Start a spoken turn (or, while she listens, stop listening and answer). */
   talk(): void;
   dispose(): void;
@@ -72,7 +75,11 @@ export function mountEris(
     scene.body,
   );
   root.append(el, soul.live);
-  const said = mountSaid(root, ctx, soul.el);
+  // The card's changes are said where her lines are, once per change.
+  const turns = mountTurns(ctx, (text) => {
+    soul.live.textContent = text;
+  });
+  const said = mountSaid(root, ctx, soul.el, turns.card);
 
   const voice = new Voice();
   let dragging: { x: number; y: number } | null = null;
@@ -113,6 +120,11 @@ export function mountEris(
   };
   /** A failed turn (FT-01): her sentence, kept with what fixes it, and her oops. */
   const fail = (text: string, reason: BrainTurnReason) => {
+    // The person stopped it (FT-06): a plain line, no oops; her turn's card says how it ended.
+    if (reason === "stopped") {
+      speakLine(text, undefined);
+      return;
+    }
     said.fail(text, reason);
     soul.stop(ctx.ticker.now());
     soul.live.textContent = text;
@@ -137,8 +149,18 @@ export function mountEris(
     // A spoken line runs the same agentic loop as a typed one, so its hand-offs are drawn too
     // (ADR 0089), and she speaks once every errand is back.
     answer: async (text) => {
+      const turn = turns.begin(text);
       try {
-        return await errands.say(text, (step) => errands.step(step));
+        const step = (s: Parameters<typeof errands.step>[0]) => {
+          errands.step(s);
+          turn.step(s);
+        };
+        const reply = await errands.say(text, step, undefined, turn.hooks);
+        turn.end(reply);
+        return reply;
+      } catch (error) {
+        turn.end({ text: "", reason: "failed" });
+        throw error;
       } finally {
         await errands.finish();
       }
@@ -242,8 +264,11 @@ export function mountEris(
     const p = position();
     el.style.left = `${p.x}px`;
     el.style.top = `${p.y}px`;
+    turns.card.tick();
     said.update(shown);
-    said.place({ x: p.x, y: p.y, width: BODY.width, height: BODY.height }, size());
+    // What the card keeps clear of is measured only while it shows.
+    const avoid = said.el.hidden ? undefined : turns.avoid(root, resting);
+    said.place({ x: p.x, y: p.y, width: BODY.width, height: BODY.height }, size(), avoid);
 
     // While the microphone question is open she does nothing and waits: its answer wakes her.
     const still =
@@ -345,6 +370,7 @@ export function mountEris(
     },
     fail,
     setState,
+    turn: (line, about) => turns.begin(line, about),
     talk() {
       wake();
       talk.toggle(ctx.ticker.now());
@@ -353,6 +379,7 @@ export function mountEris(
       observer?.disconnect();
       talk.dispose();
       errands.dispose();
+      turns.dispose();
       for (const off of offs) off();
       el.remove();
       said.dispose();
