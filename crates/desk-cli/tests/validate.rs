@@ -61,6 +61,24 @@ fn the_github_connector_validates_as_an_http_connector_without_an_entry() {
 }
 
 #[test]
+fn the_social_connector_validates_as_an_endue_connector_with_no_code() {
+    let dir = repo().join("plugins/social");
+    let out = desk(&["plugin", "validate", dir.to_str().unwrap()]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "ok endue.social 0.1.0 (connector plugin)\n"
+    );
+    let mut files: Vec<String> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    files.sort();
+    assert_eq!(files, ["README.md", "plugin.json"], "no script, wasm or page");
+}
+
+#[test]
 fn with_json_validate_prints_one_json_line_either_way() {
     let dir = repo().join("plugins/github");
     let out = desk(&["--json", "plugin", "validate", dir.to_str().unwrap()]);

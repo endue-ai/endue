@@ -1,0 +1,29 @@
+{
+  "target": "Item",
+  "description": "a social reply in one place of the account (a community): replyTo names the entry it answers",
+  "instance": {
+    "id": "t1_k2",
+    "source": {
+      "connector": "endue.social",
+      "instance": "conn_2"
+    },
+    "kind": "entry",
+    "title": "Thanks, glad you like it!",
+    "updatedAt": "2026-11-21T10:30:00Z",
+    "body": "Thanks, glad you like it!",
+    "raw": {
+      "network": "reddit",
+      "account": "conn_2",
+      "destination": "r_studio",
+      "postKind": "reply",
+      "replyTo": "t3_k1",
+      "handle": "studio_team",
+      "self": true,
+      "media": [],
+      "likes": 4
+    },
+    "url": "https://reddit.example/r/studio/comments/k1/_/k2",
+    "feed": "Studio on Reddit",
+    "publishedAt": "2026-11-21T10:30:00Z"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "target": "Item",
+  "description": "a social account's followers by day, a metric series",
+  "instance": {
+    "id": "followers",
+    "source": {
+      "connector": "endue.social",
+      "instance": "conn_1"
+    },
+    "kind": "metric",
+    "title": "followers",
+    "updatedAt": "2026-11-29T00:00:00Z",
+    "raw": {
+      "network": "instagram",
+      "account": "conn_1"
+    },
+    "series": "followers",
+    "unit": "count",
+    "points": [
+      {
+        "t": "2026-11-27T00:00:00Z",
+        "v": 1190
+      },
+      {
+        "t": "2026-11-28T00:00:00Z",
+        "v": 1200
+      }
+    ]
+  }
+}

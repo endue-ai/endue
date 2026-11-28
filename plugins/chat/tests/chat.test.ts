@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { at, chat, DISCORD, SLACK } from "./chat-fixtures";
+import { at, chat, DISCORD, SLACK, sample } from "./chat-fixtures";
 import { installed, mount, READ } from "./harness";
 
 const GENERAL = "acme.slack/work@C1";
@@ -42,6 +42,23 @@ describe("one place for every chat", () => {
       pane: null,
       empty: "Pick a conversation.",
     });
+  });
+
+  it("leaves social posts and replies, which are entries, to the social plugins", async () => {
+    const before = (await mount()).view.nav();
+    const reply = {
+      id: "18011",
+      source: { connector: "endue.social", instance: "conn_1" },
+      kind: "entry" as const,
+      title: "Autumn drop",
+      updatedAt: "2026-11-20T09:00:00Z",
+      url: "https://instagram.example/p/18011",
+      feed: "Studio on Instagram",
+      publishedAt: "2026-11-20T09:00:00Z",
+      raw: { network: "instagram", postKind: "reply", handle: "studio" },
+    };
+    const { view } = await mount({ items: [...sample(), reply] });
+    expect(view.nav()).toEqual(before);
   });
 
   it("opens a conversation oldest first with its day, the New line and thread replies folded", async () => {

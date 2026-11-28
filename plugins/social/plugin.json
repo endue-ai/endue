@@ -1,0 +1,367 @@
+{
+  "id": "endue.social",
+  "name": "Social",
+  "version": "0.1.0",
+  "kind": "connector",
+  "description": "Posts, replies and mentions from the social networks connected to your endue account, the account's numbers, and publishing, replying and deleting through them.",
+  "contributes": {
+    "commands": [
+      {
+        "id": "endue.social.post.publish",
+        "title": "Publish a post",
+        "description": "Publish a post on one social account: text, title, media or a link, or a reply to a post.",
+        "keywords": ["social", "post", "publish", "share"],
+        "irreversible": true,
+        "agent": true,
+        "args": {
+          "type": "object",
+          "required": ["instance"],
+          "properties": {
+            "instance": {
+              "type": "string",
+              "description": "The instance: the account connector it acts through."
+            },
+            "destination": {
+              "type": "string",
+              "description": "Where in the account (a page, a community), when it has several."
+            },
+            "text": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "media": {
+              "type": "array",
+              "description": "Pictures or videos at public https URLs, with alt text.",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "link": {
+              "type": "string"
+            },
+            "replyTo": {
+              "type": "string",
+              "description": "The id of the post this one answers."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "endue.social.post.reply",
+        "title": "Reply to a post",
+        "description": "Reply to a post or a reply on one social account.",
+        "keywords": ["social", "reply", "comment"],
+        "irreversible": true,
+        "agent": true,
+        "args": {
+          "type": "object",
+          "required": ["instance", "id", "text"],
+          "properties": {
+            "instance": {
+              "type": "string",
+              "description": "The instance: the account connector it acts through."
+            },
+            "id": {
+              "type": "string",
+              "description": "The post or reply to answer."
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "endue.social.post.delete",
+        "title": "Delete a post",
+        "description": "Delete one of the account's posts on its network.",
+        "keywords": ["social", "delete", "post"],
+        "irreversible": true,
+        "agent": true,
+        "args": {
+          "type": "object",
+          "required": ["instance", "id"],
+          "properties": {
+            "instance": {
+              "type": "string",
+              "description": "The instance: the account connector it acts through."
+            },
+            "id": {
+              "type": "string",
+              "description": "The post to delete."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "connector": {
+    "binding": "endue",
+    "auth": {
+      "kind": "endue"
+    },
+    "resources": [
+      {
+        "kind": "entry",
+        "actions": [
+          "endue.social.post.publish",
+          "endue.social.post.reply",
+          "endue.social.post.delete"
+        ]
+      },
+      {
+        "kind": "record"
+      },
+      {
+        "kind": "metric"
+      }
+    ],
+    "sync": {
+      "mode": "pull",
+      "intervalSeconds": 900
+    },
+    "endue": {
+      "tools": ["social_read", "social_publish", "social_delete"],
+      "requests": [
+        {
+          "tool": "social_read",
+          "arguments": {
+            "operation": {
+              "const": "profile"
+            }
+          },
+          "items": "",
+          "map": "account"
+        },
+        {
+          "tool": "social_read",
+          "arguments": {
+            "operation": {
+              "const": "posts"
+            },
+            "limit": {
+              "const": 20
+            },
+            "cursor": {
+              "page": true
+            },
+            "since": {
+              "since": true
+            }
+          },
+          "items": "/items",
+          "next": "/next_cursor",
+          "map": "post"
+        },
+        {
+          "tool": "social_read",
+          "arguments": {
+            "operation": {
+              "const": "inbox"
+            },
+            "limit": {
+              "const": 20
+            },
+            "cursor": {
+              "page": true
+            },
+            "since": {
+              "since": true
+            }
+          },
+          "items": "/items",
+          "next": "/next_cursor",
+          "map": "post",
+          "optional": true
+        },
+        {
+          "tool": "social_read",
+          "arguments": {
+            "operation": {
+              "const": "insights"
+            },
+            "scope": {
+              "const": "account"
+            },
+            "period": {
+              "const": "day"
+            },
+            "metrics": {
+              "const": ["followers", "reach", "engagement"]
+            }
+          },
+          "items": "/series",
+          "map": "number",
+          "optional": true
+        }
+      ],
+      "maps": {
+        "post": {
+          "kind": "entry",
+          "fields": {
+            "id": "/id",
+            "title": {
+              "first": [
+                "/title",
+                {
+                  "pointer": "/text",
+                  "before": "\n"
+                }
+              ]
+            },
+            "body": "/text",
+            "url": "/url",
+            "feed": {
+              "instance": "title"
+            },
+            "publishedAt": "/created_at",
+            "updatedAt": "/created_at",
+            "raw": {
+              "object": {
+                "network": {
+                  "instance": "type"
+                },
+                "account": {
+                  "instance": "id"
+                },
+                "destination": "/destination",
+                "postKind": "/kind",
+                "replyTo": "/reply_to",
+                "handle": "/author/handle",
+                "authorName": "/author/name",
+                "avatar": "/author/avatar_url",
+                "self": "/self",
+                "media": "/media",
+                "truncated": "/text_truncated",
+                "likes": "/counts/likes",
+                "replies": "/counts/replies",
+                "reposts": "/counts/reposts",
+                "views": "/counts/views"
+              }
+            }
+          }
+        },
+        "account": {
+          "kind": "record",
+          "fields": {
+            "id": "/account/id",
+            "title": {
+              "first": ["/account/name", "/account/handle"]
+            },
+            "deepLink": "/account/url",
+            "updatedAt": {
+              "instance": "syncedAt"
+            },
+            "schema": {
+              "const": "https://endue.ai/schemas/desk/social-account.json"
+            },
+            "fields": "",
+            "raw": {
+              "object": {
+                "network": "/network",
+                "account": {
+                  "instance": "id"
+                }
+              }
+            }
+          }
+        },
+        "number": {
+          "kind": "metric",
+          "fields": {
+            "id": "/metric",
+            "title": "/metric",
+            "series": "/metric",
+            "unit": "/unit",
+            "points": "/points",
+            "updatedAt": {
+              "instance": "syncedAt"
+            },
+            "raw": {
+              "object": {
+                "network": {
+                  "instance": "type"
+                },
+                "account": {
+                  "instance": "id"
+                }
+              }
+            }
+          }
+        }
+      },
+      "actions": {
+        "endue.social.post.publish": {
+          "tool": "social_publish",
+          "risk": "send",
+          "arguments": {
+            "operation": {
+              "const": "publish"
+            },
+            "destination": {
+              "arg": "destination"
+            },
+            "text": {
+              "arg": "text"
+            },
+            "title": {
+              "arg": "title"
+            },
+            "media": {
+              "arg": "media"
+            },
+            "link": {
+              "arg": "link"
+            },
+            "reply_to": {
+              "arg": "replyTo"
+            }
+          }
+        },
+        "endue.social.post.reply": {
+          "tool": "social_publish",
+          "risk": "send",
+          "arguments": {
+            "operation": {
+              "const": "reply"
+            },
+            "id": {
+              "arg": "id"
+            },
+            "text": {
+              "arg": "text"
+            }
+          }
+        },
+        "endue.social.post.delete": {
+          "tool": "social_delete",
+          "risk": "destructive",
+          "arguments": {
+            "operation": {
+              "const": "delete_post"
+            },
+            "id": {
+              "arg": "id"
+            }
+          }
+        }
+      }
+    }
+  }
+}
