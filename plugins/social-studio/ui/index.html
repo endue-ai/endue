@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Social Studio</title>
+    <link rel="stylesheet" href="/_desk/tokens.css" />
+    <link rel="stylesheet" href="/_desk/base.css" />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="importmap">
+      { "imports": { "@endue-ai/plugin-sdk": "/_desk/plugin-sdk.js", "@endue-ai/ui": "/_desk/ui.js" } }
+    </script>
+  </head>
+  <body>
+    <header class="desk-header">
+      <div class="desk-header-text">
+        <h1 class="desk-header-title" id="title"></h1>
+        <p id="status" class="desk-header-desc" role="status"></p>
+      </div>
+      <nav id="views" class="desk-tabs" role="tablist"></nav>
+    </header>
+    <div id="studio">
+      <aside id="accounts"></aside>
+      <main id="main">
+        <div id="filters">
+          <select id="network" class="desk-field"></select>
+          <input id="search" class="desk-field" type="search" autocomplete="off" />
+        </div>
+        <div id="pane">
+          <div id="list" role="listbox"></div>
+          <div id="numbers" hidden></div>
+          <section id="detail" hidden></section>
+        </div>
+        <div id="empty" hidden>
+          <p id="empty-text"></p>
+          <button id="connect" class="desk-btn desk-btn-primary" type="button" hidden></button>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

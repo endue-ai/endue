@@ -1,0 +1,175 @@
+{
+  "id": "endue.social-studio",
+  "name": "Social Studio",
+  "version": "0.1.0",
+  "kind": "ui",
+  "entry": "ui/index.html",
+  "messages": "messages",
+  "description": "Every social account the endue account connects in one window: the accounts' posts, the replies and mentions to them, and their numbers.",
+  "permissions": [
+    { "permission": "data:read", "kinds": ["entry", "metric", "record"] },
+    { "permission": "cmd:invoke", "ids": ["desk.connectors.open"] },
+    { "permission": "shell:open", "schemes": ["https"] },
+    { "permission": "connector:manage" }
+  ],
+  "surfaces": [
+    {
+      "id": "main",
+      "title": "Social Studio",
+      "titleMessage": "title",
+      "placement": "center",
+      "window": { "size": { "width": 1080, "height": 720 } }
+    }
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "endue.social-studio.open",
+        "title": "Open Social Studio",
+        "titleMessage": "open",
+        "keywords": [
+          "social",
+          "sns",
+          "instagram",
+          "threads",
+          "x",
+          "reddit",
+          "posts",
+          "소셜",
+          "SNS"
+        ],
+        "runs": { "command": "desk.plugins.open", "args": { "plugin": "endue.social-studio" } }
+      },
+      {
+        "id": "endue.social-studio.view",
+        "title": "Switch the Social Studio view",
+        "titleMessage": "view",
+        "keywords": ["social", "feed", "replies", "numbers"],
+        "args": {
+          "type": "object",
+          "properties": { "view": { "type": "string", "enum": ["feed", "replies", "numbers"] } },
+          "required": ["view"],
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "endue.social-studio.accounts",
+        "title": "Social Studio: accounts as data",
+        "keywords": ["social", "accounts", "networks"],
+        "description": "The social accounts, by network, as data, leaving the screen as it is: each with source (to name it in posts and numbers), title, network, state, the sentence that explains an error or a pause, reauth (true when it must be reconnected on endue.ai), handle, followers and capabilities (what the network lets the account do).",
+        "args": { "type": "object", "properties": {}, "additionalProperties": false },
+        "result": {
+          "type": "object",
+          "properties": { "accounts": { "type": "array" } }
+        },
+        "agent": true,
+        "readOnly": true
+      },
+      {
+        "id": "endue.social-studio.posts",
+        "title": "Social Studio: posts as data",
+        "keywords": ["social", "posts", "feed"],
+        "description": "The accounts' own posts, newest first, as data: each with source and id (to show it or read its replies), network, author, handle, at, text, url, counts (only those the network gives: likes, replies, reposts, views) and media kinds. source narrows to one account, network to one network (instagram, threads…), query to posts holding the words. Up to limit (20, at most 100).",
+        "args": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "object",
+              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "required": ["connector", "instance"],
+              "additionalProperties": false
+            },
+            "network": { "type": "string", "maxLength": 100 },
+            "query": { "type": "string", "maxLength": 200 },
+            "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+          },
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": { "posts": { "type": "array" }, "more": { "type": "boolean" } }
+        },
+        "agent": true,
+        "readOnly": true
+      },
+      {
+        "id": "endue.social-studio.replies",
+        "title": "Social Studio: replies and mentions as data",
+        "keywords": ["social", "replies", "mentions", "comments"],
+        "description": "Replies and mentions to the accounts, the unseen first, as data, each as posts answers them with seen. With { source, id } of a post, only the replies to it; else source, network and query narrow as in posts. Up to limit (20, at most 100); unseen counts them all.",
+        "args": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "object",
+              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "required": ["connector", "instance"],
+              "additionalProperties": false
+            },
+            "id": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "network": { "type": "string", "maxLength": 100 },
+            "query": { "type": "string", "maxLength": 200 },
+            "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+          },
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "replies": { "type": "array" },
+            "unseen": { "type": "integer" },
+            "more": { "type": "boolean" }
+          }
+        },
+        "agent": true,
+        "readOnly": true
+      },
+      {
+        "id": "endue.social-studio.numbers",
+        "title": "Social Studio: an account's numbers as data",
+        "keywords": ["social", "insights", "followers", "reach", "engagement"],
+        "description": "One account's numbers as data: each series (followers, reach, engagement…) with its unit, latest point and up to 90 points, and the account's best posts (most likes, then replies). The account is { source } as accounts answers it; a network that gives no numbers has no series.",
+        "args": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "object",
+              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "required": ["connector", "instance"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["source"],
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": { "series": { "type": "array" }, "best": { "type": "array" } }
+        },
+        "agent": true,
+        "readOnly": true
+      },
+      {
+        "id": "endue.social-studio.show",
+        "title": "Show a social post in Social Studio",
+        "keywords": ["social", "post", "open"],
+        "description": "Open a post, reply or mention in Social Studio and bring the window up. The post is { source, id } as posts and replies answer them.",
+        "args": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "object",
+              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "required": ["connector", "instance"],
+              "additionalProperties": false
+            },
+            "id": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          },
+          "required": ["source", "id"],
+          "additionalProperties": false
+        },
+        "agent": true
+      }
+    ]
+  }
+}
