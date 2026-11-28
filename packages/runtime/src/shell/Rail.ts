@@ -53,16 +53,24 @@ function items(ctx: ShellCtx, s: DeskState, captures: readonly CaptureInForce[])
       ? {
           id: "brain",
           icon: "brain",
-          label: ctx.tr("brainLocal", { model: b.model }),
+          // "any": the first chat model the server holds, as the desk picks one when none is set.
+          label: ctx.tr("brainLocal", {
+            model: b.model === "any" ? ctx.tr("brainAnyModel") : b.model,
+          }),
           dot: "success",
         }
       : b.mode === "cloud"
         ? {
             id: "brain",
             icon: "brain",
-            // Claude Code counts no credits of the desk's: it is named instead (ADR 0109).
+            // Claude Code and Codex count no credits of the desk's: they are named instead (ADR 0109).
+            // The brain that answers: one standing in for the chosen one is named (ADR 0094).
             label:
-              b.brain === "claude" ? ctx.tr("brainClaude") : ctx.tr("brainCloud", { n: b.credits }),
+              (b.answering ?? b.brain) === "claude"
+                ? ctx.tr("brainClaude")
+                : (b.answering ?? b.brain) === "codex"
+                  ? ctx.tr("brainCodex")
+                  : ctx.tr("brainCloud", { n: b.credits }),
             dot: "info",
           }
         : { id: "brain", icon: "brain", label: ctx.tr("brainOffline"), dot: "warning" },
@@ -98,7 +106,7 @@ function items(ctx: ShellCtx, s: DeskState, captures: readonly CaptureInForce[])
 }
 
 /** The brains the popover offers, in its order. */
-const BRAINS: readonly BrainName[] = ["endue", "claude", "local", "echo"];
+const BRAINS: readonly BrainName[] = ["endue", "codex", "claude", "local", "echo"];
 
 const row = (...children: Child[]) => h("div", { class: "pop-row" }, ...children);
 const muted = (text: string) => h("span", { class: "pop-muted" }, text);

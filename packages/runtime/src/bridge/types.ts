@@ -63,7 +63,7 @@ export interface CaptureInForce {
 }
 
 /** A brain the desk can choose for Eris (ADR 0094); claude is the person's Claude Code (ADR 0109). */
-export type BrainName = "endue" | "local" | "echo" | "claude";
+export type BrainName = "endue" | "local" | "echo" | "claude" | "codex";
 
 /**
  * Which brain answers. `brain` is the one the desk chose, where it can choose; `fallback` marks the
@@ -71,7 +71,7 @@ export type BrainName = "endue" | "local" | "echo" | "claude";
  */
 export type BrainStatus =
   | { mode: "local"; model: string; brain?: BrainName; fallback?: boolean }
-  | { mode: "cloud"; credits: number; brain?: BrainName }
+  | { mode: "cloud"; credits: number; brain?: BrainName; answering?: BrainName }
   | { mode: "offline"; brain?: BrainName };
 
 export interface WordTime {

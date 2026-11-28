@@ -1,7 +1,8 @@
-//! The brains the desk chooses from for Eris (ADR 0094): endue AI with the person's endue ID,
-//! the local brain on Ollama, examples/brain-echo and the person's own Claude Code (ADR 0109). The
-//! runtime's setting `brain.use` picks one per turn (desk-core's brain_choice.rs); each address can
-//! be moved with an environment variable.
+//! The brains the desk chooses from for Eris (ADR 0094, amended for FT-01): the person's own Eris
+//! on endue AI with their endue ID, their own Codex and Claude Code (ADR 0109), the local brain on
+//! Ollama and examples/brain-echo. The runtime's setting `brain.use` picks one per turn (desk-core's
+//! brain_choice.rs); a turn it cannot answer goes down endue, Codex, Claude Code, local. Each
+//! address can be moved with an environment variable.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -9,40 +10,51 @@ use std::sync::Arc;
 use desk_brain::Brain;
 use desk_brain_endue::HttpBrain;
 use desk_brain_local::{
-    ClaudeCodeOptions, DEFAULT_BASE_URL, LocalBrain, LocalBrainOptions, find_claude,
+    ClaudeCodeOptions, CodexOptions, DEFAULT_BASE_URL, LocalBrain, LocalBrainOptions, find_claude,
+    find_codex,
 };
-use desk_core::Brains;
 use desk_core::account::Account;
+use desk_core::{Brains, studio_tokens};
+use desk_platform::Platform;
 
-/// endue AI's brain unless `DESK_BRAIN_URL` says otherwise.
-pub const DEFAULT_BRAIN_URL: &str = "https://brain.endue.ai/v0";
+use crate::endue_eris::EndueEris;
+
 /// examples/brain-echo (`just brain-echo`) unless `DESK_ECHO_URL` says otherwise.
 pub const DEFAULT_ECHO_URL: &str = "http://127.0.0.1:8787/v0";
 
-/// Every brain this desk can reach, keeping their sessions in `data`. endue AI asks `account` for
-/// its token on every request; Ollama is at `DESK_OLLAMA_URL` (its own default otherwise); Claude
-/// Code is `DESK_CLAUDE_PATH`, else the `claude` found on PATH or where its installers put it, with
-/// `DESK_CLAUDE_MODEL` as its model (Claude Code's own otherwise).
+/// Every brain this desk can reach, keeping their sessions in `data`. endue is the person's Eris on
+/// endue AI, asked with `account`'s token (`DESK_BRAIN_URL` points it at a `specs/brain/v0` brain
+/// instead); Codex and Claude Code are `DESK_CODEX_PATH` and `DESK_CLAUDE_PATH`, else the program
+/// found on PATH or where its installers put it, with `DESK_CODEX_MODEL` and `DESK_CLAUDE_MODEL`;
+/// Ollama is at `DESK_OLLAMA_URL` (its own default otherwise).
 pub fn brains(data: &Path, home: &Path, account: Arc<Account>) -> Brains {
     let mut brains = Brains::default().with_folder(data);
-    let endue = url("DESK_BRAIN_URL", DEFAULT_BRAIN_URL);
-    match HttpBrain::new(&endue) {
-        // The person's endue ID (ADR 0089): signing in hands the brain its bearer token.
-        Ok(brain) => {
-            let brain = brain.with_token_source(Arc::new(move || account.token()));
-            brains = brains.with_endue(Arc::new(brain));
-        }
+    match endue(data, account) {
+        Ok(brain) => brains = brains.with_endue(brain),
         Err(why) => eprintln!("endue: no endue AI brain ({why})"),
     }
     match HttpBrain::new(&url("DESK_ECHO_URL", DEFAULT_ECHO_URL)) {
         Ok(brain) => brains = brains.with_echo(Arc::new(brain)),
         Err(why) => eprintln!("endue: no echo brain ({why})"),
     }
-    // A Claude Code not found now still answers as `claude` on PATH, or is unreachable, so the
-    // choice exists and the local brain stands in (ADR 0094).
+    let path = std::env::var_os("PATH");
+    // A Codex or Claude Code not found now still answers as the name on PATH, or is unreachable,
+    // so the choice exists and the next brain stands in.
+    let codex = std::env::var_os("DESK_CODEX_PATH")
+        .map(PathBuf::from)
+        .or_else(|| find_codex(path.clone(), Some(home.to_path_buf())))
+        .unwrap_or_else(|| PathBuf::from("codex"));
+    let mut options = CodexOptions::new(codex);
+    if let Ok(model) = std::env::var("DESK_CODEX_MODEL") {
+        options = options.with_model(model);
+    }
+    match LocalBrain::codex(data.join("codex-brain"), options) {
+        Ok(brain) => brains = brains.with_codex(Arc::new(brain)),
+        Err(why) => eprintln!("endue: no Codex brain ({why})"),
+    }
     let program = std::env::var_os("DESK_CLAUDE_PATH")
         .map(PathBuf::from)
-        .or_else(|| find_claude(std::env::var_os("PATH"), Some(home.to_path_buf())))
+        .or_else(|| find_claude(path, Some(home.to_path_buf())))
         .unwrap_or_else(|| PathBuf::from("claude"));
     let mut claude = ClaudeCodeOptions::new(program.clone());
     if let Ok(model) = std::env::var("DESK_CLAUDE_MODEL") {
@@ -66,6 +78,23 @@ pub fn brains(data: &Path, home: &Path, account: Arc<Account>) -> Brains {
         let brain = LocalBrain::open(folder.join(file_safe(model)), options)?;
         Ok(Arc::new(brain) as Arc<dyn Brain>)
     })
+}
+
+/// The `endue` brain: a `specs/brain/v0` brain at `DESK_BRAIN_URL` when it is set, else the
+/// person's Eris on endue AI (`DESK_ENDUE_PLATFORM_URL` moves endue AI, as for the agent bar).
+fn endue(data: &Path, account: Arc<Account>) -> Result<Arc<dyn Brain>, String> {
+    if let Some(at) = std::env::var("DESK_BRAIN_URL")
+        .ok()
+        .filter(|at| !at.trim().is_empty())
+    {
+        let brain = HttpBrain::new(&at).map_err(|e| e.to_string())?;
+        let brain = brain.with_token_source(Arc::new(move || account.token()));
+        return Ok(Arc::new(brain));
+    }
+    let platform = Platform::from_env(studio_tokens(&account)).map_err(|e| e.message)?;
+    let eris = EndueEris::new(Box::new(platform));
+    let brain = LocalBrain::with_model(data.join("endue-brain"), "endue", Box::new(eris))?;
+    Ok(Arc::new(brain))
 }
 
 fn url(variable: &str, default: &str) -> String {

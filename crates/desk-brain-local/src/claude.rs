@@ -64,6 +64,16 @@ pub fn find_claude(path: Option<OsString>, home: Option<PathBuf>) -> Option<Path
     } else {
         &["claude"]
     };
+    find_program(names, path, home)
+}
+
+/// The first of `names` on `path`, else in the folders installers use under `home` and the
+/// system's.
+pub(crate) fn find_program(
+    names: &[&str],
+    path: Option<OsString>,
+    home: Option<PathBuf>,
+) -> Option<PathBuf> {
     let mut folders: Vec<PathBuf> = path.iter().flat_map(std::env::split_paths).collect();
     if let Some(home) = home {
         for under in [
@@ -197,15 +207,38 @@ fn run(
     stdin: &str,
     folder: &Path,
 ) -> Result<Output, BrainFailure> {
-    let program = options.program.display().to_string();
-    let mut child = Command::new(&options.program)
+    let program = Program {
+        path: &options.program,
+        name: "Claude Code",
+        timeout: options.timeout,
+    };
+    run_program(&program, args, stdin, folder)
+}
+
+/// A program a brain runs once per answer, as people name it in errors.
+pub(crate) struct Program<'a> {
+    pub path: &'a Path,
+    pub name: &'a str,
+    pub timeout: Duration,
+}
+
+/// Run `program` in `folder` with `args`, `stdin` written and closed, until it exits or its
+/// timeout passes (then it is stopped).
+pub(crate) fn run_program(
+    options: &Program<'_>,
+    args: &[String],
+    stdin: &str,
+    folder: &Path,
+) -> Result<Output, BrainFailure> {
+    let (name, program) = (options.name, options.path.display().to_string());
+    let mut child = Command::new(options.path)
         .args(args)
         .current_dir(folder)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| BrainFailure::Unreachable(format!("Claude Code at {program}: {e}")))?;
+        .map_err(|e| BrainFailure::Unreachable(format!("{name} at {program}: {e}")))?;
     let input = child.stdin.take().map(|mut pipe| {
         let text = stdin.to_owned();
         thread::spawn(move || {
@@ -241,7 +274,7 @@ fn run(
             Ok(None) | Err(_) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                let late = format!("Claude Code did not answer within {:?}", options.timeout);
+                let late = format!("{name} did not answer within {:?}", options.timeout);
                 return Err(BrainFailure::Unreachable(late));
             }
         }
@@ -336,11 +369,11 @@ fn result_of(stdout: &str) -> Option<Value> {
     }
 }
 
-fn first_line(text: &str) -> Option<&str> {
+pub(crate) fn first_line(text: &str) -> Option<&str> {
     text.lines().map(str::trim).find(|line| !line.is_empty())
 }
 
-fn refused(status: u16, code: BrainErrorCode, message: String) -> BrainFailure {
+pub(crate) fn refused(status: u16, code: BrainErrorCode, message: String) -> BrainFailure {
     BrainFailure::Refused {
         status,
         error: BrainError {

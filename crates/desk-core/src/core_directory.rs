@@ -72,8 +72,12 @@ impl Core {
         if picked.conversation.reachable() {
             return json(answering(&picked.conversation, chosen, None));
         }
-        match picked.fallback.filter(|fallback| fallback.to.reachable()) {
-            Some(fallback) => json(answering(&fallback.to, chosen, Some(true))),
+        match picked
+            .fallback
+            .as_ref()
+            .and_then(|fallback| fallback.next())
+        {
+            Some((name, to, _)) => json(standing_in(&to, chosen, name)),
             None => json(offline(chosen)),
         }
     }
@@ -129,6 +133,23 @@ fn offline(brain: Option<BrainName>) -> BrainStatusResult {
     })
 }
 
+/// The status of `answering`, which answers in place of the chosen brain (ADR 0094).
+fn standing_in(
+    conversation: &Conversation,
+    brain: Option<BrainName>,
+    answering: BrainName,
+) -> BrainStatusResult {
+    match conversation.mode() {
+        BrainMode::Cloud => BrainStatusResult::BrainStatusCloud(BrainStatusCloud {
+            mode: Default::default(),
+            credits: None,
+            brain,
+            answering: Some(answering),
+        }),
+        BrainMode::Local { .. } => self::answering(conversation, brain, Some(true)),
+    }
+}
+
 /// The status of a brain that answers: in the cloud, or on this machine with its model.
 fn answering(
     conversation: &Conversation,
@@ -140,6 +161,7 @@ fn answering(
             mode: Default::default(),
             credits: None,
             brain,
+            answering: None,
         }),
         BrainMode::Local { model } => BrainStatusResult::BrainStatusLocal(BrainStatusLocal {
             mode: Default::default(),

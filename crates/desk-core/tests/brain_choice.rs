@@ -23,7 +23,7 @@ use desk_brain::{
 use desk_brain_endue::HttpBrain;
 use desk_brain_local::{LocalBrain, LocalBrainOptions};
 use desk_core::{BrainOptions, Brains, Core, DEFAULT_LOCAL_MODEL, Delivery, FALLBACK_LINE};
-use ollama::FakeOllama;
+use ollama::{FakeOllama, HELD};
 use serde_json::{Value, json};
 use support::*;
 
@@ -219,7 +219,7 @@ fn a_claude_code_that_cannot_answer_hands_the_turn_to_the_local_brain() {
 
     let (_, first) = turn(&core, &deliveries, "hi");
     assert!(first.starts_with(FALLBACK_LINE), "{first:?}");
-    assert!(first.ends_with(&format!("Hi from {DEFAULT_LOCAL_MODEL}")));
+    assert!(first.ends_with(&format!("Hi from {HELD}")));
     let expected = json!({ "mode": "local", "model": DEFAULT_LOCAL_MODEL, "brain": "claude",
         "fallback": true });
     assert_eq!(status(&core), expected);
@@ -254,13 +254,10 @@ fn an_unreachable_remote_brain_falls_back_to_the_local_brain_and_eris_says_so_on
     let (kinds, first) = turn(&core, &deliveries, "hi");
     assert!(!kinds.contains(&"offline".to_owned()), "{kinds:?}");
     assert!(first.starts_with(FALLBACK_LINE), "{first:?}");
-    assert!(
-        first.ends_with(&format!("Hi from {DEFAULT_LOCAL_MODEL}")),
-        "{first:?}"
-    );
+    assert!(first.ends_with(&format!("Hi from {HELD}")), "{first:?}");
 
     let (_, second) = turn(&core, &deliveries, "and now?");
-    assert_eq!(second, format!("Hi from {DEFAULT_LOCAL_MODEL}"));
+    assert_eq!(second, format!("Hi from {HELD}"));
 
     let expected = json!({ "mode": "local", "model": DEFAULT_LOCAL_MODEL, "brain": "endue",
         "fallback": true });
@@ -331,4 +328,42 @@ fn brain_claude_model_picks_claude_code_on_that_model_and_empty_keeps_its_own() 
     call(&core, "desk", "settings.set", params).unwrap();
     assert_eq!(turn(&core, &deliveries, "back").1, "claude: back");
     assert_eq!(sonnet.turns.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn a_turn_goes_down_endue_codex_claude_then_local() {
+    let echo = Echo::start();
+    let ollama = FakeOllama::start();
+    let home = home("brain-choice-order");
+    let models = Arc::new(Mutex::new(Vec::new()));
+    let claude = named("claude", echo.url());
+    let brains = local_on(&ollama.url, &home.join("local"), models)
+        .with_endue(closed())
+        .with_codex(closed())
+        .with_claude(claude.clone());
+    let (core, deliveries) = core_on(brains, &home);
+
+    // Signed out of endue and without Codex, the person's Claude Code answers, said once.
+    let (_, first) = turn(&core, &deliveries, "hi");
+    assert!(first.starts_with(FALLBACK_LINE), "{first:?}");
+    assert!(first.ends_with("claude: hi"), "{first:?}");
+    let (_, second) = turn(&core, &deliveries, "again");
+    assert_eq!(second, "claude: again", "the fallback is said once");
+    let expected = json!({ "mode": "cloud", "brain": "endue", "answering": "claude" });
+    assert_eq!(status(&core), expected);
+    assert_eq!(claude.turns.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn with_none_of_them_a_model_this_computer_holds_answers() {
+    let ollama = FakeOllama::start();
+    let home = home("brain-choice-order-local");
+    let models = Arc::new(Mutex::new(Vec::new()));
+    let brains = local_on(&ollama.url, &home.join("local"), models)
+        .with_endue(closed())
+        .with_codex(closed())
+        .with_claude(closed());
+    let (core, deliveries) = core_on(brains, &home);
+    let (_, first) = turn(&core, &deliveries, "hi");
+    assert!(first.ends_with(&format!("Hi from {HELD}")), "{first:?}");
 }

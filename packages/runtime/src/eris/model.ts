@@ -95,6 +95,7 @@ export async function useModel(ctx: ShellCtx, choice: ModelChoice): Promise<Brai
 const NAMES: Record<BrainName, string> = {
   endue: "endue AI",
   claude: "Claude Code",
+  codex: "Codex",
   local: "the local brain",
   echo: "the echo brain",
 };
@@ -126,7 +127,7 @@ export function defineModelCommands(ctx: ShellCtx): () => void {
       },
       agent: {
         description:
-          "Change the model you (Eris) think with, when the person asks for another model or brain. brain: endue (endue AI), claude (the person's Claude Code), local (Ollama on this computer) or echo. model: for claude an alias (opus, sonnet, haiku) or a claude-* id, or default for Claude Code's own; for local the Ollama model (qwen2.5, llama3.2). Or give model alone as the person said it (sonnet, local:qwen2.5). The next turn uses it; tell the person which one is in force.",
+          "Change the model you (Eris) think with, when the person asks for another model or brain. brain: endue (endue AI), codex (the person's Codex), claude (the person's Claude Code), local (Ollama on this computer) or echo. model: for claude an alias (opus, sonnet, haiku) or a claude-* id, or default for Claude Code's own; for local the Ollama model (qwen2.5, llama3.2). Or give model alone as the person said it (sonnet, local:qwen2.5). The next turn uses it; tell the person which one is in force.",
         args: {
           type: "object",
           properties: {

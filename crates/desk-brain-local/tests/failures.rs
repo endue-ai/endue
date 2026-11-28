@@ -3,7 +3,7 @@
 
 mod support;
 
-use desk_brain::{BrainErrorCode, BrainFailure};
+use desk_brain::BrainFailure;
 use serde_json::json;
 use support::{
     FakeOllama, Folder, Reply, brain, calls, closed_url, done, kinds, open, refused, say, submit,
@@ -26,7 +26,8 @@ fn an_unreachable_server_is_unreachable() {
 }
 
 #[test]
-fn an_error_body_is_refused() {
+fn a_model_the_server_does_not_hold_is_no_model_not_a_lost_session() {
+    // Read as not_found, the conversation cleared the session and tried again, three times (FT-01).
     let body = r#"{"error":"model \"test-model\" not found, try pulling it first"}"#;
     let ollama = FakeOllama::start(vec![Reply::Error(404, body.to_owned())]);
     let folder = Folder::new();
@@ -35,10 +36,28 @@ fn an_error_body_is_refused() {
 
     let (result, events) = turn(&brain, &session, &lease, "hi");
     match result {
+        Err(BrainFailure::Unreachable(why)) => {
+            assert!(why.contains("test-model"), "{why}");
+            assert!(why.contains("ollama pull"), "{why}");
+        }
+        other => panic!("expected no model, got {other:?}"),
+    }
+    assert!(events.is_empty(), "{events:?}");
+}
+
+#[test]
+fn an_error_body_is_refused() {
+    let body = r#"{"error":"the request is not one"}"#;
+    let ollama = FakeOllama::start(vec![Reply::Error(400, body.to_owned())]);
+    let folder = Folder::new();
+    let brain = brain(&ollama.url, &folder);
+    let (session, lease) = open(&brain, "desk-a");
+
+    let (result, events) = turn(&brain, &session, &lease, "hi");
+    match result {
         Err(BrainFailure::Refused { status, error }) => {
-            assert_eq!(status, 404);
-            assert_eq!(error.code, BrainErrorCode::NotFound);
-            assert!(error.message.contains("not found"), "{}", error.message);
+            assert_eq!(status, 400);
+            assert!(error.message.contains("not one"), "{}", error.message);
         }
         other => panic!("expected a refusal, got {other:?}"),
     }
