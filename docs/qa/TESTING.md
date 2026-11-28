@@ -42,7 +42,12 @@ Social posts follow [ADR 0410](../adr/0410-a-social-post-is-an-entry-with-a-soci
 its entries, account record and followers metric with `specs/item/v0/vectors/valid/*social*.json`;
 it checks the same `raw` keys on both networks, absent counts, a skipped inbox and insights, and the
 three irreversible commands. Mail's and Chat's `mail.test.ts` and `chat.test.ts` hold a social entry
-in the index and show the same lists.
+in the index and show the same lists. Social Studio (`plugins/social-studio`) mounts on the SDK's test
+host over jsdom with those vectors: `studio.test.ts` covers the Feed, Replies (seen state across a
+remount) and Numbers, the accounts' status, text that is never HTML, https-only links and a windowed
+list of 5,000 posts; `agent.test.ts` covers the read-only agent commands and `show`.
+`packages/runtime/e2e/social-studio.spec.ts` (`just test-e2e e2e/social-studio.spec.ts`) opens the
+window at 360 and 900 px in both schemes and writes a screenshot of each view.
 
 | Layer | What it checks | Tool and location | When | Status |
 | --- | --- | --- | --- | --- |

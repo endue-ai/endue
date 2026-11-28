@@ -163,7 +163,9 @@ const series = (
     unit,
     points: Array.from({ length: 14 }, (_, i) => ({
       t: at(15 + i, 0),
-      v: Math.round((from + step * i + (i % 3) * step * 0.6) * 1000) / 1000,
+      v: ((v) => (unit === "count" ? Math.round(v) : Math.round(v * 1000) / 1000))(
+        from + step * i + (i % 3) * step * 0.6,
+      ),
     })),
     updatedAt: at(29, 0),
     raw: { network, account: instance },
