@@ -1,0 +1,18 @@
+{
+  "target": "ConnectorToolCallEnvelope",
+  "description": "the network's own refusal, with a reason for machines",
+  "instance": {
+    "success": true,
+    "data": {
+      "ok": false,
+      "content": "Instagram needs a photo or a video to publish.",
+      "truncated": false,
+      "tool": "instagram__social_publish",
+      "risk": "send",
+      "error": {
+        "reason": "unsupported",
+        "message": "Instagram needs a photo or a video to publish."
+      }
+    }
+  }
+}

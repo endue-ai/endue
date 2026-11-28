@@ -1,0 +1,7 @@
+{
+  "target": "ConnectorToolCallRequest",
+  "description": "a call without its arguments object",
+  "instance": {
+    "operation": "posts"
+  }
+}

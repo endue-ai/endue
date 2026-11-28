@@ -1,0 +1,30 @@
+{
+  "target": "ConnectorToolListEnvelope",
+  "description": "a connector's tools, one the key may not call",
+  "instance": {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "name": "instagram__social_read",
+          "description": "Read posts, replies and numbers.",
+          "risk": "read",
+          "callable": true,
+          "input_schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "instagram__social_publish",
+          "description": "Publish a post.",
+          "risk": "send",
+          "callable": false,
+          "input_schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "total": 2
+    }
+  }
+}

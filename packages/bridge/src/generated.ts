@@ -2390,6 +2390,72 @@ export type AccountSettingsGetResult = AccountSettings;
 /** Result of account.settings.update: the settings now. */
 export type AccountSettingsUpdateResult = AccountSettings;
 
+/** What the desk's own key may do with the account's connectors: read (always), publish (send) and delete. publish and delete are asked for the first time the person does such a thing. */
+export type AccountConnectorPower = "read" | "publish" | "delete";
+
+/** active: the connector works. expired: it must be reconnected on endue.ai; the desk cannot reconnect it. */
+export type AccountConnectorState = "active" | "expired";
+
+/** What account.connectors.enable may add to the desk's key: publish (send) or delete. */
+export type AccountConnectorGrant = "publish" | "delete";
+
+/** One of the account's connectors as the desk's key sees it. expired ones must be reconnected on endue.ai: reconnectUrl is that page. */
+export interface AccountConnector {
+  id: string;
+  type: string;
+  name?: string;
+  title?: string;
+  state: AccountConnectorState;
+  tools: number;
+  reconnectUrl?: string;
+}
+
+/** Whether the desk uses the endue account's connectors, with what it may do, when its key was made (ms since the epoch), the connectors it can see and, for people, why the last step did not go through. No key is ever in it. */
+export interface AccountConnectors {
+  enabled: boolean;
+  may: AccountConnectorPower[];
+  keyName?: string;
+  createdAt?: number;
+  connectors: AccountConnector[];
+  problem?: string;
+}
+
+/** Parameters of account.connectors.enable: the scope and, optionally, what else the key may do. The desk makes a key for itself with the session when there is none, and replaces it with a wider one when allow asks for more. */
+export interface AccountConnectorsEnableParams {
+  scope: AccountManagePermission;
+  allow?: AccountConnectorGrant[];
+}
+
+/** Whether the desk uses the endue account's connectors, and the connectors it can see. Nothing is sent without the desk's own key. */
+export interface AccountConnectorsStatusRequest {
+  id: RequestId;
+  method: "account.connectors.status";
+  params: AccountParams;
+}
+
+/** Turn on "Use my endue connectors on this desk", or let its key publish or delete too. The key is kept in the OS keychain only. */
+export interface AccountConnectorsEnableRequest {
+  id: RequestId;
+  method: "account.connectors.enable";
+  params: AccountConnectorsEnableParams;
+}
+
+/** Turn it off: the desk revokes its key at endue AI and deletes it from the keychain. A revoke that cannot reach endue AI is said in problem and tried again at the next start. */
+export interface AccountConnectorsDisableRequest {
+  id: RequestId;
+  method: "account.connectors.disable";
+  params: AccountParams;
+}
+
+/** Result of account.connectors.status. */
+export type AccountConnectorsStatusResult = AccountConnectors;
+
+/** Result of account.connectors.enable. */
+export type AccountConnectorsEnableResult = AccountConnectors;
+
+/** Result of account.connectors.disable. */
+export type AccountConnectorsDisableResult = AccountConnectors;
+
 /** The account changed: a sign-in began, finished or failed, the session was renewed with a problem or ended, the profile arrived or changed, or the desk signed out. Sent to holders of account:manage. */
 export interface AccountChangedEvent {
   event: "account.changed";
@@ -3345,6 +3411,9 @@ export type BridgeRequest =
   | AccountSignOutRequest
   | AccountSettingsGetRequest
   | AccountSettingsUpdateRequest
+  | AccountConnectorsStatusRequest
+  | AccountConnectorsEnableRequest
+  | AccountConnectorsDisableRequest
   | AgentsListRequest
   | AgentsSessionsRequest
   | AgentsTranscriptRequest
@@ -8518,6 +8587,12 @@ export interface BridgeMethodMap {
     params: AccountSettingsUpdateParams;
     result: AccountSettingsUpdateResult;
   };
+  "account.connectors.status": { params: AccountParams; result: AccountConnectorsStatusResult };
+  "account.connectors.enable": {
+    params: AccountConnectorsEnableParams;
+    result: AccountConnectorsEnableResult;
+  };
+  "account.connectors.disable": { params: AccountParams; result: AccountConnectorsDisableResult };
   "agents.list": { params: AgentsParams; result: AgentsListResult };
   "agents.sessions": { params: AgentsSessionsParams; result: AgentsSessionsResult };
   "agents.transcript": { params: AgentsTranscriptParams; result: AgentsTranscriptResult };
@@ -8721,6 +8796,9 @@ export const BRIDGE_METHODS = [
   "account.signOut",
   "account.settings.get",
   "account.settings.update",
+  "account.connectors.status",
+  "account.connectors.enable",
+  "account.connectors.disable",
   "agents.list",
   "agents.sessions",
   "agents.transcript",

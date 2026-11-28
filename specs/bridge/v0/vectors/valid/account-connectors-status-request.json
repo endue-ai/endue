@@ -1,0 +1,13 @@
+{
+  "target": "BridgeRequest",
+  "description": "whether the desk uses the endue account's connectors, under account:manage",
+  "instance": {
+    "id": 51,
+    "method": "account.connectors.status",
+    "params": {
+      "scope": {
+        "permission": "account:manage"
+      }
+    }
+  }
+}

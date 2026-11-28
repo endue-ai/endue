@@ -1,0 +1,28 @@
+{
+  "target": "AccountConnectors",
+  "description": "on, read only, with one expired connector",
+  "instance": {
+    "enabled": true,
+    "may": ["read"],
+    "keyName": "endue Desk on ada-mac",
+    "createdAt": 1795000000000,
+    "connectors": [
+      {
+        "id": "conn_1",
+        "type": "instagram",
+        "name": "Instagram",
+        "title": "@ada.studio",
+        "state": "active",
+        "tools": 13
+      },
+      {
+        "id": "conn_2",
+        "type": "bluesky",
+        "name": "Bluesky",
+        "state": "expired",
+        "tools": 3,
+        "reconnectUrl": "https://endue.ai/resources/connectors"
+      }
+    ]
+  }
+}

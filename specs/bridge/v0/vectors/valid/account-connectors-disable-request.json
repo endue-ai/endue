@@ -1,0 +1,13 @@
+{
+  "target": "BridgeRequest",
+  "description": "turn it off",
+  "instance": {
+    "id": 53,
+    "method": "account.connectors.disable",
+    "params": {
+      "scope": {
+        "permission": "account:manage"
+      }
+    }
+  }
+}

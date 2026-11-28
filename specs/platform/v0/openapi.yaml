@@ -42,6 +42,11 @@ tags:
       user-service. The account, its preferences and the person's API keys answer the bare body.
   - name: notifications
     description: notification-service. Every answer is an envelope.
+  - name: connectors
+    description: >-
+      The connector API under /api/public/v1/connectors: the account's connectors and their tools,
+      called with an account API key the desk made for itself, never with the endue ID session. Every
+      answer is a success envelope.
 paths:
   /api/v1/agents:
     get:
@@ -419,6 +424,41 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiKeyList" }
         default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createApiKey
+      tags: [users]
+      summary: Make an account API key with the session, for the connector API
+      description: >-
+        endue makes one key for itself, named for the computer, when the person turns on "Use my endue
+        connectors on this desk". The answer carries the secret once; endue keeps it in the OS
+        keychain and never reads it back from endue AI.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApiKeyCreateRequest" }
+      responses:
+        "201":
+          description: The key, with its secret this once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiKeyCreated" }
+        default: { $ref: "#/components/responses/Error" }
+  /api/v1/me/api-keys/{key_id}:
+    delete:
+      operationId: revokeApiKey
+      tags: [users]
+      summary: Revoke one of the person's API keys
+      description: endue revokes its own key when the person turns the feature off or signs out.
+      parameters:
+        - name: key_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" }
+      responses:
+        "204":
+          description: Revoked.
+        default: { $ref: "#/components/responses/Error" }
   /api/v1/artifacts:
     get:
       operationId: listArtifacts
@@ -773,6 +813,73 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/NotificationPreferencesEnvelope" }
         default: { $ref: "#/components/responses/Error" }
+  /api/public/v1/connectors:
+    get:
+      operationId: listConnectors
+      tags: [connectors]
+      security:
+        - accountKey: []
+      summary: The account's connectors the key may use
+      description: >-
+        The connections of the account that are not turned off for API keys. An expired one must be
+        reconnected on endue.ai; endue cannot reconnect it.
+      responses:
+        "200":
+          description: The connectors, in a success envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectorListEnvelope" }
+        default: { $ref: "#/components/responses/Error" }
+  /api/public/v1/connectors/{connector_id}/tools:
+    get:
+      operationId: listConnectorTools
+      tags: [connectors]
+      security:
+        - accountKey: []
+      summary: One connector's tools, their risk and whether this key may call them
+      parameters:
+        - $ref: "#/components/parameters/ConnectorId"
+      responses:
+        "200":
+          description: The tools, in a success envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectorToolListEnvelope" }
+        default: { $ref: "#/components/responses/Error" }
+  /api/public/v1/connectors/{connector_id}/tools/{tool}/call:
+    post:
+      operationId: callConnectorTool
+      tags: [connectors]
+      security:
+        - accountKey: []
+      summary: Call one tool of a connector
+      description: >-
+        The network's own refusal is ok false with status 200. A refusal of the key or its scope is an
+        error envelope. Idempotency-Key makes a retry of a publishing call answer the first result.
+        X-RateLimit-Limit, X-RateLimit-Remaining and X-RateLimit-Reset say how many calls are left;
+        a 429 carries Retry-After.
+      parameters:
+        - $ref: "#/components/parameters/ConnectorId"
+        - name: tool
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9_]{1,128}$" }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConnectorToolCallRequest" }
+      responses:
+        "200":
+          description: The tool's answer, in a success envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectorToolCallEnvelope" }
+        default: { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     endueId:
@@ -781,7 +888,18 @@ components:
       description: >-
         The endue ID access token of the desk's account. endue sends no Origin header, waits 15 s at
         most, and after a 401 refreshes the token once and tries once more.
+    accountKey:
+      type: http
+      scheme: bearer
+      description: >-
+        An account API key (sk_...) endue made for itself with createApiKey. A 401 means the key is
+        gone; endue forgets it and never retries.
   parameters:
+    ConnectorId:
+      name: connector_id
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" }
     AgentId:
       name: agent_id
       in: path
@@ -857,6 +975,83 @@ components:
             content: { type: ["string", "null"] }
           required: [role, content]
       required: [run_id, stop_reason, message]
+    ConnectorStatus:
+      enum: [active, expired]
+    ConnectorSummary:
+      type: object
+      properties:
+        connector_id: { type: string, minLength: 1 }
+        type: { type: string, minLength: 1 }
+        name: { type: string }
+        display_name: { type: [string, "null"] }
+        status: { $ref: "#/components/schemas/ConnectorStatus" }
+        tool_count: { type: integer, minimum: 0 }
+      required: [connector_id, type, status]
+    ConnectorListEnvelope:
+      type: object
+      properties:
+        success: { const: true }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/ConnectorSummary" } }
+            total: { type: integer, minimum: 0 }
+          required: [items]
+      required: [success, data]
+    ConnectorRisk:
+      description: The tool's tier. null is a tool no key may call.
+      enum: [read, write, send, destructive, null]
+    ConnectorTool:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        risk: { $ref: "#/components/schemas/ConnectorRisk" }
+        callable: { type: boolean }
+        input_schema: { type: object }
+      required: [name, risk, callable]
+    ConnectorToolListEnvelope:
+      type: object
+      properties:
+        success: { const: true }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/ConnectorTool" } }
+            total: { type: integer, minimum: 0 }
+          required: [items]
+      required: [success, data]
+    ConnectorToolCallRequest:
+      type: object
+      properties:
+        arguments: { type: object }
+      required: [arguments]
+      additionalProperties: false
+    ConnectorToolError:
+      description: Why a network refused, for machines. Present when the tool names it.
+      type: object
+      properties:
+        reason: { enum: [unsupported, reauth, quota, rejected, invalid, in_progress] }
+        message: { type: string }
+        retry_after: { type: integer, minimum: 0 }
+      required: [reason, message]
+    ConnectorToolCall:
+      type: object
+      properties:
+        ok: { type: boolean }
+        content: { type: string }
+        data: { description: "The answer as JSON, when it is JSON and ok is true." }
+        truncated: { type: boolean }
+        tool: { type: string }
+        risk: { $ref: "#/components/schemas/ConnectorRisk" }
+        error: { $ref: "#/components/schemas/ConnectorToolError" }
+      required: [ok, content, tool]
+    ConnectorToolCallEnvelope:
+      type: object
+      properties:
+        success: { const: true }
+        data: { $ref: "#/components/schemas/ConnectorToolCall" }
+      required: [success, data]
     ErrorEnvelope:
       description: Every error of the platform. endue reads the status first (401 signed out, 403 forbidden, 404 and 410 not found, 400 and 422 invalid), then the code.
       type: object
@@ -1386,6 +1581,31 @@ components:
         last_used_at: { type: [string, "null"] }
         created_at: { type: string }
       required: [id]
+    ApiKeyScope:
+      description: What a key may do with the account's connectors.
+      enum: ["connectors:read", "connectors:write", "connectors:send", "connectors:delete"]
+    ApiKeyCreateRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80, pattern: "\\S" }
+        scopes:
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/ApiKeyScope" }
+      required: [name, scopes]
+      additionalProperties: false
+    ApiKeyCreated:
+      description: A key just made. secret is in no other answer.
+      type: object
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string }
+        secret: { type: string, pattern: "^sk_[A-Za-z0-9_]+$" }
+        scopes: { type: array, items: { type: string } }
+        created_at: { type: string }
+      required: [id, secret, scopes]
     ApiKeyList:
       description: The person's keys.
       type: object

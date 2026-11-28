@@ -1,0 +1,14 @@
+{
+  "target": "BridgeRequest",
+  "description": "a power the desk never asks for",
+  "instance": {
+    "id": 54,
+    "method": "account.connectors.enable",
+    "params": {
+      "scope": {
+        "permission": "account:manage"
+      },
+      "allow": ["write"]
+    }
+  }
+}
