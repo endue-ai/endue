@@ -152,6 +152,8 @@ pub fn boot(input: BootInput) -> Booted {
             }
         };
     account.keychain = keychain.clone();
+    // The desk's own key for the account's connectors, in the same keychain alone (ADR 0407).
+    core = core.with_account_connectors(keychain.clone());
     // Database passwords a plugin keeps for db.open, in the same keychain (ADR 0311).
     core = core.with_db_passwords(keychain, Some(data.join("db-passwords.json")));
     // The SSH host keys a plugin's tunnels trust, by host and port (ADR 0359).
@@ -171,6 +173,9 @@ pub fn boot(input: BootInput) -> Booted {
     let core = Arc::new(core);
     // Tool calls run as the agent that asks (ADR 0072, 0089).
     core.route_tools();
+    // A key a turn-off or sign-out could not revoke is revoked now (ADR 0407).
+    let settling = Arc::clone(&core);
+    std::thread::spawn(move || settling.settle_account_connectors());
     if let Some(attach) = attach {
         attach(&core);
     }

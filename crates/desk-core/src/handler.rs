@@ -107,6 +107,8 @@ pub struct Core {
     pub(crate) databases: Arc<Mutex<Databases>>,
     /// The passwords callers keep in the OS keychain for db.open (ADR 0311).
     pub(crate) db_passwords: Mutex<crate::db_passwords::DbPasswords>,
+    /// The desk's own key for the endue account's connectors (ADR 0407).
+    pub(crate) account_connectors: crate::account_connectors::KeyStore,
     /// The SSH host keys callers trust for db.open's tunnels (ADR 0359).
     pub(crate) db_ssh_hosts: Mutex<crate::db_ssh_hosts::DbSshHosts>,
     pub(crate) provided_views: Mutex<ProvidedViews>,
@@ -176,6 +178,7 @@ impl Core {
             sockets: Arc::new(Mutex::new(Sockets::default())),
             databases: Arc::new(Mutex::new(Databases::default())),
             db_passwords: Mutex::default(),
+            account_connectors: Default::default(),
             db_ssh_hosts: Mutex::default(),
             provided_views: Mutex::new(ProvidedViews::default()),
             surfaces: Mutex::new(Surfaces::default()),
