@@ -32,7 +32,7 @@ typed. `crates/desk-core/tests/account_connectors.rs` checks consent, the read-o
 the keychain (no file or answer holds it), widening by replacement, revoke on turn-off and sign-out,
 a revoke retried at the next start, a refused key forgotten once and the reconnect page.
 `connections.test.ts` drives the Settings section on the account stub.
-The endue connector binding follows [ADR 0408](../adr/0408-a-connector-plugin-can-be-the-endue-accounts-connectors-as-data.md).
+The endue connector binding follows [ADR 0409](../adr/0409-a-connector-plugin-can-be-the-endue-accounts-connectors-as-data.md).
 `crates/desk-core/tests/endue_binding.rs` and `endue_actions.rs` run a fixture plugin with made-up tools against the fake
 platform: instances from the account, pages and since, skipped records, truncated and refused answers,
 budget and limits, one idempotency key per invocation, expired connectors, the key off and removal.

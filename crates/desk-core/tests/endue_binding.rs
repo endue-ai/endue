@@ -1,4 +1,4 @@
-//! The endue connector binding (ADR 0408) over a fixture plugin whose tools are made up
+//! The endue connector binding (ADR 0409) over a fixture plugin whose tools are made up
 //! (`gadget__thing_read`, `gadget__thing_send`), so no network's name, field or limit is in the core:
 //! its instances are the account's connectors that offer every tool, a sync maps what the read tool
 //! answers into items, and its command calls the send tool, all with the desk's own key (ADR 0407)

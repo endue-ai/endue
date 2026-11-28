@@ -1393,7 +1393,7 @@ pub type Role = String;
 /// Semantic version, for example 0.1.0 or 1.2.3-beta.1.
 pub type Version = String;
 
-/// ui runs in a sandboxed iframe, logic in a Wasm instance, tool as an MCP server inside the VM. policy runs no code: it only contributes data (ADR 0017). library runs no code of its own either: it is files other plugins import, served at /<id>/... like any plugin's, never mounted and never turned off. connector brings an app's data in as items, as a Wasm component, an MCP server, an http block the core runs (no entry; ADR 0106) or an endue block over the endue account's connectors (no entry; ADR 0408); view runs no code either: it is one or more views (ADR 0032). theme runs no code: it is a theme block and its font and image files, chosen with desk.theme.active (ADR 0056). design-system runs no code either: it is a designSystem block of component recipes, chosen with desk.design.active (ADR 0090). pack runs no code either: a pack block naming the plugins it brings (nested in its folder or on the desk), its own views and its contributed layout (ADR 0108). native is a program per OS (its native block, no entry) that the desk starts as a process of its own: it draws its surface over specs/surface and calls the bridge over the connection the desk gave it, as itself; it is not sandboxed, only its bridge calls are checked (ADR 0154).
+/// ui runs in a sandboxed iframe, logic in a Wasm instance, tool as an MCP server inside the VM. policy runs no code: it only contributes data (ADR 0017). library runs no code of its own either: it is files other plugins import, served at /<id>/... like any plugin's, never mounted and never turned off. connector brings an app's data in as items, as a Wasm component, an MCP server, an http block the core runs (no entry; ADR 0106) or an endue block over the endue account's connectors (no entry; ADR 0409); view runs no code either: it is one or more views (ADR 0032). theme runs no code: it is a theme block and its font and image files, chosen with desk.theme.active (ADR 0056). design-system runs no code either: it is a designSystem block of component recipes, chosen with desk.design.active (ADR 0090). pack runs no code either: a pack block naming the plugins it brings (nested in its folder or on the desk), its own views and its contributed layout (ADR 0108). native is a program per OS (its native block, no entry) that the desk starts as a process of its own: it draws its surface over specs/surface and calls the bridge over the connection the desk gave it, as itself; it is not sandboxed, only its bridge calls are checked (ADR 0154).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PluginKind {
     #[serde(rename = "ui")]
@@ -2952,7 +2952,7 @@ pub struct ConnectorManifest {
     pub instance_settings: Option<BTreeMap<String, ConnectorSetting>>,
 }
 
-/// How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0408).
+/// How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0409).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConnectorBinding {
     #[serde(rename = "wasm")]
@@ -3164,7 +3164,7 @@ pub struct HttpConst {
     pub r#const: serde_json::Value,
 }
 
-/// A connector as data over the endue account's connectors (binding endue, ADR 0408): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch.
+/// A connector as data over the endue account's connectors (binding endue, ADR 0409): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EndueBinding {

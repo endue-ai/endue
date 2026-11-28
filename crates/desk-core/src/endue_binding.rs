@@ -1,4 +1,4 @@
-//! The endue connector binding without the core (specs/connector/v0 `EndueBinding`, ADR 0408): one
+//! The endue connector binding without the core (specs/connector/v0 `EndueBinding`, ADR 0409): one
 //! sync's tool calls and their pages, every record mapped into an item by the http binding's maps,
 //! and an action's arguments built from its command's. The core hands in the call (the desk's own key,
 //! ADR 0407); nothing here holds the key, and no network's name, field or limit is in it.

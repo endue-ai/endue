@@ -5,7 +5,7 @@ has no screen of its own (ADR 0032). One contract, four bindings: `wasm`, a comp
 `entry` names (local and light, no VM), `mcp`, an MCP server inside the VM (ADR 0002), `http`,
 requests and a mapping the core runs from the manifest, with no code and no `entry` (ADR 0106), and
 `endue`, the endue account's connectors, whose tools the core calls with the desk's own key (no code,
-no `entry`; ADR 0408). A plugin of
+no `entry`; ADR 0409). A plugin of
 kind `connector` declares it under `connector` in `plugin.json`: `ConnectorManifest` in
 `connector.schema.json`. v0 may break on any minor release (ADR 0004).
 
@@ -45,7 +45,7 @@ kind `connector` declares it under `connector` in `plugin.json`: `ConnectorManif
 
 ## endue binding
 
-`endue` (`EndueBinding`) is a connector as data over the endue account's connectors (ADR 0408). The
+`endue` (`EndueBinding`) is a connector as data over the endue account's connectors (ADR 0409). The
 core runs it with the desk's own key (ADR 0407); nothing of the plugin's runs, and it needs no
 `net:fetch`.
 

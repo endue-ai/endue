@@ -1,4 +1,4 @@
-//! The fixture of the endue binding's tests (ADR 0408): a connector plugin with made-up tools
+//! The fixture of the endue binding's tests (ADR 0409): a connector plugin with made-up tools
 //! (`gadget__thing_read`, `gadget__thing_send`), a desk signed in to the in-process fake platform
 //! with its key in a fake keychain, and the account connectors, pages and calls the fake answers.
 #![allow(dead_code)]

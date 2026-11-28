@@ -42,7 +42,7 @@ pub(crate) struct Connectors {
     pub(crate) builtins: Mutex<BuiltIns>,
     /// The http connectors' instances (ADR 0106).
     pub(crate) http: Mutex<crate::core_http::HttpConnectors>,
-    /// The endue connectors' instances (ADR 0408).
+    /// The endue connectors' instances (ADR 0409).
     pub(crate) endue: Mutex<crate::core_endue::EndueConnectors>,
     feed: Mutex<Feed>,
     scheduler: Mutex<Option<Scheduler>>,

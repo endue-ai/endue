@@ -1,4 +1,4 @@
-//! One sync of an endue connector's instance (ADR 0408): `syncing`, every request's pages read with
+//! One sync of an endue connector's instance (ADR 0409): `syncing`, every request's pages read with
 //! the desk's own key (`endue_binding`), what changed written to the index, then `connected`, or
 //! `error` with the tool's words. A sync that stopped early (its budget spent, the limit reached)
 //! writes what it read and removes nothing, and the next one waits as the limit asks.

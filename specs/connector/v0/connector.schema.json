@@ -48,7 +48,7 @@
       ]
     },
     "ConnectorBinding": {
-      "description": "How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0408).",
+      "description": "How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0409).",
       "type": "string",
       "enum": ["wasm", "mcp", "http", "endue"]
     },
@@ -333,7 +333,7 @@
       "additionalProperties": false
     },
     "EndueBinding": {
-      "description": "A connector as data over the endue account's connectors (binding endue, ADR 0408): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch.",
+      "description": "A connector as data over the endue account's connectors (binding endue, ADR 0409): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch.",
       "type": "object",
       "properties": {
         "tools": {

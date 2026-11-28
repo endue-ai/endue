@@ -278,7 +278,7 @@ fn usage_errors_exit_2() {
     assert_eq!(desk(&["nope"]).status.code(), Some(2));
 }
 
-/// A connector over the endue account's connectors with made-up tools (ADR 0408).
+/// A connector over the endue account's connectors with made-up tools (ADR 0409).
 const GADGET: &str = r#"{ "id": "fixture.gadget", "name": "Gadget", "version": "0.1.0",
   "kind": "connector",
   "contributes": { "commands": [

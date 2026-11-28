@@ -1,4 +1,4 @@
-//! Listing the endue account's connectors for an endue connector plugin (ADR 0408): one instance
+//! Listing the endue account's connectors for an endue connector plugin (ADR 0409): one instance
 //! per connector that offers every tool its block names, found by the tool's ending; a connector
 //! that left takes its instance and items, an expired one says to reconnect on endue.ai, a refused
 //! key turns the instances to paused, and a 429 holds every call of the plugin until its wait.

@@ -1,4 +1,4 @@
-//! The commands of an endue connector plugin (ADR 0408): it has no script, so the core registers the
+//! The commands of an endue connector plugin (ADR 0409): it has no script, so the core registers the
 //! commands its endue block acts with while the plugin is on and answers them itself. An invocation
 //! calls its tool on the account connector its `instance` argument names, with the desk's own key and
 //! one Idempotency-Key made for the invocation, the same on the one retry after a lost answer.

@@ -71,7 +71,7 @@ pub fn manifest_problems(manifest: &PluginManifest) -> Vec<String> {
     problems
 }
 
-/// The names an endue block (specs/connector/v0 `EndueBinding`, ADR 0408) uses that do not resolve:
+/// The names an endue block (specs/connector/v0 `EndueBinding`, ADR 0409) uses that do not resolve:
 /// each tool a request or action names is one of its tools, each request's map one of its maps, each
 /// map makes a kind the connector lists with an id and a title, each action is a command the plugin
 /// declares, and an action on a send or destructive tool is an irreversible command.

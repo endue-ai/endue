@@ -1,4 +1,4 @@
-//! Endue connectors (`binding: endue`, ADR 0408): plugins whose instances are the endue account's
+//! Endue connectors (`binding: endue`, ADR 0409): plugins whose instances are the endue account's
 //! connectors. The core lists the account's connectors with the desk's own key (ADR 0407) at start,
 //! on connector.sync and every sync interval, keeps one instance per connector that offers every
 //! tool the block names, and removes the instance and its items when its connector leaves. Records

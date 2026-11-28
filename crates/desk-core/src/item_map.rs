@@ -1,5 +1,5 @@
 //! A record mapped into an item by a binding's maps (specs/connector/v0 `HttpItemMap`, ADR 0106 and
-//! ADR 0408): pointers, shaped reads, constants, objects of values, the instance's values and the
+//! ADR 0409): pointers, shaped reads, constants, objects of values, the instance's values and the
 //! first of several. The http and endue bindings share it.
 
 use desk_bridge::{HttpInstanceField, HttpItemMap, HttpRead, HttpValue, Item, ItemSource};

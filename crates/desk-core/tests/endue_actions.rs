@@ -1,4 +1,4 @@
-//! The endue connector binding's commands (ADR 0408) over the fixture plugin: the core answers its
+//! The endue connector binding's commands (ADR 0409) over the fixture plugin: the core answers its
 //! action with one call of the made-up send tool, one idempotency key per invocation, and the tool's
 //! own words when it refuses.
 
