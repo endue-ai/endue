@@ -106,6 +106,22 @@ fn a_sync_maps_tool_answers_into_items_and_keeps_the_cursor() {
 }
 
 #[test]
+fn one_object_at_items_is_one_record_and_first_takes_a_value_that_reads() {
+    let fake = FakePlatform::start();
+    let a = gadget(&fake, "Studio A", &BOTH);
+    let mut solo = thing("t9", "Solo\nline");
+    solo["title"] = json!("");
+    let answer = json!({ "ok": true, "content": "", "data": { "items": solo } });
+    pages(&fake, &a, vec![answer]);
+    let desk = desk("endue-one-object", &fake);
+    turn_on(&desk);
+    desk.tick();
+    let items = entries(&desk, &a);
+    assert_eq!(ids(&items), ["t9"]);
+    assert_eq!(items[0]["title"], "Solo", "the empty title reads nothing");
+}
+
+#[test]
 fn a_record_that_is_not_an_item_is_skipped_and_counted() {
     let fake = FakePlatform::start();
     let a = gadget(&fake, "Studio A", &BOTH);

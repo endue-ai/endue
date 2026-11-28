@@ -39,7 +39,7 @@ pub fn manifest() -> Value {
                         "since": { "since": true } },
                     "map": "thing" }],
                 "maps": { "thing": { "kind": "entry", "fields": {
-                    "id": "/id", "title": { "pointer": "/text", "before": "\n" }, "body": "/text",
+                    "id": "/id", "title": { "first": ["/title", { "pointer": "/text", "before": "\n" }] }, "body": "/text",
                     "publishedAt": "/at", "updatedAt": "/at", "url": "/url",
                     "feed": { "const": "Gadget" },
                     "raw": { "object": { "network": { "instance": "type" },

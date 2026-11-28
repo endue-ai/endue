@@ -1852,8 +1852,19 @@ export interface HttpItemMap {
   fields: Record<string, HttpValue>;
 }
 
-/** One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, or a value of the instance. A null or missing value leaves the field out, unless default gives one. */
-export type HttpValue = JsonPointer | HttpRead | HttpConst | HttpObject | HttpInstanceValue;
+/** One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, a value of the instance, or the first of several that reads something. A null or missing value leaves the field out, unless default gives one. */
+export type HttpValue =
+  | JsonPointer
+  | HttpRead
+  | HttpConst
+  | HttpObject
+  | HttpInstanceValue
+  | HttpFirst;
+
+/** The first of these values that reads something other than null or the empty text. */
+export interface HttpFirst {
+  first: HttpValue[];
+}
 
 /** Read the value at pointer and shape it. */
 export interface HttpRead {
@@ -1873,13 +1884,13 @@ export interface HttpObject {
   object: Record<string, HttpValue>;
 }
 
-/** A value of the instance the record came from: its id, its title, or type, the endue account connector's type (binding endue; missing for the others). */
+/** A value of the instance the record came from, or of the sync that reads it (HttpInstanceField). */
 export interface HttpInstanceValue {
   instance: HttpInstanceField;
 }
 
-/** Which value of the instance. */
-export type HttpInstanceField = "id" | "title" | "type";
+/** Which value: the instance's id or title, type (the endue account connector's type; missing for the other bindings), or syncedAt (when this sync began). */
+export type HttpInstanceField = "id" | "title" | "type" | "syncedAt";
 
 /** The same value for every record. */
 export interface HttpConst {
@@ -1912,7 +1923,7 @@ export interface EndueRequest {
   tool: EndueToolName;
   /** The tool's arguments, by name. */
   arguments?: Record<string, EndueRequestArgument>;
-  /** Where the records are in the answer's data: a JSON pointer to an array; empty for data that is the array. */
+  /** Where the records are in the answer's data: a JSON pointer to an array, or to one object, which is one record; empty for the data itself. */
   items: JsonPointer;
   /** Where the next page's cursor is in the answer's data. Absent, or nothing there: the last page. */
   next?: JsonPointer;

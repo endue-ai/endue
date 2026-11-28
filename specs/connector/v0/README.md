@@ -33,7 +33,7 @@ kind `connector` declares it under `connector` in `plugin.json`: `ConnectorManif
 | `headers` | Sent with every request; never `Authorization`, `Cookie` or `Host` |
 | `auth` | `setting`, a secret instance setting the core reads; sent as `header` (`Authorization`) with `prefix` (`Bearer `) |
 | `requests` | GET `path` with `query`; the records at the pointer `items`; `pagination` `link` (RFC 8288 `rel="next"`) or `body` (a URL at `pointer`), on the base URL's origin only, `maxPages` (10) at most; the `map` that makes them items |
-| `maps` | By name: `kind` and `fields`, each item field from a JSON pointer into the record (`""` is all of it), `{ pointer, after?, before?, values?, default? }`, `{ const }`, `{ object: { name: value } }` (an object of values; one that reads nothing is left out) or `{ instance: id \| title \| type }` (`type` is the endue account connector's type, missing for the other bindings) |
+| `maps` | By name: `kind` and `fields`, each item field from a JSON pointer into the record (`""` is all of it), `{ pointer, after?, before?, values?, default? }`, `{ const }`, `{ object: { name: value } }` (an object of values; one that reads nothing is left out) `{ instance: id \| title \| type \| syncedAt }` (`type` is the endue account connector's type, missing for the other bindings; `syncedAt` when this sync began) or `{ first: [value, ...] }` (the first that reads something other than null or `""`) |
 
 - Each sync reads every page of every request again, writes what is new or changed and removes what
   left; the same id from two requests is one item. A record whose item does not fit `specs/item/v0` is
@@ -52,7 +52,7 @@ core runs it with the desk's own key (ADR 0407); nothing of the plugin's runs, a
 | Field | Meaning |
 | --- | --- |
 | `tools` | The tool endings an account connector must offer, all of them, to be an instance: `social_read` matches `<type>__social_read` |
-| `requests` | The `tool` a sync calls with `arguments` (`{ const }`, `{ page: true }`, the cursor the previous page's `next` pointed to, or `{ since: true }`, the last good sync's time); the records at the pointer `items` in the answer's `data`; `next`, the pointer to the next page's cursor; `maxPages` (10); the `map`; `optional` (a refusal `unsupported` skips it) |
+| `requests` | The `tool` a sync calls with `arguments` (`{ const }`, `{ page: true }`, the cursor the previous page's `next` pointed to, or `{ since: true }`, the last good sync's time); the records at the pointer `items` in the answer's `data` (an array, or one object that is one record); `next`, the pointer to the next page's cursor; `maxPages` (10); the `map`; `optional` (a refusal `unsupported` skips it) |
 | `maps` | The http binding's maps, by name |
 | `actions` | By command id: the `tool` it calls, its `risk` (`read`, `write`, `send`, `destructive`) and its `arguments` (`{ const }`, `{ arg }`, the command's argument of that name, or `{ file }`) |
 | `budget` | Tool calls one sync makes at most: 1 to 200, 30 when absent |

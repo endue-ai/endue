@@ -245,14 +245,29 @@
       "additionalProperties": false
     },
     "HttpValue": {
-      "description": "One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, or a value of the instance. A null or missing value leaves the field out, unless default gives one.",
+      "description": "One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, a value of the instance, or the first of several that reads something. A null or missing value leaves the field out, unless default gives one.",
       "oneOf": [
         { "$ref": "#/$defs/JsonPointer" },
         { "$ref": "#/$defs/HttpRead" },
         { "$ref": "#/$defs/HttpConst" },
         { "$ref": "#/$defs/HttpObject" },
-        { "$ref": "#/$defs/HttpInstanceValue" }
+        { "$ref": "#/$defs/HttpInstanceValue" },
+        { "$ref": "#/$defs/HttpFirst" }
       ]
+    },
+    "HttpFirst": {
+      "description": "The first of these values that reads something other than null or the empty text.",
+      "type": "object",
+      "properties": {
+        "first": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/HttpValue" },
+          "minItems": 2,
+          "maxItems": 8
+        }
+      },
+      "required": ["first"],
+      "additionalProperties": false
     },
     "HttpRead": {
       "description": "Read the value at pointer and shape it.",
@@ -299,16 +314,16 @@
       "additionalProperties": false
     },
     "HttpInstanceValue": {
-      "description": "A value of the instance the record came from: its id, its title, or type, the endue account connector's type (binding endue; missing for the others).",
+      "description": "A value of the instance the record came from, or of the sync that reads it (HttpInstanceField).",
       "type": "object",
       "properties": { "instance": { "$ref": "#/$defs/HttpInstanceField" } },
       "required": ["instance"],
       "additionalProperties": false
     },
     "HttpInstanceField": {
-      "description": "Which value of the instance.",
+      "description": "Which value: the instance's id or title, type (the endue account connector's type; missing for the other bindings), or syncedAt (when this sync began).",
       "type": "string",
-      "enum": ["id", "title", "type"]
+      "enum": ["id", "title", "type", "syncedAt"]
     },
     "HttpConst": {
       "description": "The same value for every record.",
@@ -381,7 +396,7 @@
           "additionalProperties": { "$ref": "#/$defs/EndueRequestArgument" }
         },
         "items": {
-          "description": "Where the records are in the answer's data: a JSON pointer to an array; empty for data that is the array.",
+          "description": "Where the records are in the answer's data: a JSON pointer to an array, or to one object, which is one record; empty for the data itself.",
           "$ref": "#/$defs/JsonPointer"
         },
         "next": {

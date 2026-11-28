@@ -120,10 +120,12 @@ impl Core {
             }
         };
         let source = source(id, name);
+        let synced_at = rfc3339(self.clock.now());
         let here = Here {
             id: name,
             title: Some(&title),
             kind: Some(&kind),
+            synced_at: &synced_at,
         };
         let since = since.as_deref();
         let read = endue_binding::sync(&binding, &tools, since, &source, &here, &mut call);

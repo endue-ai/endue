@@ -114,6 +114,7 @@ mod history;
 mod history_index;
 mod http_binding;
 mod init;
+mod item_map;
 mod last_start;
 mod lease;
 mod local_agents;

@@ -6,12 +6,11 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use desk_bridge::{
-    HttpBinding, HttpInstanceField, HttpItemMap, HttpPageNext, HttpRead, HttpRequest, HttpValue,
-    Item, ItemSource,
-};
+use desk_bridge::{HttpBinding, HttpPageNext, HttpRequest, Item, ItemSource};
 use desk_sys::net::{Method, Request, Response};
-use serde_json::{Map, Value};
+use serde_json::Value;
+
+pub(crate) use crate::item_map::{Here, item_of, pointer};
 
 /// Pages a request reads when it names no maxPages, and the most it may name.
 const PAGES: u64 = 10;
@@ -33,15 +32,6 @@ impl Failure {
             reauth: false,
         }
     }
-}
-
-/// The instance a record came from, for the `{ instance }` values of a map.
-#[derive(Debug, Default, Clone, Copy)]
-pub(crate) struct Here<'a> {
-    pub(crate) id: &'a str,
-    pub(crate) title: Option<&'a str>,
-    /// The endue account connector's type; none for the other bindings.
-    pub(crate) kind: Option<&'a str>,
 }
 
 /// What a sync brought: its items by id, and how many records made no valid item.
@@ -102,81 +92,6 @@ pub(crate) fn sync(
         }
     }
     Ok(synced)
-}
-
-/// The record's item, keyed by its id, or none when it does not fit specs/item/v0.
-pub(crate) fn item_of(
-    map: &HttpItemMap,
-    record: &Value,
-    source: &ItemSource,
-    here: &Here<'_>,
-) -> Option<(String, Item)> {
-    let mut item = Map::new();
-    for (field, value) in &map.fields {
-        if let Some(found) = read(record, value, here) {
-            item.insert(field.clone(), found);
-        }
-    }
-    item.insert("kind".into(), serde_json::to_value(map.kind).ok()?);
-    item.insert("source".into(), serde_json::to_value(source).ok()?);
-    let id = item.get("id")?.as_str()?.to_owned();
-    let item = serde_json::from_value::<Item>(Value::Object(item)).ok()?;
-    Some((id, item))
-}
-
-/// One field's value from the record: none for null or missing, unless a default gives one.
-fn read(record: &Value, value: &HttpValue, here: &Here<'_>) -> Option<Value> {
-    match value {
-        HttpValue::JsonPointer(at) => pointer(record, at).filter(|v| !v.is_null()).cloned(),
-        HttpValue::HttpConst(constant) => Some(constant.r#const.clone()),
-        HttpValue::HttpRead(rule) => shaped(record, rule).or_else(|| rule.default.clone()),
-        HttpValue::HttpObject(object) => {
-            let kept: Map<String, Value> = object
-                .object
-                .iter()
-                .filter_map(|(name, value)| Some((name.clone(), read(record, value, here)?)))
-                .collect();
-            (!kept.is_empty()).then_some(Value::Object(kept))
-        }
-        HttpValue::HttpInstance(value) => match value.instance {
-            HttpInstanceField::Id => Some(here.id),
-            HttpInstanceField::Title => here.title,
-            HttpInstanceField::Type => here.kind,
-        }
-        .map(|text| Value::String(text.to_owned())),
-    }
-}
-
-fn shaped(record: &Value, rule: &HttpRead) -> Option<Value> {
-    let mut found = pointer(record, &rule.pointer)
-        .filter(|v| !v.is_null())?
-        .clone();
-    if let Some(after) = &rule.after {
-        let text = found.as_str()?;
-        let cut = text.rfind(after.as_str())?;
-        found = Value::String(text[cut + after.len()..].to_owned());
-    }
-    if let Some(before) = &rule.before {
-        let text = found.as_str()?;
-        let cut = text.find(before.as_str()).unwrap_or(text.len());
-        found = Value::String(text[..cut].to_owned());
-    }
-    if let Some(values) = &rule.values {
-        let key = match &found {
-            Value::String(text) => text.clone(),
-            other => other.to_string(),
-        };
-        found = values.get(&key)?.clone();
-    }
-    Some(found)
-}
-
-/// RFC 6901: the value at `at` in `value`; the empty pointer is the value itself.
-fn pointer<'a>(value: &'a Value, at: &str) -> Option<&'a Value> {
-    if at.is_empty() {
-        return Some(value);
-    }
-    value.pointer(at)
 }
 
 fn headers(binding: &HttpBinding, token: Option<&str>) -> BTreeMap<String, String> {
@@ -338,24 +253,6 @@ mod tests {
         let custom = BTreeMap::from([("user-agent".into(), "endue-connector".into())]);
         binding.headers = Some(custom.clone());
         assert_eq!(headers(&binding, None), custom);
-    }
-
-    #[test]
-    fn an_instance_value_reads_the_instance_and_type_is_missing_outside_endue() {
-        let value = |v: Value| serde_json::from_value::<HttpValue>(v).unwrap();
-        let here = Here {
-            id: "work",
-            title: Some("Work"),
-            kind: None,
-        };
-        let object = value(serde_json::json!({ "object": {
-            "id": { "instance": "id" }, "title": { "instance": "title" },
-            "type": { "instance": "type" } } }));
-        let read = read(&Value::Null, &object, &here);
-        assert_eq!(
-            read,
-            Some(serde_json::json!({ "id": "work", "title": "Work" }))
-        );
     }
 
     #[test]

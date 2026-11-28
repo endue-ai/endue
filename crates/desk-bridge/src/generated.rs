@@ -3091,7 +3091,7 @@ pub struct HttpItemMap {
     pub fields: BTreeMap<String, HttpValue>,
 }
 
-/// One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, or a value of the instance. A null or missing value leaves the field out, unless default gives one.
+/// One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, a value of the instance, or the first of several that reads something. A null or missing value leaves the field out, unless default gives one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum HttpValue {
@@ -3100,6 +3100,14 @@ pub enum HttpValue {
     HttpConst(HttpConst),
     HttpObject(HttpObject),
     HttpInstance(HttpInstanceValue),
+    HttpFirst(HttpFirst),
+}
+
+/// The first of these values that reads something other than null or the empty text.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HttpFirst {
+    pub first: Vec<HttpValue>,
 }
 
 /// Read the value at pointer and shape it.
@@ -3128,14 +3136,14 @@ pub struct HttpObject {
     pub object: BTreeMap<String, HttpValue>,
 }
 
-/// A value of the instance the record came from: its id, its title, or type, the endue account connector's type (binding endue; missing for the others).
+/// A value of the instance the record came from, or of the sync that reads it (HttpInstanceField).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HttpInstanceValue {
     pub instance: HttpInstanceField,
 }
 
-/// Which value of the instance.
+/// Which value: the instance's id or title, type (the endue account connector's type; missing for the other bindings), or syncedAt (when this sync began).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum HttpInstanceField {
     #[serde(rename = "id")]
@@ -3144,6 +3152,8 @@ pub enum HttpInstanceField {
     Title,
     #[serde(rename = "type")]
     Type,
+    #[serde(rename = "syncedAt")]
+    SyncedAt,
 }
 
 /// The same value for every record.
@@ -3186,7 +3196,7 @@ pub struct EndueRequest {
     /// The tool's arguments, by name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arguments: Option<BTreeMap<String, EndueRequestArgument>>,
-    /// Where the records are in the answer's data: a JSON pointer to an array; empty for data that is the array.
+    /// Where the records are in the answer's data: a JSON pointer to an array, or to one object, which is one record; empty for the data itself.
     pub items: JsonPointer,
     /// Where the next page's cursor is in the answer's data. Absent, or nothing there: the last page.
     #[serde(default, skip_serializing_if = "Option::is_none")]

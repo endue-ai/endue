@@ -107,10 +107,12 @@ impl Core {
             sysnet::fetch(&request).map_err(|e| Failure::new(e.message))
         };
         let title = self.title(id, name);
+        let synced_at = rfc3339(self.clock.now());
         let here = http_binding::Here {
             id: name,
             title: title.as_deref(),
             kind: None,
+            synced_at: &synced_at,
         };
         let synced =
             http_binding::sync(&binding, &base, token.as_deref(), &source, &here, &mut call)?;

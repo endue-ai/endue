@@ -96,13 +96,15 @@ pub(crate) fn sync(
                 return Err(Failure::new(why));
             }
             let data = answered.data.unwrap_or(Value::Null);
-            let records = pointer(&data, &request.items).and_then(Value::as_array);
-            let records = records.ok_or_else(|| {
-                Failure::new(format!(
-                    "{tool} answered without a list at {:?}",
-                    request.items
-                ))
-            })?;
+            let records = match pointer(&data, &request.items) {
+                Some(Value::Array(records)) => records.as_slice(),
+                Some(record @ Value::Object(_)) => std::slice::from_ref(record),
+                _ => {
+                    let at = &request.items;
+                    let why = format!("{tool} answered without a list or an object at {at:?}");
+                    return Err(Failure::new(why));
+                }
+            };
             for record in records {
                 match item_of(map, record, source, here) {
                     Some((id, item)) => {
