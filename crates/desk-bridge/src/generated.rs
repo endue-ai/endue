@@ -5708,6 +5708,11 @@ pub enum BridgeRequest {
     StudioCatalogUse(StudioCatalogUseRequest),
     StudioConversationsList(StudioConversationsListRequest),
     StudioChatAsk(StudioChatAskRequest),
+    StudioMessagesList(StudioMessagesListRequest),
+    StudioChatSend(StudioChatSendRequest),
+    StudioChatAttach(StudioChatAttachRequest),
+    StudioChatStop(StudioChatStopRequest),
+    StudioConversationsRead(StudioConversationsReadRequest),
     StudioSpacesList(StudioSpacesListRequest),
     StudioSpacesGet(StudioSpacesGetRequest),
     ComputerPermissionsStatus(ComputerPermissionsStatusRequest),
@@ -5852,6 +5857,7 @@ pub enum BridgeEvent {
     UpdateChanged(UpdateChangedEvent),
     AccountChanged(AccountChangedEvent),
     AgentsRun(AgentsRunEvent),
+    StudioChat(StudioChatEvent),
     AgentsChanged(AgentsChangedEvent),
     MemoryChanged(MemoryChangedEvent),
     AgentCancelled(AgentCancelledEvent),
@@ -10881,6 +10887,247 @@ pub struct StudioChatAskResult {
     pub text: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StudioMessageRole {
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "assistant")]
+    Assistant,
+}
+
+/// One group of a turn's tool calls: its label, the connector or plugin that provides it, how many calls and how many failed. No argument or result.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioWorkGroup {
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    pub calls: u64,
+    pub failed: u64,
+}
+
+/// The work of one turn: its phase, when it started and ended, how many tool calls were attempted, succeeded and failed, and at most 50 groups.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioWork {
+    pub phase: String,
+    #[serde(rename = "startedAt", default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    #[serde(rename = "endedAt", default, skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<String>,
+    pub attempted: u64,
+    pub succeeded: u64,
+    pub failed: u64,
+    pub groups: Vec<StudioWorkGroup>,
+}
+
+/// One message of a conversation as the thread shows it: the person's or the agent's text, when, and for an answer the run and its work.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioMessage {
+    pub id: String,
+    pub role: StudioMessageRole,
+    pub text: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "runId", default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<StudioAgentId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work: Option<StudioWork>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioMessagesListRequest {
+    pub id: RequestId,
+    pub method: StudioMessagesListRequestMethod,
+    pub params: StudioMessagesListParams,
+}
+
+/// Parameters of studio.messages.list: a conversation's messages before the message `before` (the newest without it), at most `limit` (20 unless given).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioMessagesListParams {
+    #[serde(rename = "conversationId")]
+    pub conversation_id: StudioAgentId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u64>,
+    pub scope: StudioManagePermission,
+}
+
+/// Result of studio.messages.list: the messages, oldest first, and whether older ones are left.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioMessagesListResult {
+    pub messages: Vec<StudioMessage>,
+    #[serde(rename = "hasMore")]
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatSendRequest {
+    pub id: RequestId,
+    pub method: StudioChatSendRequestMethod,
+    pub params: StudioChatSendParams,
+}
+
+/// Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatSendParams {
+    #[serde(rename = "agentId")]
+    pub agent_id: StudioAgentId,
+    #[serde(
+        rename = "conversationId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub conversation_id: Option<StudioAgentId>,
+    #[serde(rename = "spaceId", default, skip_serializing_if = "Option::is_none")]
+    pub space_id: Option<StudioSpaceId>,
+    pub text: String,
+    #[serde(rename = "messageId")]
+    pub message_id: String,
+    pub scope: StudioManagePermission,
+}
+
+/// Result of studio.chat.send: the conversation the line went into and the run it started; the run's events follow as studio.chat.event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatSendResult {
+    #[serde(rename = "conversationId")]
+    pub conversation_id: StudioAgentId,
+    #[serde(rename = "runId", default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<StudioAgentId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatAttachRequest {
+    pub id: RequestId,
+    pub method: StudioChatAttachRequestMethod,
+    pub params: StudioChatAttachParams,
+}
+
+/// Parameters of studio.chat.attach: follow the run in flight in a conversation; its events follow as studio.chat.event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatAttachParams {
+    #[serde(rename = "conversationId")]
+    pub conversation_id: StudioAgentId,
+    #[serde(rename = "agentId")]
+    pub agent_id: StudioAgentId,
+    pub scope: StudioManagePermission,
+}
+
+/// Result of studio.chat.attach: whether a run was in flight to follow.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatAttachResult {
+    pub attached: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatStopRequest {
+    pub id: RequestId,
+    pub method: StudioChatStopRequestMethod,
+    pub params: StudioChatStopParams,
+}
+
+/// Parameters of studio.chat.stop: cancel the run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatStopParams {
+    #[serde(rename = "conversationId")]
+    pub conversation_id: StudioAgentId,
+    #[serde(rename = "runId")]
+    pub run_id: StudioAgentId,
+    pub scope: StudioManagePermission,
+}
+
+/// Result of studio.chat.stop.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatStopResult {
+    pub stopped: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioConversationsReadRequest {
+    pub id: RequestId,
+    pub method: StudioConversationsReadRequestMethod,
+    pub params: StudioConversationsReadParams,
+}
+
+/// Parameters of studio.conversations.read: the person has read the conversation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioConversationsReadParams {
+    #[serde(rename = "conversationId")]
+    pub conversation_id: StudioAgentId,
+    pub scope: StudioManagePermission,
+}
+
+/// Result of studio.conversations.read: when it was read before, where the new-messages line falls.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioConversationsReadResult {
+    #[serde(
+        rename = "previousReadAt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub previous_read_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StudioChatEventKind {
+    #[serde(rename = "started")]
+    Started,
+    #[serde(rename = "delta")]
+    Delta,
+    #[serde(rename = "work")]
+    Work,
+    #[serde(rename = "needsInput")]
+    NeedsInput,
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "cancelled")]
+    Cancelled,
+}
+
+/// One step of a run the shell follows: started (runId), delta (text is the new text), work (the turn's work so far), needsInput (message: what the run asks, when the desk can say it), completed (text is the final answer), failed (message: what failed), cancelled.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatEventData {
+    #[serde(rename = "conversationId")]
+    pub conversation_id: StudioAgentId,
+    #[serde(rename = "runId", default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<StudioAgentId>,
+    pub kind: StudioChatEventKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work: Option<StudioWork>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// A step of a run the shell sent or attached to, to that caller only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudioChatEvent {
+    pub event: StudioChatEventEvent,
+    pub data: StudioChatEventData,
+}
+
 /// A space's id on endue AI.
 pub type StudioSpaceId = String;
 
@@ -15396,6 +15643,54 @@ pub enum StudioChatAskRequestMethod {
     #[default]
     #[serde(rename = "studio.chat.ask")]
     StudioChatAsk,
+}
+
+/// The `method` of [`StudioMessagesListRequest`]: always `"studio.messages.list"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioMessagesListRequestMethod {
+    #[default]
+    #[serde(rename = "studio.messages.list")]
+    StudioMessagesList,
+}
+
+/// The `method` of [`StudioChatSendRequest`]: always `"studio.chat.send"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioChatSendRequestMethod {
+    #[default]
+    #[serde(rename = "studio.chat.send")]
+    StudioChatSend,
+}
+
+/// The `method` of [`StudioChatAttachRequest`]: always `"studio.chat.attach"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioChatAttachRequestMethod {
+    #[default]
+    #[serde(rename = "studio.chat.attach")]
+    StudioChatAttach,
+}
+
+/// The `method` of [`StudioChatStopRequest`]: always `"studio.chat.stop"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioChatStopRequestMethod {
+    #[default]
+    #[serde(rename = "studio.chat.stop")]
+    StudioChatStop,
+}
+
+/// The `method` of [`StudioConversationsReadRequest`]: always `"studio.conversations.read"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioConversationsReadRequestMethod {
+    #[default]
+    #[serde(rename = "studio.conversations.read")]
+    StudioConversationsRead,
+}
+
+/// The `event` of [`StudioChatEvent`]: always `"studio.chat.event"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum StudioChatEventEvent {
+    #[default]
+    #[serde(rename = "studio.chat.event")]
+    StudioChatEvent,
 }
 
 /// The `method` of [`StudioSpacesListRequest`]: always `"studio.spaces.list"`.

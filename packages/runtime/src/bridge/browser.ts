@@ -4,6 +4,7 @@ import { agentCard, type Directory, listAgents, listTasks, sampleDirectory } fro
 import userHello from "./envelopes/user-hello.json";
 import { type LocalStub, type LocalStubOptions, localAgentsStub } from "./local-agents";
 import type { StudioStub } from "./studio";
+import { type ThreadStub, threadStub } from "./studio-thread";
 import type {
   AccountStatus,
   AudioLevels,
@@ -74,6 +75,8 @@ export interface BrowserBridge extends ShellBridge {
     holdTurn(): void;
     /** The turn held open now. */
     turn(): HeldTurn | undefined;
+    /** The agents' conversations (ADR 0411): their messages, and a run a test holds open. */
+    thread: ThreadStub;
   };
 }
 
@@ -143,7 +146,7 @@ export function wordTimes(text: string, msPerChar = 55): WordTime[] {
 }
 
 /** studio.* as the shell calls it, answered by the studio stub as the runtime (`desk`). */
-function studioShell(stub: StudioStub, opened: string[]): StudioShellBridge {
+function studioShell(stub: StudioStub, opened: string[], thread: ThreadStub): StudioShellBridge {
   const scope = { permission: "studio:manage" } as const;
   const on = <M extends keyof StudioStub["handlers"]>(method: M) => {
     const handler = stub.handlers[method];
@@ -159,6 +162,7 @@ function studioShell(stub: StudioStub, opened: string[]): StudioShellBridge {
     spaces: async () => (await on("studio.spaces.list")({ scope }, "desk")).spaces,
     space: async (spaceId) => on("studio.spaces.get")({ spaceId, scope }, "desk"),
     ask: async (question) => on("studio.chat.ask")({ ...question, scope }, "desk"),
+    thread: thread.bridge,
     async open(url) {
       opened.push(url);
     },
@@ -200,11 +204,13 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
   const local = options.localAgents
     ? localAgentsStub({ epoch: options.epoch ?? Date.now(), ...options.localAgents })
     : undefined;
+  const wallNow = () => (options.epoch === undefined ? Date.now() : options.epoch + options.now());
+  const thread = threadStub(options.studio?.conversations ?? [], wallNow);
   const turns = turnsOf(options.errand ?? sampleErrand, (text) => wordTimes(text));
 
   return {
     ...(local ? { localAgents: local } : {}),
-    ...(options.studio ? { studio: studioShell(options.studio, opened) } : {}),
+    ...(options.studio ? { studio: studioShell(options.studio, opened, thread) } : {}),
     storage: {
       async get<T>(key: string) {
         const raw = store.getItem(PREFIX + key);
@@ -276,6 +282,7 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
       },
       setAccount: (status) => changed(structuredClone(status)),
       holdTurn: () => turns.hold(),
+      thread,
       turn: () => turns.held(),
       hear(words) {
         heard = words;

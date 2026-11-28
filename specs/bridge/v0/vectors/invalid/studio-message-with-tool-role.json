@@ -1,0 +1,15 @@
+{
+  "target": "StudioMessagesListResult",
+  "description": "a tool row never crosses as a message",
+  "instance": {
+    "messages": [
+      {
+        "id": "msg_3",
+        "role": "tool",
+        "text": "{}",
+        "createdAt": "2026-11-29T09:00:00Z"
+      }
+    ],
+    "hasMore": false
+  }
+}

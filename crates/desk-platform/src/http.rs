@@ -119,17 +119,6 @@ impl Platform {
             .map(|reply| reply.body)
     }
 
-    pub(crate) fn event_response(
-        &self,
-        path: &str,
-        body: &Value,
-        timeout: Duration,
-        max: u64,
-    ) -> Result<Response> {
-        let request = self.request(Method::Post, path, Some(body), timeout, "text/event-stream");
-        self.authenticated(request, max)
-    }
-
     fn request(
         &self,
         method: Method,

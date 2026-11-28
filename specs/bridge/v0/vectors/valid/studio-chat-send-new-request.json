@@ -1,0 +1,16 @@
+{
+  "target": "BridgeRequest",
+  "description": "the first line of a new chat",
+  "instance": {
+    "id": 13,
+    "method": "studio.chat.send",
+    "params": {
+      "agentId": "ag_fixture",
+      "text": "Hello",
+      "messageId": "desk_fedcba9876543210",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

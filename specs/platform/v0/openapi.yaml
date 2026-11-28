@@ -583,7 +583,10 @@ paths:
       operationId: createAgentConversation
       tags: [conversations]
       summary: Open a new conversation with the selected agent
-      description: Opens an agent conversation for the signed-in account at the ask approval level.
+      description: >-
+        Opens an agent conversation for the signed-in account. A reviewed question (ADR 0395) names it
+        "From Desk" at the ask approval level; a conversation the person starts in an agent's window
+        sends the agent alone, as endue.ai's "New chat" does, and endue AI names it from its first turn.
       requestBody:
         required: true
         content:
@@ -596,14 +599,137 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AgentConversationEnvelope" }
         default: { $ref: "#/components/responses/Error" }
+  /api/v1/ai/conversations/{conversation_id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: One conversation; the desk reads when the person last read it
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/ConversationIdentifier" }
+      responses:
+        "200":
+          description: The conversation, in a success envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversationEnvelope" }
+        default: { $ref: "#/components/responses/Error" }
+  /api/v1/ai/conversations/{conversation_id}/messages:
+    get:
+      operationId: listConversationMessages
+      tags: [conversations]
+      summary: One page of a conversation's message rows, oldest first
+      description: >-
+        The newest limit rows with latest=true, or the limit rows before the row before names. Rows
+        are user and assistant words, an assistant row's tool calls, and tool rows answering them; the
+        desk folds every row that is not the person's or the agent's words into the work of its run and
+        reads no tool argument, tool result, reasoning or file.
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/ConversationIdentifier" }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: latest
+          in: query
+          description: true for the newest page; left out with before.
+          schema: { type: boolean }
+        - name: before
+          in: query
+          description: The id of the oldest row held; the page ends just before it.
+          schema: { $ref: "#/components/schemas/ConversationIdentifier" }
+      responses:
+        "200":
+          description: The page, in a success envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageListEnvelope" }
+        default: { $ref: "#/components/responses/Error" }
+  /api/v1/ai/conversations/{conversation_id}/read:
+    post:
+      operationId: markConversationRead
+      tags: [conversations]
+      summary: Mark the conversation read up to now
+      description: >-
+        The desk reads the conversation's last_read_at first (getConversation), which is where its
+        thread draws the new-messages line, and reads nothing of this answer but its status.
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/ConversationIdentifier" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmptyRequest" }
+      responses:
+        "200": { description: Marked. }
+        "204": { description: Marked. }
+        default: { $ref: "#/components/responses/Error" }
+  /api/v1/ai/conversations/{conversation_id}/cancel:
+    post:
+      operationId: cancelConversationRun
+      tags: [conversations]
+      summary: Stop the run in flight
+      description: >-
+        The run's stream ends with an error event whose code is RUN_CANCELLED. A 409 says no run was
+        in flight (it had ended), which the desk reads as done.
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/ConversationIdentifier" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CancelRunRequest" }
+      responses:
+        "200": { description: Stopped. }
+        "204": { description: Stopped. }
+        default: { $ref: "#/components/responses/Error" }
+  /api/v1/ai/conversations/{conversation_id}/attach:
+    get:
+      operationId: attachConversationRun
+      tags: [conversations]
+      summary: Join the run in flight and read its server-sent events from now on
+      description: The same events as runAgentConversation; 204 when no run is in flight.
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/ConversationIdentifier" }
+      responses:
+        "200":
+          description: A sequence of Server-Sent Event frames.
+          content:
+            text/event-stream:
+              schema: { type: string }
+              x-sse-events:
+                run_created: { $ref: "#/components/schemas/RunCreatedEvent" }
+                delta: { $ref: "#/components/schemas/RunDeltaEvent" }
+                step: { $ref: "#/components/schemas/RunStepEvent" }
+                run_presentation: { $ref: "#/components/schemas/RunPresentationEvent" }
+                interaction: { $ref: "#/components/schemas/RunInteractionEvent" }
+                done: { $ref: "#/components/schemas/AgentConversationDone" }
+                error: { $ref: "#/components/schemas/RunErrorEvent" }
+        "204": { description: No run is in flight. }
+        default: { $ref: "#/components/responses/Error" }
   /api/v1/ai/conversations/{conversation_id}/runs:
     post:
       operationId: runAgentConversation
       tags: [conversations]
       summary: Send a text turn and read its server-sent events
       description: >-
-        The terminal events are done and error. The assistant message in done is authoritative.
-        interaction describes a pending input. Fields and events outside this subset are additive.
+        The events are read as they arrive. The terminal events are done and error. The assistant
+        message in done is authoritative. interaction describes a pending input. Fields and events
+        outside this subset are additive and skipped. The desk gives up after 90 s without a byte (the
+        server pings well inside that) and reads at most 2 MiB of one run.
       parameters:
         - name: conversation_id
           in: path
@@ -621,7 +747,13 @@ paths:
             text/event-stream:
               schema: { type: string }
               x-sse-events:
+                run_created: { $ref: "#/components/schemas/RunCreatedEvent" }
+                delta: { $ref: "#/components/schemas/RunDeltaEvent" }
+                step: { $ref: "#/components/schemas/RunStepEvent" }
+                run_presentation: { $ref: "#/components/schemas/RunPresentationEvent" }
+                interaction: { $ref: "#/components/schemas/RunInteractionEvent" }
                 done: { $ref: "#/components/schemas/AgentConversationDone" }
+                error: { $ref: "#/components/schemas/RunErrorEvent" }
         default: { $ref: "#/components/responses/Error" }
   /api/v1/spaces:
     get:
@@ -931,7 +1063,7 @@ components:
         agent_id: { $ref: "#/components/schemas/ConversationIdentifier" }
         title: { type: string, maxLength: 60 }
         approval_level: { const: ask }
-      required: [agent_id, approval_level]
+      required: [agent_id]
       additionalProperties: false
     AgentConversationEnvelope:
       type: object
@@ -973,8 +1105,177 @@ components:
           properties:
             role: { const: assistant }
             content: { type: ["string", "null"] }
+            metadata: { $ref: "#/components/schemas/RowMetadata" }
           required: [role, content]
       required: [run_id, stop_reason, message]
+    ConversationEnvelope:
+      type: object
+      properties:
+        success: { const: true }
+        data:
+          type: object
+          properties:
+            id: { $ref: "#/components/schemas/ConversationIdentifier" }
+            agent_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+            last_read_at: { type: ["string", "null"], format: date-time }
+          required: [id, agent_id]
+      required: [success, data]
+    EmptyRequest:
+      type: object
+      additionalProperties: false
+    CancelRunRequest:
+      type: object
+      properties:
+        run_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+      required: [run_id]
+      additionalProperties: false
+    MessageListEnvelope:
+      type: object
+      properties:
+        success: { const: true }
+        data:
+          type: object
+          properties:
+            items:
+              description: Oldest first; each a MessageRow or a ToolRow.
+              type: array
+              maxItems: 100
+              items:
+                oneOf:
+                  - { $ref: "#/components/schemas/MessageRow" }
+                  - { $ref: "#/components/schemas/ToolRow" }
+            total: { type: integer, minimum: 0 }
+            has_more: { type: ["boolean", "null"] }
+          required: [items]
+      required: [success, data]
+    MessageRow:
+      description: >-
+        The person's or the agent's words (content is markdown; null on a row that only calls tools),
+        or a system note, which the desk does not show. Of a tool call the desk reads its id and its
+        tool's name.
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ConversationIdentifier" }
+        run_id: { type: ["string", "null"] }
+        role: { enum: [user, assistant, system] }
+        content: { type: ["string", "null"] }
+        tool_calls:
+          type: ["array", "null"]
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              function:
+                type: object
+                properties:
+                  name: { type: string }
+                required: [name]
+            required: [function]
+        metadata: { $ref: "#/components/schemas/RowMetadata" }
+        created_at: { type: string, format: date-time }
+      required: [id, role, created_at]
+    ToolRow:
+      description: A tool's answer to one call; the desk reads its call, its tool and whether it failed, never its content.
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/ConversationIdentifier" }
+        run_id: { type: ["string", "null"] }
+        role: { const: tool }
+        tool_call_id: { type: string }
+        name: { type: string }
+        metadata: { $ref: "#/components/schemas/RowMetadata" }
+        created_at: { type: string, format: date-time }
+      required: [id, role, tool_call_id]
+    RowMetadata:
+      type: ["object", "null"]
+      properties:
+        is_error: { type: boolean }
+        presentation: { $ref: "#/components/schemas/RunPresentation" }
+    RunPresentation:
+      description: >-
+        The run's summary as it stands (on run_presentation, and on the final answer's
+        metadata.presentation); a higher revision replaces a lower one.
+      type: object
+      properties:
+        run_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+        revision: { type: integer, minimum: 0 }
+        phase: { enum: [running, completed, awaiting_input, partial, failed, cancelled] }
+        started_at: { type: ["string", "null"], format: date-time }
+        ended_at: { type: ["string", "null"], format: date-time }
+        counts:
+          type: object
+          properties:
+            attempted: { type: integer, minimum: 0 }
+            succeeded: { type: integer, minimum: 0 }
+            failed: { type: integer, minimum: 0 }
+        references:
+          description: What the run leaned on; the desk reads the connectors' provider, label and usage.
+          type: array
+          items:
+            type: object
+            properties:
+              kind: { type: string }
+              provider: { type: ["string", "null"] }
+              label: { type: string }
+              usage: { type: string }
+            required: [kind, label]
+      required: [run_id, phase]
+    RunCreatedEvent:
+      description: JSON data of the run_created event.
+      type: object
+      properties:
+        run_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+      required: [run_id]
+    RunDeltaEvent:
+      description: JSON data of the delta event, the next piece of the answer.
+      type: object
+      properties:
+        run_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+        content: { type: string }
+      required: [content]
+    RunStepEvent:
+      description: >-
+        JSON data of the step event: the calls one step made and how each went. Their arguments and
+        results are on the wire and never read.
+      type: object
+      properties:
+        run_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+        tool_calls:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string }
+              ok: { type: boolean }
+            required: [name]
+      required: [tool_calls]
+    RunPresentationEvent:
+      description: JSON data of the run_presentation event.
+      type: object
+      properties:
+        presentation: { $ref: "#/components/schemas/RunPresentation" }
+      required: [presentation]
+    RunInteractionEvent:
+      description: JSON data of the interaction event; the desk reads the question's words alone.
+      type: object
+      properties:
+        run_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+        correlation_id: { type: string }
+        payload:
+          type: object
+          properties:
+            question: { type: string }
+            prompt: { type: string }
+      required: [correlation_id]
+    RunErrorEvent:
+      description: JSON data of the error event; RUN_CANCELLED says the run was stopped.
+      type: object
+      properties:
+        run_id: { $ref: "#/components/schemas/ConversationIdentifier" }
+        code: { type: string }
+        message: { type: string }
+      required: [code]
     ConnectorStatus:
       enum: [active, expired]
     ConnectorSummary:

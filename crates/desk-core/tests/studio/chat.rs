@@ -85,7 +85,7 @@ fn the_shell_owns_the_bridge_and_a_replaced_front_desk_never_receives_the_questi
 }
 
 #[test]
-fn eris_consumes_the_cloud_reply_only_after_the_person_approves() {
+fn eris_ask_still_waits_for_review() {
     let fake = FakePlatform::start();
     let agent = fake.state().add_agent("Fixture", "Read the outline");
     let echo = common::Echo::start();

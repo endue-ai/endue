@@ -28,8 +28,8 @@ pub fn default_placement(id: &str) -> Placement {
     } else if id.starts_with("local:") {
         ("desk.agents", Rect::new(360.0, 120.0, 820.0, 600.0))
     } else if id.starts_with("endue-agent:") {
-        // An endue agent's or space's card, tall enough for its Studio side, clear of Eris (ADR 0129).
-        ("endue.agent", Rect::new(200.0, 110.0, 440.0, 600.0))
+        // An endue agent's conversation, centred under the band Eris floats over (ADR 0411).
+        ("endue.agent", Rect::new(260.0, 200.0, 920.0, 580.0))
     } else if id.starts_with("endue-space:") {
         ("endue.space", Rect::new(180.0, 100.0, 480.0, 640.0))
     } else if id == "keys" {

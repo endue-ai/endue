@@ -1,0 +1,43 @@
+{
+  "target": "StudioMessagesListResult",
+  "description": "the person's line and the agent's answer with its work, oldest first",
+  "instance": {
+    "messages": [
+      {
+        "id": "msg_1",
+        "role": "user",
+        "text": "What changed today?",
+        "createdAt": "2026-11-29T09:00:00Z"
+      },
+      {
+        "id": "msg_2",
+        "role": "assistant",
+        "text": "Two things changed.",
+        "createdAt": "2026-11-29T09:00:14Z",
+        "runId": "run_1",
+        "work": {
+          "phase": "completed",
+          "startedAt": "2026-11-29T09:00:00Z",
+          "endedAt": "2026-11-29T09:00:14Z",
+          "attempted": 3,
+          "succeeded": 2,
+          "failed": 1,
+          "groups": [
+            {
+              "label": "Search the web",
+              "provider": "web",
+              "calls": 2,
+              "failed": 1
+            },
+            {
+              "label": "Read a page",
+              "calls": 1,
+              "failed": 0
+            }
+          ]
+        }
+      }
+    ],
+    "hasMore": true
+  }
+}

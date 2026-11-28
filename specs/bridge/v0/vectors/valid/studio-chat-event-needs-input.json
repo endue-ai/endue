@@ -1,0 +1,13 @@
+{
+  "target": "BridgeEvent",
+  "description": "the run waits for the person",
+  "instance": {
+    "event": "studio.chat.event",
+    "data": {
+      "conversationId": "cnv_fixture",
+      "runId": "run_2",
+      "kind": "needsInput",
+      "message": "Which calendar?"
+    }
+  }
+}

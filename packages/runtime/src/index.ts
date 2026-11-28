@@ -19,7 +19,9 @@ export type {
   LocalAsk,
   LocalSessionQuery,
   ShellBridge,
+  StudioLine,
   StudioShellBridge,
+  StudioThreadBridge,
 } from "./bridge/types";
 export { type Clock, ManualClock, realClock, type Tween, tween } from "./clock";
 export { comboOf, type KeyLike, type Platform, ShortcutRouter } from "./input";

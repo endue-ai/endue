@@ -365,6 +365,68 @@
   font-weight: 600;
 }
 
+/* A conversation (ADR 0411): a column of at most 860px whose rows are 20px apart; the person's
+   `.desk-bubble` at the right, the agent's text as plain prose; `.desk-work` is one turn's work, a
+   line that unfolds its tool groups; `.desk-composer` holds the field, its tools and Send. */
+.desk-thread {
+  display: grid;
+  gap: var(--desk-space-5);
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--desk-space-6) var(--desk-space-6) var(--desk-space-4);
+  font-size: var(--desk-text-base);
+  line-height: 1.68;
+}
+.desk-bubble {
+  justify-self: end;
+  max-width: min(480px, 85%);
+  padding: var(--desk-space-3) var(--desk-space-4);
+  border-radius: var(--desk-radius-lg) var(--desk-radius-lg) var(--desk-radius-sm) var(--desk-radius-lg);
+  background: var(--desk-hover);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.desk-work {
+  border: var(--desk-border-width) solid var(--desk-border);
+  border-radius: var(--desk-radius-lg);
+  color: var(--desk-text-muted);
+  font-size: var(--desk-text-sm);
+}
+.desk-work > summary,
+.desk-work > button {
+  display: flex;
+  align-items: center;
+  gap: var(--desk-space-2);
+  padding: var(--desk-space-2) var(--desk-space-3);
+  cursor: pointer;
+}
+.desk-work [data-failed] {
+  color: var(--desk-danger-text);
+}
+.desk-composer {
+  display: grid;
+  gap: var(--desk-space-2);
+  padding: var(--desk-space-3);
+  border: var(--desk-border-width) solid var(--desk-border);
+  border-radius: var(--desk-radius-lg);
+  background: var(--desk-card);
+  box-shadow: var(--desk-shadow-sm);
+}
+.desk-composer:focus-within {
+  outline: var(--desk-focus-width) solid var(--desk-ring);
+  outline-offset: var(--desk-focus-offset);
+}
+.desk-composer textarea {
+  max-height: 200px;
+  border: 0;
+  background: transparent;
+  color: var(--desk-text);
+  font: inherit;
+  resize: none;
+  outline: none;
+}
+
 /* Loading data: a skeleton where the content's shape is known (it shows after a beat, so fast work
    does not flash), a spinner where it is not. */
 .desk-skeleton {

@@ -1,0 +1,7 @@
+{
+  "target": "StudioChatStopResult",
+  "description": "the run was cancelled",
+  "instance": {
+    "stopped": true
+  }
+}

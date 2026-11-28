@@ -50,8 +50,22 @@ pub struct State {
     pub conversations: Vec<Value>,
     /// Conversation IDs and their bound agent for the fake run endpoints.
     pub chat_conversations: BTreeMap<String, String>,
-    /// What the next conversation run streams.
+    /// What every conversation run streams (`POST …/runs`), frame by frame.
     pub chat_stream: String,
+    /// What `GET …/attach` streams; `None` answers 204, as when no run is in flight.
+    pub attach_stream: Option<String>,
+    /// How long the fake waits between the frames of a stream.
+    pub chat_gap: Option<Duration>,
+    /// How long a stream stays open after its last frame: to the end of it, or until the run is
+    /// cancelled (`POST …/cancel`), when it ends with a `RUN_CANCELLED` error event.
+    pub chat_hold: Option<Duration>,
+    /// Each conversation's message rows, oldest first, as `GET …/messages` answers them.
+    pub messages: BTreeMap<String, Vec<Value>>,
+    /// When the person last read each conversation (`last_read_at`); `POST …/read` sets it.
+    pub read_at: BTreeMap<String, String>,
+    /// Conversations whose stream is open now, and the cancels asked while it was.
+    pub(super) streaming: BTreeSet<String>,
+    pub(super) cancelled: BTreeSet<String>,
     /// The person's Eris on endue AI (`GET /api/v1/ai/secretary`): her agent and conversation;
     /// `None` answers that the account has none.
     pub eris: Option<(String, String)>,
@@ -91,6 +105,13 @@ impl State {
                 "\"message\":{\"role\":\"assistant\",\"content\":\"The outline is ready.\"}}\n\n"
             )
             .to_owned(),
+            attach_stream: None,
+            chat_gap: None,
+            chat_hold: None,
+            messages: BTreeMap::new(),
+            read_at: BTreeMap::new(),
+            streaming: BTreeSet::new(),
+            cancelled: BTreeSet::new(),
             spaces: Vec::new(),
             account: FakeAccount::default(),
             connectors: FakeConnectors::default(),
@@ -211,6 +232,39 @@ impl State {
         }
         // The most recently active first, as ai-agent-service sorts them.
         self.conversations.insert(0, conversation);
+        id
+    }
+}
+
+impl State {
+    /// The agent a conversation is bound to: one created through the fake, or a seeded one.
+    pub(super) fn agent_of(&self, conversation: &str) -> Option<String> {
+        self.chat_conversations
+            .get(conversation)
+            .cloned()
+            .or_else(|| {
+                self.conversations
+                    .iter()
+                    .find(|c| c["id"] == conversation)
+                    .and_then(|c| c["agent_id"].as_str().map(str::to_owned))
+            })
+    }
+
+    /// Seed a message row of `conversation` (`role`, `content`, `run_id`, `tool_calls`, …): `row`
+    /// with an id and a time added when it has none; its id.
+    pub fn add_message(&mut self, conversation: &str, mut row: Value) -> String {
+        let rows = self.messages.get(conversation).map_or(0, Vec::len);
+        let id = row["id"]
+            .as_str()
+            .map_or_else(|| format!("msg_{}", rows + 1), str::to_owned);
+        row["id"] = json!(id);
+        if row.get("created_at").is_none() {
+            row["created_at"] = json!(self.tick());
+        }
+        self.messages
+            .entry(conversation.to_owned())
+            .or_default()
+            .push(row);
         id
     }
 }

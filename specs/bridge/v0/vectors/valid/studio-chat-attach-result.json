@@ -1,0 +1,7 @@
+{
+  "target": "StudioChatAttachResult",
+  "description": "no run was in flight",
+  "instance": {
+    "attached": false
+  }
+}

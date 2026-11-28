@@ -13,6 +13,10 @@ use desk_platform::wire_account::{
     Channel, NotificationUpdate, Notifications, Preferences, PreferencesPatch, User, UserPatch,
 };
 use desk_platform::wire_catalog::{CatalogAgent, ConversationPage, Recommended, Used};
+use desk_platform::wire_chat::{
+    ConversationRead, MessageList, MessageRow, RunCreatedEvent, RunDeltaEvent, RunErrorEvent,
+    RunInteractionEvent, RunPresentationEvent, RunStepEvent, ToolRow,
+};
 use desk_platform::wire_connectors::{
     ConnectorSummary, ConnectorTool, Items, KeyCreated, KeyScope, NewKey, ToolArguments, ToolCall,
 };
@@ -150,8 +154,19 @@ fn valid_answers_read_into_the_client_types() {
             | "ApiKeyCreated"
             | "ApiKeyCreateRequest"
             | "ConnectorToolCallRequest" => {}
+            // A conversation's messages and its run's events: `chat_vectors_read_into_the_clients_types`.
+            "MessageListEnvelope"
+            | "ConversationEnvelope"
+            | "RunCreatedEvent"
+            | "RunDeltaEvent"
+            | "RunStepEvent"
+            | "RunPresentationEvent"
+            | "RunInteractionEvent"
+            | "RunErrorEvent" => {}
             // Requests: the client's own bodies are checked below.
             "CreateAgentRequest"
+            | "AgentConversationInput"
+            | "CancelRunRequest"
             | "UpdateAgentRequest"
             | "UserUpdateRequest"
             | "UserPreferenceUpdateRequest"
@@ -257,6 +272,69 @@ fn connector_vectors_read_into_the_clients_types() {
         (
             "ConnectorToolCallRequest",
             serde_json::to_value(ToolArguments { arguments }).unwrap(),
+        ),
+    ];
+    for (target, body) in bodies {
+        assert!(validator(target).is_valid(&body), "{target}: {body}");
+    }
+}
+
+#[test]
+fn chat_vectors_read_into_the_clients_types() {
+    let mut seen = Vec::new();
+    for vector in vectors().iter().filter(|v| v.valid) {
+        match vector.target.as_str() {
+            "MessageListEnvelope" => {
+                let list: Envelope<MessageList> =
+                    serde_json::from_value(vector.instance.clone()).unwrap();
+                for row in &list.data.items {
+                    let read = if row["role"] == "tool" {
+                        serde_json::from_value::<ToolRow>(row.clone()).is_ok()
+                    } else {
+                        serde_json::from_value::<MessageRow>(row.clone()).is_ok()
+                    };
+                    assert!(read, "{}: {row} does not read", vector.file);
+                }
+            }
+            "ConversationEnvelope" => reads::<Envelope<ConversationRead>>(vector),
+            "RunCreatedEvent" => reads::<RunCreatedEvent>(vector),
+            "RunDeltaEvent" => reads::<RunDeltaEvent>(vector),
+            "RunStepEvent" => reads::<RunStepEvent>(vector),
+            "RunPresentationEvent" => reads::<RunPresentationEvent>(vector),
+            "RunInteractionEvent" => reads::<RunInteractionEvent>(vector),
+            "RunErrorEvent" => reads::<RunErrorEvent>(vector),
+            _ => continue,
+        }
+        seen.push(vector.target.clone());
+    }
+    for target in [
+        "MessageListEnvelope",
+        "ConversationEnvelope",
+        "RunCreatedEvent",
+        "RunDeltaEvent",
+        "RunStepEvent",
+        "RunPresentationEvent",
+        "RunInteractionEvent",
+        "RunErrorEvent",
+    ] {
+        assert!(
+            seen.iter().any(|t| t == target),
+            "no valid vector of {target}"
+        );
+    }
+    // The bodies the client sends: a new conversation of the person's own, a reviewed question's,
+    // a read, a cancel (crates/desk-platform/src/{chat.rs,messages.rs}).
+    let bodies = [
+        ("AgentConversationInput", json!({ "agent_id": "ag_1" })),
+        (
+            "AgentConversationInput",
+            json!({ "agent_id": "ag_1", "title": "From Desk", "approval_level": "ask" }),
+        ),
+        ("EmptyRequest", json!({})),
+        ("CancelRunRequest", json!({ "run_id": "run_1" })),
+        (
+            "AgentConversationTurn",
+            json!({ "agent_id": "ag_1", "content": "Hi", "stream": true, "client_message_id": "m_1" }),
         ),
     ];
     for (target, body) in bodies {

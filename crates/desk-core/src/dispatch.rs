@@ -185,6 +185,13 @@ impl Core {
                 (r.id, self.studio_conversations_list(caller, r.params))
             }
             R::StudioChatAsk(r) => (r.id, self.studio_chat_ask(caller, r.params)),
+            R::StudioMessagesList(r) => (r.id, self.studio_messages_list(caller, r.params)),
+            R::StudioChatSend(r) => (r.id, self.studio_chat_send(caller, r.params)),
+            R::StudioChatAttach(r) => (r.id, self.studio_chat_attach(caller, r.params)),
+            R::StudioChatStop(r) => (r.id, self.studio_chat_stop(caller, r.params)),
+            R::StudioConversationsRead(r) => {
+                (r.id, self.studio_conversations_read(caller, r.params))
+            }
             R::StudioSpacesList(r) => (r.id, self.studio_spaces_list(caller, r.params)),
             R::StudioSpacesGet(r) => (r.id, self.studio_spaces_get(caller, r.params)),
             r @ (R::ComputerPermissionsStatus(_)

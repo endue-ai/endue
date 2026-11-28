@@ -96,4 +96,57 @@ describe("studio for the shell (ADR 0129)", () => {
       },
     ]);
   });
+
+  test("an agent's conversation goes to studio.* and hears only its runs (ADR 0411)", async () => {
+    const stub = browserStub({
+      "studio.messages.list": () => ({ messages: [], hasMore: false }),
+      "studio.chat.send": () => ({ conversationId: "cnv_1" }),
+      "studio.chat.stop": () => ({ stopped: true }),
+      "studio.conversations.read": () => ({ previousReadAt: at }),
+    });
+    const client = new BridgeClient({
+      name: "test",
+      call: (request, caller) => stub.call(request, caller),
+      onEvent: (listener) => stub.onEvent(listener),
+    });
+    const thread = studioShell(client).thread;
+    if (!thread) throw new Error("no thread");
+    const heard: string[] = [];
+    const off = thread.onEvent((e) => heard.push(e.kind));
+    await thread.messages("cnv_1", "msg_9");
+    await thread.send({
+      agentId: "ag_1",
+      conversationId: "cnv_1",
+      text: "Hi",
+      messageId: "desk_12345678",
+    });
+    await thread.stop("cnv_1", "run_1");
+    expect(await thread.read("cnv_1")).toBe(at);
+    stub.emit({ event: "studio.chat.event", data: { conversationId: "cnv_1", kind: "started" } });
+    stub.emit({ event: "brain.status", data: { state: "ready" } } as never);
+    off();
+    stub.emit({ event: "studio.chat.event", data: { conversationId: "cnv_1", kind: "delta" } });
+    expect(heard).toEqual(["started"]);
+    expect(stub.calls.map(({ method, params }) => ({ method, params }))).toEqual([
+      {
+        method: "studio.messages.list",
+        params: { conversationId: "cnv_1", before: "msg_9", limit: 30, scope: STUDIO },
+      },
+      {
+        method: "studio.chat.send",
+        params: {
+          agentId: "ag_1",
+          conversationId: "cnv_1",
+          text: "Hi",
+          messageId: "desk_12345678",
+          scope: STUDIO,
+        },
+      },
+      {
+        method: "studio.chat.stop",
+        params: { conversationId: "cnv_1", runId: "run_1", scope: STUDIO },
+      },
+      { method: "studio.conversations.read", params: { conversationId: "cnv_1", scope: STUDIO } },
+    ]);
+  });
 });

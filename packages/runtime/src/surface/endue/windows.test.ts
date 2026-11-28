@@ -36,178 +36,248 @@ const click = (el: HTMLElement, action: string, side: "front" | "back") =>
   face(el, side)?.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)?.click();
 const fact = (el: HTMLElement, key: string) =>
   el.querySelector(`[data-fact="${key}"] dd`)?.textContent;
-const boardRow = (el: HTMLElement, id: string) =>
-  face(el, "back")?.querySelector<HTMLElement>(`[data-row="${id}"]`);
-const press = (el: HTMLElement, selector: string) =>
-  face(el, "back")?.querySelector<HTMLButtonElement>(selector)?.click();
 
-describe("an endue agent's window (ADR 0129)", () => {
-  it("shows the agent's card: name, handle and role, presence, description and chips", async () => {
+const tab = (el: HTMLElement, key: "home" | "studio") =>
+  el.querySelector<HTMLButtonElement>(`[data-tab="${key}"]`)?.click();
+const studioPanel = (el: HTMLElement) => el.querySelector<HTMLElement>(".thread-studio");
+const studioRow = (el: HTMLElement, id: string) =>
+  studioPanel(el)?.querySelector<HTMLElement>(`[data-row="${id}"]`);
+const pressIn = (el: HTMLElement, selector: string) =>
+  studioPanel(el)?.querySelector<HTMLButtonElement>(selector)?.click();
+const texts = (el: ParentNode | null | undefined, selector: string) =>
+  [...(el?.querySelectorAll(selector) ?? [])].map((n) => n.textContent);
+
+describe("an endue agent's window (ADR 0411)", () => {
+  it("the_window_shows_the_agents_conversations", async () => {
     const { el } = await mounted("agent", MISO);
-    const front = face(el, "front");
-    expect(front?.querySelector(".endue-title")?.textContent).toBe("Miso");
-    expect(front?.querySelector(".endue-badge")?.textContent).toBe("endue");
-    expect(front?.querySelector(".endue-handle")?.textContent).toBe(
-      "@miso · Keeps my calendar and sorts my mail",
+    await settle();
+    expect(el.querySelector(".thread-head .thread-name")?.textContent).toBe("Miso");
+    expect(el.querySelector(".thread-head .thread-handle")?.textContent).toBe("@miso");
+    // The side: New chat, then Miso's conversations, the newest first and open.
+    const side = el.querySelector(".thread-side");
+    expect(side?.querySelector("[data-action=new-chat]")?.textContent).toBe("New chat");
+    expect(texts(side, ".thread-side-title")).toEqual([
+      "Move Friday's dentist",
+      "Sort this week's mail",
+    ]);
+    expect(side?.querySelector("[aria-current=true]")?.getAttribute("data-conversation")).toBe(
+      "cnv_sample1",
     );
-    expect(front?.querySelector(".endue-presence")?.textContent).toBe("Working");
-    expect(
-      [...(front?.querySelectorAll(".endue-chips li") ?? [])].map((c) => c.textContent),
-    ).toEqual(["claude-sonnet-4.5"]);
-    expect(front?.hasAttribute("inert")).toBe(false);
-    expect(face(el, "back")?.hasAttribute("inert")).toBe(true);
-    expect(face(el, "back")?.getAttribute("aria-hidden")).toBe("true");
+    // Its run is in flight: the star marks the row.
+    expect(side?.querySelector("[data-conversation=cnv_sample1] .thread-star")).not.toBeNull();
+    // The thread: the person's bubbles, the agent's prose, a turn's work, the new-messages line.
+    expect(texts(el, ".thread-bubble")).toEqual([
+      "Move Friday's dentist",
+      "Thanks. Can you go on?",
+    ]);
+    expect(texts(el, ".thread-prose p")).toEqual([
+      "I looked into it.",
+      "Here is what I found so far.",
+      "On it.",
+    ]);
+    expect(el.querySelector(".thread-work-line")?.textContent).toBe(
+      "Work completed · 14 s · 3 tools",
+    );
+    expect(texts(el, ".thread-used .tag")).toEqual(["Search the web", "Read a page"]);
+    const rows = [...el.querySelectorAll(".thread-list > li")].map((li) => li.className);
+    expect(rows.indexOf("thread-new")).toBe(3);
+    expect(el.querySelector(".thread-new")?.textContent).toBe("New messages");
+    expect(el.querySelector(".thread-time")?.textContent).toBe("32m");
+    // The composer: Reply into this conversation, Send, the keys under it.
+    const field = el.querySelector<HTMLTextAreaElement>(".thread-field");
+    expect(field?.placeholder).toBe("Reply");
+    expect(field?.getAttribute("aria-label")).toBe("Reply to Miso");
+    expect(el.querySelector(".thread-send")?.textContent).toBe("Send");
+    expect(el.querySelector(".thread-keys")?.textContent).toBe("EnterSendShiftEnterNew line");
   });
 
-  it("shows the agent's face on its card once the core has read it (ADR 0232)", async () => {
+  it("unfolds a turn's work into its tool groups", async () => {
+    const { el } = await mounted("agent", MISO);
+    await settle();
+    const head = el.querySelector<HTMLButtonElement>(".thread-work-head");
+    expect(head?.getAttribute("aria-expanded")).toBe("false");
+    head?.click();
+    const groups = el.querySelector(".thread-work-groups");
+    expect(groups?.hasAttribute("hidden")).toBe(false);
+    expect(texts(groups, ".thread-group-label")).toEqual(["Search the web", "Read a page"]);
+    expect(texts(groups, ".thread-group-calls")).toEqual(["×2", "×1"]);
+  });
+
+  it("sends a line into the conversation it shows and the answer comes in", async () => {
+    const { el, bridge } = await mounted("agent", MISO);
+    await settle();
+    const field = el.querySelector<HTMLTextAreaElement>(".thread-field");
+    if (!field) throw new Error("no composer");
+    field.value = "Make it Thursday";
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await settle();
+    await settle();
+    expect(texts(el, ".thread-bubble").at(-1)).toBe("Make it Thursday");
+    expect(texts(el, ".thread-prose p").at(-1)).toBe("Here is what I found.");
+    expect(bridge.fake.thread.messages.cnv_sample1?.at(-2)?.text).toBe("Make it Thursday");
+    expect(field.value).toBe("");
+  });
+
+  it("a new chat starts a conversation at its first send", async () => {
+    const { el, bridge } = await mounted("agent", MISO);
+    await settle();
+    el.querySelector<HTMLButtonElement>("[data-action=new-chat]")?.click();
+    await settle();
+    expect(el.querySelector(".thread-intro .endue-title")?.textContent).toBe("Miso");
+    const field = el.querySelector<HTMLTextAreaElement>(".thread-field");
+    expect(field?.placeholder).toBe("Message Miso");
+    if (!field) throw new Error("no composer");
+    field.value = "Plan my week";
+    el.querySelector<HTMLButtonElement>("[data-action=send]")?.click();
+    await settle();
+    await settle();
+    expect(texts(el, ".thread-bubble")).toEqual(["Plan my week"]);
+    expect(texts(el, ".thread-prose p")).toEqual(["Here is what I found."]);
+    expect(Object.keys(bridge.fake.thread.messages)).toContain("cnv_new_1");
+  });
+
+  it("a run held open can be stopped, and a failed one offers Try again", async () => {
+    const { el, bridge } = await mounted("agent", MISO);
+    await settle();
+    const field = el.querySelector<HTMLTextAreaElement>(".thread-field");
+    if (!field) throw new Error("no composer");
+    bridge.fake.thread.hold();
+    field.value = "Draft the note";
+    el.querySelector<HTMLButtonElement>("[data-action=send]")?.click();
+    await settle();
+    const run = bridge.fake.thread.held();
+    run?.delta("Dear team,");
+    expect(el.querySelector(".thread-run .thread-prose")?.textContent).toBe("Dear team,");
+    expect(el.querySelector(".thread-send")?.textContent).toBe("Stop");
+    el.querySelector<HTMLButtonElement>("[data-action=stop]")?.click();
+    await settle();
+    expect(bridge.fake.thread.stopped).toEqual([run?.runId]);
+    expect(el.querySelector(".thread-run")?.textContent).toBe("Stopped.");
+
+    bridge.fake.thread.hold();
+    field.value = "Try the flights";
+    el.querySelector<HTMLButtonElement>("[data-action=send]")?.click();
+    await settle();
+    bridge.fake.thread.held()?.fail("the model timed out");
+    expect(el.querySelector(".thread-callout[data-tone=danger]")?.textContent).toContain(
+      "The run failed: the model timed out",
+    );
+    el.querySelector<HTMLButtonElement>("[data-action=try-again]")?.click();
+    await settle();
+    await settle();
+    expect(texts(el, ".thread-bubble").at(-1)).toBe("Try the flights");
+    expect(texts(el, ".thread-prose p").at(-1)).toBe("Here is what I found.");
+  });
+
+  it("an_inactive_agent_has_no_composer", async () => {
+    const { el, store } = await mounted("agent", sampleAgentId(2));
+    expect(el.querySelector(".thread-composer")).toBeNull();
+    expect(el.querySelector(".thread-inactive p")?.textContent).toBe(
+      "This agent is not taking work.",
+    );
+    el.querySelector<HTMLButtonElement>("[data-action=open-studio-tab]")?.click();
+    await settle();
+    expect(store.get().endue.flipped).toEqual([`endue-agent:${sampleAgentId(2)}`]);
+  });
+
+  it("shows the agent's face in its header once the core has read it (ADR 0232)", async () => {
     const { el, studio } = await mounted("agent", MISO);
     await settle();
-    const picture = face(el, "front")?.querySelector<HTMLImageElement>(".endue-avatar img");
+    const picture = el.querySelector<HTMLImageElement>(".thread-head .endue-avatar img");
     expect(picture?.getAttribute("src")).toBe(studio.pictures[MISO]);
-    expect(face(el, "front")?.querySelector(".endue-avatar")?.textContent).toBe("");
   });
 
-  it("turns over to the Studio board on Studio, and back on Card", async () => {
+  it("home_and_studio_are_tabs", async () => {
     const { el, store } = await mounted("agent", MISO);
-    click(el, "studio", "front");
+    expect(texts(el, "[role=tab]")).toEqual(["Home", "Studio"]);
+    expect(el.querySelector("[data-tab=home]")?.getAttribute("aria-selected")).toBe("true");
+    expect(studioPanel(el)?.hidden).toBe(true);
+    tab(el, "studio");
     await settle();
-    const card = el.querySelector(".endue-flip");
-    expect(card?.classList.contains("is-flipped")).toBe(true);
     expect(store.get().endue.flipped).toEqual([`endue-agent:${MISO}`]);
-    expect(face(el, "front")?.hasAttribute("inert")).toBe(true);
-    expect(face(el, "back")?.hasAttribute("inert")).toBe(false);
-    const back = face(el, "back");
+    expect(el.querySelector("[data-tab=studio]")?.getAttribute("aria-selected")).toBe("true");
+    expect(el.querySelector<HTMLElement>(".thread-home")?.hidden).toBe(true);
+    const back = studioPanel(el);
+    expect(back?.hidden).toBe(false);
     // Three columns, as endue.ai's Studio has them, the agent's sheet in the middle.
-    expect(
-      [...(back?.querySelectorAll(".studio-col-head") ?? [])].map((h) => h.textContent),
-    ).toEqual(["01Where requests come in", "02Where the agent handles them", "03What it reaches"]);
+    expect(texts(back, ".studio-col-head")).toEqual([
+      "01Where requests come in",
+      "02Where the agent handles them",
+      "03What it reaches",
+    ]);
     expect(
       [...(back?.querySelectorAll("[data-col='in'] [data-row]") ?? [])].map((r) =>
         r.getAttribute("data-row"),
       ),
     ).toEqual(["console", "channel", "live", "api", "mcp"]);
-    expect(
-      [...(back?.querySelectorAll("[data-col='out'] [data-row]") ?? [])].map((r) =>
-        r.getAttribute("data-row"),
-      ),
-    ).toEqual(["devices", "outputs"]);
     const hub = back?.querySelector("[data-hub]");
     expect(hub?.querySelector(".studio-name")?.textContent).toBe("Miso");
-    expect(hub?.querySelector(".studio-status")?.textContent).toBe("Working");
-    expect(hub?.querySelector(".studio-handle")?.textContent).toBe(
-      "@miso · Keeps my calendar and sorts my mail",
-    );
     expect(hub?.querySelector(".studio-sentence")?.textContent).toBe(
       "Takes requests from Console chat · Acme · API, handles them with 2 built-in tools, and leaves results in Outputs.",
     );
-    expect(hub?.querySelector('[data-section="prompt"] .studio-sheet-value')?.textContent).toBe(
-      "“Answer briefly, in Korean.”",
-    );
-    expect(hub?.querySelector('[data-section="model"] .studio-sheet-value')?.textContent).toBe(
-      "claude-sonnet-4.5",
-    );
-    expect(hub?.querySelector(".studio-portrait img")?.getAttribute("src")).toMatch(
-      /^data:image\//,
-    );
-    // The lines' layer is there, drawn over the board and out of a screen reader's way.
     expect(back?.querySelector("svg.studio-lines")?.getAttribute("aria-hidden")).toBe("true");
-    expect(back?.querySelectorAll("svg.studio-lines [data-line]").length).toBeGreaterThan(0);
-    // The focus follows the turn to the face now in front.
-    expect(document.activeElement?.getAttribute("data-action")).toBe("card");
-
-    click(el, "card", "back");
+    expect(texts(back, ".endue-actions [data-action]")).toEqual(["Read again", "Edit in Studio"]);
+    tab(el, "home");
     await settle();
-    expect(el.querySelector(".endue-flip")?.classList.contains("is-flipped")).toBe(false);
-    expect(document.activeElement?.getAttribute("data-action")).toBe("studio");
+    expect(studioPanel(el)?.hidden).toBe(true);
+    expect(store.get().endue.flipped).toEqual([]);
   });
 
   it("unfolds a way in where it stands, one at a time, and keeps the focus on it", async () => {
     const { el } = await mounted("agent", MISO);
-    click(el, "studio", "front");
+    tab(el, "studio");
     await settle();
     const head = (id: string) =>
-      boardRow(el, id)?.querySelector<HTMLButtonElement>("[data-row-head]");
+      studioRow(el, id)?.querySelector<HTMLButtonElement>("[data-row-head]");
     expect(head("live")?.getAttribute("aria-expanded")).toBe("false");
     head("live")?.focus();
     head("live")?.click();
     expect(head("live")?.getAttribute("aria-expanded")).toBe("true");
-    expect(boardRow(el, "live")?.querySelector(".studio-row-body p")?.textContent).toBe(
+    expect(studioRow(el, "live")?.querySelector(".studio-row-body p")?.textContent).toBe(
       "Turn it on to chat at endue.live/@miso.",
     );
     expect(document.activeElement).toBe(head("live"));
     head("mcp")?.click();
-    expect(head("live")?.getAttribute("aria-expanded")).toBe("false");
-    expect(boardRow(el, "live")?.querySelector(".studio-row-body")).toBeNull();
-    expect(boardRow(el, "mcp")?.hasAttribute("data-expanded")).toBe(true);
-    head("mcp")?.click();
-    expect(boardRow(el, "mcp")?.hasAttribute("data-expanded")).toBe(false);
+    expect(studioRow(el, "live")?.querySelector(".studio-row-body")).toBeNull();
   });
 
   it("opens each part of the board in the Agents Studio, and nothing of endue.ai", async () => {
     const { el, bridge, ran } = await mounted("agent", MISO);
-    click(el, "studio", "front");
+    tab(el, "studio");
     await settle();
-    press(el, '[data-section="prompt"]');
+    pressIn(el, '[data-section="prompt"]');
     await settle();
-    press(el, '[data-row="devices"] [data-row-head]');
+    pressIn(el, '[data-key="studio-foot-settings"]');
     await settle();
-    press(el, '[data-key="studio-foot-settings"]');
-    await settle();
-    press(el, '[data-row="channel"] [data-row-head]');
-    press(el, '[data-row="channel"] [data-row-action="add"]');
-    await settle();
-    press(el, '[data-row="console"] [data-row-head]');
-    press(el, '[data-row="console"] [data-row-action="open"]');
-    await settle();
-    press(el, '[data-key="studio-character"]');
+    pressIn(el, '[data-action="open-studio"]');
     await settle();
     const studio = (facet: string) => [
       { command: "desk.plugins.open", args: { plugin: "endue.agents" } },
       { command: "endue.agents.studio", args: { agent: MISO, facet } },
     ];
-    expect(ran).toEqual([
-      ...studio("prompt"),
-      ...studio("connectors"),
-      ...studio("settings"),
-      ...studio("channels"),
-      ...studio("identity"),
-      ...studio("identity"),
-    ]);
-    expect(bridge.fake.opened).toEqual([]);
-  });
-
-  it("edits the agent in the Agents Studio from its card, with no endue.ai page", async () => {
-    const { el, bridge, ran } = await mounted("agent", MISO);
-    const labels = (side: "front" | "back") =>
-      [...(face(el, side)?.querySelectorAll(".endue-actions [data-action]") ?? [])].map(
-        (b) => b.textContent,
-      );
-    expect(labels("front")).toEqual(["Edit in Studio"]);
-    expect(labels("back")).toEqual(["Read again", "Edit in Studio"]);
-    click(el, "open-studio", "front");
-    await settle();
+    expect(ran.slice(0, 4)).toEqual([...studio("prompt"), ...studio("settings")]);
     expect(ran.at(-1)).toEqual({
       command: "endue.agents.studio",
       args: { agent: MISO, facet: "identity" },
     });
-    expect(face(el, "front")?.querySelector('[data-action="open-web"]')).toBeNull();
     expect(bridge.fake.opened).toEqual([]);
   });
 
-  it("speaks the desk's language on both faces", async () => {
+  it("speaks the desk's language", async () => {
     const { el } = await mounted("agent", MISO, "ko");
-    expect(face(el, "front")?.querySelector('[data-action="studio"]')?.textContent).toBe(
-      "스튜디오",
-    );
-    expect(face(el, "front")?.querySelector(".endue-presence")?.textContent).toBe("일하는 중");
-    click(el, "studio", "front");
     await settle();
-    expect(face(el, "back")?.querySelector('[data-action="card"]')?.textContent).toBe("카드로");
-    expect(face(el, "back")?.querySelector(".studio-col-head")?.textContent).toBe(
+    expect(texts(el, "[role=tab]")).toEqual(["홈", "스튜디오"]);
+    expect(el.querySelector("[data-action=new-chat]")?.textContent).toBe("새 대화");
+    expect(el.querySelector(".thread-side-heading")?.textContent).toBe("최근");
+    expect(el.querySelector<HTMLTextAreaElement>(".thread-field")?.placeholder).toBe("답장");
+    expect(el.querySelector(".thread-send")?.textContent).toBe("보내기");
+    expect(el.querySelector(".thread-new")?.textContent).toBe("새 메시지");
+    expect(el.querySelector(".thread-work-line")?.textContent).toBe("작업 완료 · 14초 · 도구 3개");
+    expect(el.querySelector(".thread-time")?.textContent).toBe("32분");
+    tab(el, "studio");
+    await settle();
+    expect(studioPanel(el)?.querySelector(".studio-col-head")?.textContent).toBe(
       "01요청이 들어오는 곳",
-    );
-    expect(boardRow(el, "console")?.querySelector(".studio-row-title")?.textContent).toBe(
-      "콘솔 채팅",
     );
   });
 

@@ -1,0 +1,7 @@
+{
+  "target": "AgentConversationInput",
+  "description": "a conversation the person starts in an agent's window: no title of the desk's own",
+  "instance": {
+    "agent_id": "ag_01JC0Q4MR00000000000000001"
+  }
+}

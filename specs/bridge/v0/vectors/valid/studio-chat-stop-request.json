@@ -1,0 +1,15 @@
+{
+  "target": "BridgeRequest",
+  "description": "cancel the run",
+  "instance": {
+    "id": 15,
+    "method": "studio.chat.stop",
+    "params": {
+      "conversationId": "cnv_fixture",
+      "runId": "run_2",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

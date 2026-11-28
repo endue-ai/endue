@@ -311,6 +311,7 @@ only arrange content; use semantic headings, labels and native landmarks for its
 | Status dot | `.desk-dot` (`data-tone` unread, success, warning, danger, info) | A still state beside a word or under an `aria-label` |
 | Star | `.desk-star` (`data-working="true"`, `.is-small`, `.is-large`), `.desk-star-label` | An agent at work, `role="img"` `aria-label="Working"`, with one line saying who does what |
 | Loading | `.desk-skeleton`, `.desk-spinner` | Data loading: a skeleton where the shape is known, a spinner where it is not |
+| Conversation | `.desk-thread`, `.desk-bubble`, `.desk-work`, `.desk-composer` | A conversation with an agent (ADR 0411): the person's bubbles at the right, the agent's prose, a turn's work that unfolds, and the field with Send |
 
 ```html
 <header class="desk-header">

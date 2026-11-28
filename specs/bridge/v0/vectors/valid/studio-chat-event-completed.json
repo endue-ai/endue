@@ -1,0 +1,13 @@
+{
+  "target": "BridgeEvent",
+  "description": "the final answer",
+  "instance": {
+    "event": "studio.chat.event",
+    "data": {
+      "conversationId": "cnv_fixture",
+      "runId": "run_2",
+      "kind": "completed",
+      "text": "Tomorrow is clear."
+    }
+  }
+}
