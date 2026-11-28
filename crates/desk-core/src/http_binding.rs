@@ -6,11 +6,11 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use desk_bridge::{
-    HttpBinding, HttpItemMap, HttpPageNext, HttpRead, HttpRequest, HttpValue, Item, ItemSource,
-};
+use desk_bridge::{HttpBinding, HttpPageNext, HttpRequest, Item, ItemSource};
 use desk_sys::net::{Method, Request, Response};
-use serde_json::{Map, Value};
+use serde_json::Value;
+
+pub(crate) use crate::item_map::{Here, item_of, pointer};
 
 /// Pages a request reads when it names no maxPages, and the most it may name.
 const PAGES: u64 = 10;
@@ -48,6 +48,7 @@ pub(crate) fn sync(
     base: &str,
     token: Option<&str>,
     source: &ItemSource,
+    here: &Here<'_>,
     fetch: &mut dyn FnMut(Request) -> Result<Response, Failure>,
 ) -> Result<Synced, Failure> {
     let origin = origin_of(base).ok_or_else(|| Failure::new(format!("{base} is not a URL")))?;
@@ -61,9 +62,9 @@ pub(crate) fn sync(
         let mut url = Some(first_url(base, request));
         let pages = request.max_pages.unwrap_or(PAGES).clamp(1, MAX_PAGES);
         for _ in 0..pages {
-            let Some(here) = url.take() else { break };
+            let Some(page) = url.take() else { break };
             let response = fetch(Request {
-                url: here,
+                url: page,
                 method: Method::Get,
                 headers: headers.clone(),
                 body: None,
@@ -80,7 +81,7 @@ pub(crate) fn sync(
                 ))
             })?;
             for record in records {
-                match item_of(map, record, source) {
+                match item_of(map, record, source, here) {
                     Some((id, item)) => {
                         synced.items.insert(id, item);
                     }
@@ -91,61 +92,6 @@ pub(crate) fn sync(
         }
     }
     Ok(synced)
-}
-
-/// The record's item, keyed by its id, or none when it does not fit specs/item/v0.
-pub(crate) fn item_of(
-    map: &HttpItemMap,
-    record: &Value,
-    source: &ItemSource,
-) -> Option<(String, Item)> {
-    let mut item = Map::new();
-    for (field, value) in &map.fields {
-        if let Some(found) = read(record, value) {
-            item.insert(field.clone(), found);
-        }
-    }
-    item.insert("kind".into(), serde_json::to_value(map.kind).ok()?);
-    item.insert("source".into(), serde_json::to_value(source).ok()?);
-    let id = item.get("id")?.as_str()?.to_owned();
-    let item = serde_json::from_value::<Item>(Value::Object(item)).ok()?;
-    Some((id, item))
-}
-
-/// One field's value from the record: none for null or missing, unless a default gives one.
-fn read(record: &Value, value: &HttpValue) -> Option<Value> {
-    match value {
-        HttpValue::JsonPointer(at) => pointer(record, at).filter(|v| !v.is_null()).cloned(),
-        HttpValue::HttpConst(constant) => Some(constant.r#const.clone()),
-        HttpValue::HttpRead(rule) => shaped(record, rule).or_else(|| rule.default.clone()),
-    }
-}
-
-fn shaped(record: &Value, rule: &HttpRead) -> Option<Value> {
-    let mut found = pointer(record, &rule.pointer)
-        .filter(|v| !v.is_null())?
-        .clone();
-    if let Some(after) = &rule.after {
-        let text = found.as_str()?;
-        let cut = text.rfind(after.as_str())?;
-        found = Value::String(text[cut + after.len()..].to_owned());
-    }
-    if let Some(values) = &rule.values {
-        let key = match &found {
-            Value::String(text) => text.clone(),
-            other => other.to_string(),
-        };
-        found = values.get(&key)?.clone();
-    }
-    Some(found)
-}
-
-/// RFC 6901: the value at `at` in `value`; the empty pointer is the value itself.
-fn pointer<'a>(value: &'a Value, at: &str) -> Option<&'a Value> {
-    if at.is_empty() {
-        return Some(value);
-    }
-    value.pointer(at)
 }
 
 fn headers(binding: &HttpBinding, token: Option<&str>) -> BTreeMap<String, String> {

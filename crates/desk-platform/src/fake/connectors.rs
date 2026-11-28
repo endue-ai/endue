@@ -4,7 +4,7 @@
 //! key's scopes with 403, an expired connector's tools with 409, and answers 429 with Retry-After
 //! when told to. Its answers carry the limits it is given (`X-RateLimit-*`).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 use serde_json::{Value, json};
 
@@ -39,10 +39,14 @@ pub struct FakeConnectors {
     /// What a call answers, by `connector/tool`: `ok`, `content` and the rest of the call's
     /// answer. A tool without one answers `ok: true` with `{}`.
     pub answers: BTreeMap<String, Value>,
+    /// Answers a tool gives once each, in order, before `answers`, by `connector/tool`: one per page.
+    pub queued: BTreeMap<String, VecDeque<Value>>,
     /// Headers every connector answer carries (`x-ratelimit-remaining` …).
     pub headers: BTreeMap<String, String>,
     /// The next connector API answer is 429 with this Retry-After.
     pub limited: Option<u64>,
+    /// The next connector API answer is this status, as when an answer is lost on the way.
+    pub failing: Option<u16>,
 }
 
 impl FakeConnectors {
@@ -184,6 +188,9 @@ pub(super) fn api(state: &mut State, seen: &Seen) -> Option<Answer> {
         return Some(error(429, "RATE_LIMITED", "Too many requests"));
     }
     state.connectors.headers.remove("retry-after");
+    if let Some(status) = state.connectors.failing.take() {
+        return Some(error(status, "UNAVAILABLE", "Try again"));
+    }
     let may = |risk: &str| {
         let scope = match risk {
             "destructive" => "connectors:delete",
@@ -235,22 +242,29 @@ fn connector<'a>(state: &'a State, id: &str) -> Option<&'a FakeConnector> {
     state.connectors.connectors.iter().find(|c| c.id == id)
 }
 
-fn call(state: &State, seen: &Seen, id: &str, tool: &str, may: &dyn Fn(&str) -> bool) -> Answer {
+fn call(
+    state: &mut State,
+    seen: &Seen,
+    id: &str,
+    tool: &str,
+    may: &dyn Fn(&str) -> bool,
+) -> Answer {
     let Some(c) = connector(state, id) else {
         return error(404, "CONNECTOR_NOT_FOUND", "Connector not found");
     };
     let Some(spec) = c.tools.iter().find(|t| t["name"] == tool) else {
         return error(404, "CONNECTOR_TOOL_NOT_FOUND", "Tool not found");
     };
-    let risk = spec["risk"].as_str().unwrap_or_default();
-    if !may(risk) {
+    let risk = spec["risk"].as_str().unwrap_or_default().to_owned();
+    let expired = c.expired;
+    if !may(&risk) {
         return error(
             403,
             "CONNECTOR_TOOL_NOT_ALLOWED",
             "This key may not call this tool",
         );
     }
-    if c.expired {
+    if expired {
         return error(
             409,
             "CONNECTOR_NOT_ACTIVE",
@@ -260,11 +274,14 @@ fn call(state: &State, seen: &Seen, id: &str, tool: &str, may: &dyn Fn(&str) -> 
     if !seen.body["arguments"].is_object() {
         return error(400, "VALIDATION_ERROR", "arguments must be an object");
     }
-    let mut answer = state
+    let key = format!("{id}/{tool}");
+    let queued = state
         .connectors
-        .answers
-        .get(&format!("{id}/{tool}"))
-        .cloned()
+        .queued
+        .get_mut(&key)
+        .and_then(VecDeque::pop_front);
+    let mut answer = queued
+        .or_else(|| state.connectors.answers.get(&key).cloned())
         .unwrap_or_else(|| json!({ "ok": true, "content": "{}", "data": {} }));
     answer["tool"] = json!(tool);
     answer["risk"] = json!(risk);

@@ -18,9 +18,9 @@ use std::sync::MutexGuard;
 use desk_bridge::{
     BridgeEvent, CmdAnswerParams, CmdAnswerResult, CmdAnsweredData, CmdAnsweredEvent,
     CmdChangedData, CmdChangedEvent, CmdInvokeParams, CmdInvokeResult, CmdInvokedData,
-    CmdInvokedEvent, CmdListParams, CmdListResult, CmdRegisterParams, CmdRegisterResult,
-    CmdUnregisterParams, CmdUnregisterResult, CommandChange, CommandFailure, CommandFailureCode,
-    CommandInfo, ErrorCode, EventName, Permission,
+    CmdListParams, CmdListResult, CmdRegisterParams, CmdRegisterResult, CmdUnregisterParams,
+    CmdUnregisterResult, CommandChange, CommandFailure, CommandFailureCode, CommandInfo, ErrorCode,
+    EventName, Permission,
 };
 use serde_json::{Map, Value};
 
@@ -218,21 +218,15 @@ impl Core {
             self.run_went_on(run, Ok(&invocation_id));
         }
         self.note_invoked(&invocation_id, id, caller, &info.provider);
-        let to = self.recipients(EventName::CmdInvoked, vec![info.provider]);
-        self.events().publish_to(
-            to,
-            BridgeEvent::CmdInvoked(CmdInvokedEvent {
-                event: Default::default(),
-                data: CmdInvokedData {
-                    invocation_id: invocation_id.clone(),
-                    id: id.to_owned(),
-                    args,
-                    caller: caller.to_owned(),
-                    approved,
-                    file_open_granted,
-                },
-            }),
-        );
+        let data = CmdInvokedData {
+            invocation_id: invocation_id.clone(),
+            id: id.to_owned(),
+            args,
+            caller: caller.to_owned(),
+            approved,
+            file_open_granted,
+        };
+        self.deliver_invoked(info.provider, data);
         Ok(invocation_id)
     }
 

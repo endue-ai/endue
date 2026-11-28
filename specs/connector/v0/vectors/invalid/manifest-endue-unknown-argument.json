@@ -1,0 +1,22 @@
+{
+  "target": "ConnectorManifest",
+  "description": "a request argument that is neither a constant, the page cursor nor the last sync's time",
+  "instance": {
+    "binding": "endue",
+    "endue": {
+      "tools": ["thing_read"],
+      "requests": [
+        {
+          "tool": "thing_read",
+          "arguments": { "cursor": { "previous": true } },
+          "items": "/items",
+          "map": "thing"
+        }
+      ],
+      "maps": { "thing": { "kind": "entry", "fields": { "id": "/id", "title": "/text" } } }
+    },
+    "auth": { "kind": "endue" },
+    "resources": [{ "kind": "entry" }],
+    "sync": { "mode": "pull", "intervalSeconds": 900 }
+  }
+}

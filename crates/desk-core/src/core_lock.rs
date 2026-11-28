@@ -73,6 +73,7 @@ impl Core {
         self.unloaded(id);
         self.forget_wasm(id);
         self.forget_http(id);
+        self.forget_endue(id);
         if let Some(host) = self.connector_host() {
             host.remove(id);
         }

@@ -129,12 +129,14 @@ impl Core {
                 }
             }
         }
+        self.endue_key_changed();
         json(self.connectors_now())
     }
 
     pub(crate) fn account_connectors_disable(&self, caller: &str, params: AccountParams) -> Answer {
         let account = Arc::clone(self.account_for(caller, params.scope)?);
         let problem = self.forget_endue_key(&account)?;
+        self.endue_key_changed();
         json(off(problem))
     }
 
