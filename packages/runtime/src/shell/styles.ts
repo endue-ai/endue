@@ -11,6 +11,7 @@ import "../system/shortcuts.css";
 import "./bar-new.css";
 import "../eris/eris.css";
 import "../eris/errand.css";
+import "../eris/trail.css";
 import "../surface/surface.css";
 import "../surface/tabs.css";
 import "../surface/local-agent/local-agent.css";

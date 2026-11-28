@@ -175,6 +175,49 @@ describe("Eris's errands", () => {
     expect(frames).toEqual([640, DWELL_MS, 640]);
   });
 
+  it("the_spark_leads_a_trail_and_keeps_its_timing", async () => {
+    const mail = at(document.createElement("section"), {
+      left: 100,
+      top: 300,
+      width: 400,
+      height: 300,
+    });
+    mail.dataset.surface = "endue.mail";
+    shell.append(mail);
+    /** The followers half way along the first leg. */
+    let half: { opacity: string; transform: string }[] = [];
+    ctx.ticker.animate = (ms: number, _ease: unknown, update: (t: number) => void) => {
+      update(0.5);
+      if (!half.length)
+        half = [...shell.querySelectorAll<HTMLElement>(".errand-follower")].map((dot) => ({
+          opacity: dot.style.opacity,
+          transform: dot.style.transform,
+        }));
+      update(1);
+      frames.push(ms);
+      return Promise.resolve();
+    };
+    const errands = mountErrands(() => shell, ctx);
+    errands.step(TOOL);
+    await drawn();
+    const dots = [...shell.querySelectorAll<HTMLElement>(".errand-follower")];
+    expect(dots).toHaveLength(3);
+    expect(dots.every((dot) => dot.getAttribute("aria-hidden") === "true")).toBe(true);
+    // Fainter the further behind, each on the arc behind the spark.
+    expect(half.map((d) => Number(d.opacity))).toEqual([0.55, 0.4, 0.25]);
+    expect(new Set(half.map((d) => d.transform)).size).toBe(3);
+    // At rest on the window the trail is gone.
+    await vi.waitFor(() =>
+      expect(shell.querySelector(".errand")?.getAttribute("data-leg")).toBe("there"),
+    );
+    expect(dots.map((dot) => Number(dot.style.opacity))).toEqual([0, 0, 0]);
+    errands.step(BACK);
+    await errands.finish();
+    expect(shell.querySelector(".errand-follower")).toBeNull();
+    // The errand's timing is unchanged (ADR 0271, ADR 0275).
+    expect(frames).toEqual([640, DWELL_MS, 640]);
+  });
+
   it("waits beside Eris for a plugin without a window, and an unanswered errand comes back empty", async () => {
     const errands = mountErrands(() => shell, ctx);
     errands.step(TOOL);

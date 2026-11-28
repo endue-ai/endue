@@ -42,6 +42,23 @@
 }
 .errand[data-ok="false"] .errand-spark { filter: grayscale(0.8); }
 
+/* The trail behind the spark (eris/trail.ts, ADR 0408): her gold on the way out, the star's colour
+   on the way back, grey on a failed one. */
+.errand-follower {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: var(--z-float-top);
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--desk-eris-gold-light);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.errand-follower[data-leg="back"] { background: var(--desk-star); }
+.errand-follower[data-ok="false"] { background: var(--desk-text-muted); }
+
 .errand-label {
   display: inline-flex;
   flex-direction: column;

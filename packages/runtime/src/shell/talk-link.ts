@@ -34,7 +34,7 @@ export function linkEnds(pill: Box, target: Box): { from: Point; to: Point } {
 }
 
 /** A point `t` of the way along the link's shallow curve. */
-function bend(from: Point, to: Point, t: number): Point {
+export function bend(from: Point, to: Point, t: number): Point {
   const lift = Math.sin(Math.PI * t) * Math.min(48, Math.hypot(to.x - from.x, to.y - from.y) / 6);
   return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t - lift };
 }

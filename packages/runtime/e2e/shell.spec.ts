@@ -193,7 +193,7 @@ test.describe("the desk shell", () => {
     await expect(page.locator(".drawer-button .badge")).toHaveText("2");
   });
 
-  test("typing opens the line, commands run with Enter, a message rises and is absorbed", async ({
+  test("typing opens the line, commands run with Enter, a message fades and its trail flies", async ({
     page,
   }) => {
     await expect(page.locator(".composer-field")).toHaveCSS("height", "1px");
@@ -211,13 +211,14 @@ test.describe("the desk shell", () => {
     await expect(page.getByRole("option").last()).toHaveText("Eris 에게 말하기 · hello there");
     await page.keyboard.press("Enter");
     await expect(page.locator(".absorb")).toHaveText("hello there");
-    await step(page, 700);
+    // It fades where it stands (200 ms) while its trail flies into her (ADR 0408).
+    await step(page, 100);
     const mid = await page
       .locator(".absorb")
       .evaluate((el) => Number(getComputedStyle(el).opacity));
     expect(mid).toBeGreaterThan(0);
     expect(mid).toBeLessThan(1);
-    await step(page, 720);
+    await step(page, 1320);
     await expect(page.locator(".absorb")).toHaveCount(0);
     // In her, she reads it (0.48 s) and then answers (ADR 0275).
     await step(page, 500);

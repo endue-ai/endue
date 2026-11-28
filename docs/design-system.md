@@ -18,7 +18,10 @@ Before a UI change, people read this page and agents follow `.claude/skills/desi
    not a button, text, surface, border or badge. Data keeps its colours (charts, a series, an agent's
    chosen colour); the brand does not decorate. Where Eris is at work is hers to mark too: a window
    glows in it around its frame only while she uses it, her errand's thread and its answer run in
-   it, and her ring turns in it while she reads a line (ADR 0271, ADR 0275).
+   it, and her ring turns in it while she reads a line (ADR 0271, ADR 0275). A trail runs in it when
+   a line or a step of work is handed to an agent; a window the person puts away or brings back runs
+   a muted one, since nobody is at work (ADR 0408). A trail never moves on its own: it runs once,
+   because of an act of the person or a step of an agent, and nothing loops or idles.
 3. **Status is a sentence.** Say who is doing what ("Eris is reading the file."); a badge or dot comes
    after the words, never alone. A coloured surface only for a warning, a failure or what needs the
    person (`.desk-callout[data-tone="warning"|"danger"]`, `.desk-error`).

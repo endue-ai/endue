@@ -1,15 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
 import { DESK, openShell, step } from "./shell-helpers";
 
-// How Eris works a line, end to end (ADR 0089, ADR 0271, ADR 0275): the line flies from the talk
-// line into her, she takes it in and reads it, her ring turning, and only then does an errand
+// How Eris works a line, end to end (ADR 0089, ADR 0271, ADR 0275, ADR 0408): a trail carries the
+// line from the talk line into her, she takes it in and reads it, her ring turning, and only then does an errand
 // leave: a labelled spark in her gold along a thread to the plugin's window, which glows in the
 // star's colour from the moment the spark lands until the plugin answers, and the answer flies back
 // to her in the star's colour. A line that runs nothing lights no window.
 test.use({ viewport: DESK });
 
-/** How long the line flies into her (Composer's ABSORB_MS) and how long she reads it (READ_MS). */
-const FLIGHT = 1400;
+/** How long the line's trail flies into her (trail.ts's FLIGHT_MS) and how long she reads it (READ_MS). */
+const FLIGHT = 720;
 const READ = 480;
 /**
  * One leg of an errand (LEG_MS), how long its spark stays at the window at least (DWELL_MS), and
@@ -93,12 +93,15 @@ test("a line that runs nothing flies into her, she reads it and answers, and no 
   await tell(page, "what is this");
   await step(page, 320);
   await look();
-  // The line is still on its way into her.
-  await expect(page.locator(".absorb")).toHaveCount(1);
+  // The line is still on its way into her: its text has faded where it stood, its trail flies.
+  await expect(page.locator(".absorb")).toHaveCount(0);
+  await expect(page.locator('.trail[data-tone="star"]')).toHaveCount(1);
   expect(await mind(page)).toBeNull();
   await step(page, FLIGHT - 320 + 32);
-  // It is in her: she reads it, her ring turning in the star's colour.
-  await expect(page.locator(".absorb")).toHaveCount(0);
+  // It is in her: she reads it, her ring turning in the star's colour, and the arrival's ring shows.
+  expect(
+    await page.locator(".trail-ring").evaluate((el) => Number(getComputedStyle(el).opacity)),
+  ).toBeGreaterThan(0);
   expect(await mind(page)).toBe("reading");
   const ring = page.locator(".eris .eris-mind");
   await expect(ring).toHaveAttribute("aria-hidden", "true");
@@ -165,6 +168,12 @@ test("an errand leaves once the line is read, its window glows while the plugin 
   // Not lit before the spark lands.
   expect(await lit(page)).toEqual([]);
   await step(page, LEG / 2);
+  // The spark leads a trail: three followers behind it, fainter the further back (ADR 0408).
+  const followers = await page
+    .locator(".errand-follower")
+    .evaluateAll((dots) => dots.map((d) => Number(getComputedStyle(d).opacity)));
+  expect(followers).toHaveLength(3);
+  expect(followers[0]).toBeGreaterThan(followers[2] ?? 1);
   await shot(page, "2-request-out");
 
   await step(page, LEG / 2 + 32);

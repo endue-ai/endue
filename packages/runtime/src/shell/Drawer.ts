@@ -5,6 +5,7 @@
 import { layoutOf, raise } from "./actions";
 import type { ShellCtx } from "./context";
 import { h, render } from "./dom";
+import { mountHandOvers } from "./hand-over";
 import { icon } from "./icons";
 import type { DrawerItem } from "./state";
 
@@ -113,8 +114,12 @@ export function mountDrawer(root: HTMLElement, ctx: ShellCtx): () => void {
     (s) => [s.drawer, s.popover === "drawer", s.lang, layoutOf(s).drawer],
     draw,
   );
+  // What is put away flies to the handle, and back from it (ADR 0408).
+  const shell = () => (root.closest(".shell") as HTMLElement | null) ?? document.body;
+  const offHands = mountHandOvers(shell, button, ctx);
   return () => {
     off();
+    offHands();
     el.remove();
   };
 }
