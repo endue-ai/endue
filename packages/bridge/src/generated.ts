@@ -1852,19 +1852,34 @@ export interface HttpItemMap {
   fields: Record<string, HttpValue>;
 }
 
-/** One item field's value: a JSON pointer into the record (empty is the whole record), or an object that reads one and shapes it. A null or missing value leaves the field out, unless default gives one. */
-export type HttpValue = JsonPointer | HttpRead | HttpConst;
+/** One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, or a value of the instance. A null or missing value leaves the field out, unless default gives one. */
+export type HttpValue = JsonPointer | HttpRead | HttpConst | HttpObject | HttpInstanceValue;
 
 /** Read the value at pointer and shape it. */
 export interface HttpRead {
   pointer: JsonPointer;
   /** Keep the text after the last occurrence of this text; a value without it is missing. */
   after?: string;
+  /** Keep the text before the first occurrence of this text (\n keeps the first line); a value without it is kept whole. */
+  before?: string;
   /** Replace the value, as text, by the one it names; one it does not name is missing. */
   values?: Record<string, unknown>;
   /** The value when the pointer reads nothing, or nothing that values or after keep. */
   default?: unknown;
 }
+
+/** An object of values, by name, each one as a field's value is read; one that reads nothing is left out, and an object that keeps none is missing. */
+export interface HttpObject {
+  object: Record<string, HttpValue>;
+}
+
+/** A value of the instance the record came from: its id, its title, or type, the endue account connector's type (binding endue; missing for the others). */
+export interface HttpInstanceValue {
+  instance: HttpInstanceField;
+}
+
+/** Which value of the instance. */
+export type HttpInstanceField = "id" | "title" | "type";
 
 /** The same value for every record. */
 export interface HttpConst {

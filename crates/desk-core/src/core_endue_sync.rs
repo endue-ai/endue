@@ -14,7 +14,7 @@ use crate::core_endue::{expired, off};
 use crate::core_http::{interval, source};
 use crate::endue_binding::{self, Fault, Read};
 use crate::handler::Core;
-use crate::http_binding::Failure;
+use crate::http_binding::{Failure, Here};
 
 /// How a sync ended.
 enum Ended {
@@ -91,7 +91,7 @@ impl Core {
         let Some((_, binding)) = self.endue_manifest(id) else {
             return Ended::Failed(Failure::new(format!("no connector {id}")));
         };
-        let (connector, tools, since, is_expired) = {
+        let (connector, tools, since, is_expired, title, kind) = {
             let endue = self.endue();
             let Some(i) = endue.0.get(id).and_then(|p| p.instances.get(name)) else {
                 return Ended::Off;
@@ -101,6 +101,8 @@ impl Core {
                 i.tools.clone(),
                 i.last_sync_at.clone(),
                 i.expired,
+                i.title.clone(),
+                i.kind.clone(),
             )
         };
         if is_expired {
@@ -118,7 +120,13 @@ impl Core {
             }
         };
         let source = source(id, name);
-        let read = endue_binding::sync(&binding, &tools, since.as_deref(), &source, &mut call);
+        let here = Here {
+            id: name,
+            title: Some(&title),
+            kind: Some(&kind),
+        };
+        let since = since.as_deref();
+        let read = endue_binding::sync(&binding, &tools, since, &source, &here, &mut call);
         if refused {
             self.endue_key_refused();
             return Ended::Off;

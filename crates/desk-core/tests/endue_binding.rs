@@ -63,6 +63,16 @@ fn a_sync_maps_tool_answers_into_items_and_keeps_the_cursor() {
     assert_eq!(items[0]["kind"], "entry");
     assert_eq!(items[0]["source"], source(GADGET, &a));
     assert_eq!(items[0]["body"], "Hello\nthere");
+    assert_eq!(items[0]["title"], "Hello", "before keeps the first line");
+    assert_eq!(
+        items[0]["raw"],
+        json!({ "network": "gadget", "studio": "Studio A", "text": "Hello\nthere" }),
+        "an object of values, the instance's type and title among them; one that reads nothing is left out"
+    );
+    assert_eq!(
+        items[1]["title"], "Again",
+        "a value without the text is kept whole"
+    );
     assert_eq!(items[0]["publishedAt"], "2026-10-29T08:00:00Z");
     let seen = calls(&fake, &a, "thing_read");
     let arguments: Vec<&Value> = seen.iter().map(|s| &s.body["arguments"]).collect();

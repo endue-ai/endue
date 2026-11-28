@@ -245,11 +245,13 @@
       "additionalProperties": false
     },
     "HttpValue": {
-      "description": "One item field's value: a JSON pointer into the record (empty is the whole record), or an object that reads one and shapes it. A null or missing value leaves the field out, unless default gives one.",
+      "description": "One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, or a value of the instance. A null or missing value leaves the field out, unless default gives one.",
       "oneOf": [
         { "$ref": "#/$defs/JsonPointer" },
         { "$ref": "#/$defs/HttpRead" },
-        { "$ref": "#/$defs/HttpConst" }
+        { "$ref": "#/$defs/HttpConst" },
+        { "$ref": "#/$defs/HttpObject" },
+        { "$ref": "#/$defs/HttpInstanceValue" }
       ]
     },
     "HttpRead": {
@@ -259,6 +261,11 @@
         "pointer": { "$ref": "#/$defs/JsonPointer" },
         "after": {
           "description": "Keep the text after the last occurrence of this text; a value without it is missing.",
+          "type": "string",
+          "minLength": 1
+        },
+        "before": {
+          "description": "Keep the text before the first occurrence of this text (\\n keeps the first line); a value without it is kept whole.",
           "type": "string",
           "minLength": 1
         },
@@ -272,6 +279,36 @@
       },
       "required": ["pointer"],
       "additionalProperties": false
+    },
+    "HttpObject": {
+      "description": "An object of values, by name, each one as a field's value is read; one that reads nothing is left out, and an object that keeps none is missing.",
+      "type": "object",
+      "properties": {
+        "object": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+            "maxLength": 64
+          },
+          "additionalProperties": { "$ref": "#/$defs/HttpValue" },
+          "minProperties": 1
+        }
+      },
+      "required": ["object"],
+      "additionalProperties": false
+    },
+    "HttpInstanceValue": {
+      "description": "A value of the instance the record came from: its id, its title, or type, the endue account connector's type (binding endue; missing for the others).",
+      "type": "object",
+      "properties": { "instance": { "$ref": "#/$defs/HttpInstanceField" } },
+      "required": ["instance"],
+      "additionalProperties": false
+    },
+    "HttpInstanceField": {
+      "description": "Which value of the instance.",
+      "type": "string",
+      "enum": ["id", "title", "type"]
     },
     "HttpConst": {
       "description": "The same value for every record.",

@@ -39,9 +39,11 @@ pub fn manifest() -> Value {
                         "since": { "since": true } },
                     "map": "thing" }],
                 "maps": { "thing": { "kind": "entry", "fields": {
-                    "id": "/id", "title": "/text", "body": "/text", "publishedAt": "/at",
-                    "updatedAt": "/at", "url": "/url", "feed": { "const": "Gadget" },
-                    "raw": "" } } },
+                    "id": "/id", "title": { "pointer": "/text", "before": "\n" }, "body": "/text",
+                    "publishedAt": "/at", "updatedAt": "/at", "url": "/url",
+                    "feed": { "const": "Gadget" },
+                    "raw": { "object": { "network": { "instance": "type" },
+                        "studio": { "instance": "title" }, "text": "/text", "none": "/none" } } } } },
                 "actions": { SEND: { "tool": "thing_send", "risk": "send", "arguments": {
                     "operation": { "const": "send" }, "text": { "arg": "text" } } } },
                 "budget": 5

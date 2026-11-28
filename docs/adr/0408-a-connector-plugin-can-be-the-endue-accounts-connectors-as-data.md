@@ -63,6 +63,10 @@ the binding can list the account's connectors, which an http block cannot.
   refused before it is called. Each invocation makes one `Idempotency-Key`, the same on the one
   retry after a lost answer (no answer, or a 5xx). A `file` argument is refused with a sentence
   until endue AI's connector API takes an upload.
+* **Maps compose.** A map value can be an object of values (`{ object }`), a value of the instance
+  (`{ instance: id | title | type }`, `type` the account connector's, so one map can name the
+  network an item came from), and a read can keep the text `before` a mark (`\n`, the first line).
+  The http binding gets the same values; `type` is missing there.
 * Removing the plugin removes its instances, items, store and commands.
 
 ### Consequences

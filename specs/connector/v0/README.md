@@ -33,7 +33,7 @@ kind `connector` declares it under `connector` in `plugin.json`: `ConnectorManif
 | `headers` | Sent with every request; never `Authorization`, `Cookie` or `Host` |
 | `auth` | `setting`, a secret instance setting the core reads; sent as `header` (`Authorization`) with `prefix` (`Bearer `) |
 | `requests` | GET `path` with `query`; the records at the pointer `items`; `pagination` `link` (RFC 8288 `rel="next"`) or `body` (a URL at `pointer`), on the base URL's origin only, `maxPages` (10) at most; the `map` that makes them items |
-| `maps` | By name: `kind` and `fields`, each item field from a JSON pointer into the record (`""` is all of it), `{ pointer, after?, values?, default? }` or `{ const }` |
+| `maps` | By name: `kind` and `fields`, each item field from a JSON pointer into the record (`""` is all of it), `{ pointer, after?, before?, values?, default? }`, `{ const }`, `{ object: { name: value } }` (an object of values; one that reads nothing is left out) or `{ instance: id \| title \| type }` (`type` is the endue account connector's type, missing for the other bindings) |
 
 - Each sync reads every page of every request again, writes what is new or changed and removes what
   left; the same id from two requests is one item. A record whose item does not fit `specs/item/v0` is

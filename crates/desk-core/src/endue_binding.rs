@@ -13,7 +13,7 @@ use desk_platform::Answer;
 use desk_platform::wire_connectors::{Refusal, ToolCall};
 use serde_json::{Map, Value};
 
-use crate::http_binding::{Failure, item_of};
+use crate::http_binding::{Failure, Here, item_of};
 
 /// Pages a request reads when it names no maxPages, and the most it may name.
 const PAGES: u64 = 10;
@@ -49,6 +49,7 @@ pub(crate) fn sync(
     tools: &BTreeMap<String, String>,
     since: Option<&str>,
     source: &ItemSource,
+    here: &Here<'_>,
     call: &mut Call<'_>,
 ) -> Result<Read, Failure> {
     let budget = binding.budget.unwrap_or(BUDGET);
@@ -103,7 +104,7 @@ pub(crate) fn sync(
                 ))
             })?;
             for record in records {
-                match item_of(map, record, source) {
+                match item_of(map, record, source, here) {
                     Some((id, item)) => {
                         read.items.insert(id, item);
                     }

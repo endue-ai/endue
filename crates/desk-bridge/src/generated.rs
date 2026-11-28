@@ -3091,13 +3091,15 @@ pub struct HttpItemMap {
     pub fields: BTreeMap<String, HttpValue>,
 }
 
-/// One item field's value: a JSON pointer into the record (empty is the whole record), or an object that reads one and shapes it. A null or missing value leaves the field out, unless default gives one.
+/// One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, or a value of the instance. A null or missing value leaves the field out, unless default gives one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum HttpValue {
     JsonPointer(JsonPointer),
     HttpRead(HttpRead),
     HttpConst(HttpConst),
+    HttpObject(HttpObject),
+    HttpInstance(HttpInstanceValue),
 }
 
 /// Read the value at pointer and shape it.
@@ -3108,12 +3110,40 @@ pub struct HttpRead {
     /// Keep the text after the last occurrence of this text; a value without it is missing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// Keep the text before the first occurrence of this text (\n keeps the first line); a value without it is kept whole.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
     /// Replace the value, as text, by the one it names; one it does not name is missing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub values: Option<serde_json::Map<String, serde_json::Value>>,
     /// The value when the pointer reads nothing, or nothing that values or after keep.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<serde_json::Value>,
+}
+
+/// An object of values, by name, each one as a field's value is read; one that reads nothing is left out, and an object that keeps none is missing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HttpObject {
+    pub object: BTreeMap<String, HttpValue>,
+}
+
+/// A value of the instance the record came from: its id, its title, or type, the endue account connector's type (binding endue; missing for the others).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HttpInstanceValue {
+    pub instance: HttpInstanceField,
+}
+
+/// Which value of the instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HttpInstanceField {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "title")]
+    Title,
+    #[serde(rename = "type")]
+    Type,
 }
 
 /// The same value for every record.

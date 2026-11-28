@@ -151,6 +151,7 @@ impl Core {
                     name,
                     Offered {
                         connector,
+                        kind: summary.kind,
                         title,
                         tools,
                         risks,
@@ -183,6 +184,7 @@ enum Listing {
 /// An account connector that offers every tool, as the listing found it.
 struct Offered {
     connector: String,
+    kind: String,
     title: String,
     tools: BTreeMap<String, String>,
     risks: BTreeMap<String, Risk>,
@@ -193,6 +195,7 @@ impl Offered {
     fn fresh(&self, now: SystemTime) -> EndueInstance {
         EndueInstance {
             connector: self.connector.clone(),
+            kind: self.kind.clone(),
             title: self.title.clone(),
             tools: self.tools.clone(),
             risks: self.risks.clone(),
@@ -210,6 +213,7 @@ impl EndueInstance {
     /// What the listing says now: its title, tools and whether it must be connected again.
     fn update(&mut self, offered: Offered) {
         self.title = offered.title;
+        self.kind = offered.kind;
         self.tools = offered.tools;
         self.risks = offered.risks;
         self.expired = offered.expired;

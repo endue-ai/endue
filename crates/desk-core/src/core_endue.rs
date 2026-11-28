@@ -22,6 +22,8 @@ use crate::handler::{Answer, Core, error};
 pub(crate) struct EndueInstance {
     /// The account connector's id.
     pub(crate) connector: String,
+    /// The account connector's type, which `{ instance: type }` values read.
+    pub(crate) kind: String,
     pub(crate) title: String,
     /// Its tools' full names, by the ending the block names.
     pub(crate) tools: BTreeMap<String, String>,
@@ -219,8 +221,8 @@ impl Core {
             instances
                 .map(|(name, i)| {
                     json!({ "id": name, "settings": settings(i), "paused": false,
-                        "lastSyncAt": i.last_sync_at, "title": i.title, "tools": i.tools, "risks": i.risks,
-                        "expired": i.expired })
+                        "lastSyncAt": i.last_sync_at, "title": i.title, "kind": i.kind, "tools": i.tools,
+                        "risks": i.risks, "expired": i.expired })
                 })
                 .collect()
         };
@@ -262,6 +264,7 @@ fn stored(record: &Value, now: SystemTime) -> Option<(String, EndueInstance)> {
     let tools = serde_json::from_value(record["tools"].clone()).ok()?;
     let risks = serde_json::from_value(record["risks"].clone()).unwrap_or_default();
     let title = record["title"].as_str().unwrap_or(&name).to_owned();
+    let kind = record["kind"].as_str().unwrap_or_default().to_owned();
     let last = record["lastSyncAt"].as_str().map(str::to_owned);
     let expired = record["expired"].as_bool().unwrap_or(false);
     let instance = EndueInstance {
@@ -271,6 +274,7 @@ fn stored(record: &Value, now: SystemTime) -> Option<(String, EndueInstance)> {
             status(ConnectorState::Connected, last.clone(), None)
         },
         connector,
+        kind,
         title,
         tools,
         risks,

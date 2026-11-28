@@ -106,7 +106,14 @@ impl Core {
             request.allowed_hosts = vec![host.clone()];
             sysnet::fetch(&request).map_err(|e| Failure::new(e.message))
         };
-        let synced = http_binding::sync(&binding, &base, token.as_deref(), &source, &mut call)?;
+        let title = self.title(id, name);
+        let here = http_binding::Here {
+            id: name,
+            title: title.as_deref(),
+            kind: None,
+        };
+        let synced =
+            http_binding::sync(&binding, &base, token.as_deref(), &source, &here, &mut call)?;
         self.write_items(&source, synced.items, true)
             .map_err(Failure::new)
     }
