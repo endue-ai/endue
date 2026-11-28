@@ -45,8 +45,12 @@ pub(crate) struct EnduePlugin {
     pub(crate) refresh: Option<SystemTime>,
 }
 
+/// The endue plugins by id, and the files the desk uploaded for their actions.
 #[derive(Default)]
-pub(crate) struct EndueConnectors(pub(crate) BTreeMap<String, EnduePlugin>);
+pub(crate) struct EndueConnectors(
+    pub(crate) BTreeMap<String, EnduePlugin>,
+    pub(crate) crate::core_endue_media::Uploaded,
+);
 
 /// What the person reads while the endue account's connectors are off.
 pub(crate) fn off(title: &str) -> String {

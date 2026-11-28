@@ -172,7 +172,7 @@ fn arguments(
 }
 
 /// An action's arguments from its command's `args`; an argument the command left out is left out.
-/// A file cannot go yet: endue AI's connector API takes no upload.
+/// A `{ file }` argument holds paths still: the core uploads them before the call (`endue_files`).
 pub(crate) fn action_arguments(
     action: &EndueAction,
     args: Option<&Map<String, Value>>,
@@ -182,14 +182,7 @@ pub(crate) fn action_arguments(
         let value = match argument {
             EndueActionArgument::HttpConst(constant) => Some(constant.r#const.clone()),
             EndueActionArgument::EndueArg(from) => args.and_then(|a| a.get(&from.arg)).cloned(),
-            EndueActionArgument::EndueFile(from) => match args.and_then(|a| a.get(&from.file)) {
-                Some(_) => {
-                    return Err(
-                        "Files cannot be sent through the endue account's connectors yet.".into(),
-                    );
-                }
-                None => None,
-            },
+            EndueActionArgument::EndueFile(from) => args.and_then(|a| a.get(&from.file)).cloned(),
         };
         if let Some(value) = value {
             built.insert(name.clone(), value);

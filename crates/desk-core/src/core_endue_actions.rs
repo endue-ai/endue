@@ -112,7 +112,7 @@ impl Core {
             let risk = found.risks.get(&action.tool).copied();
             (found.connector.clone(), tool, risk)
         };
-        let arguments = action_arguments(action, args)?;
+        let mut arguments = action_arguments(action, args)?;
         let (connectors, _) = self
             .endue_connectors()
             .ok_or_else(|| crate::core_endue::off(instance))?;
@@ -122,6 +122,8 @@ impl Core {
                 data.id
             ));
         }
+        // Files go up only once the tool may be called: a refused call uploads nothing.
+        self.endue_files(&data.caller, action, &mut arguments, &connectors)?;
         let key = format!("desk-{}", self.endue_invocation_key(&data.invocation_id));
         let mut answered = connectors.call(&connector, &tool, arguments.clone(), &key);
         if answered.as_ref().is_err_and(lost) {
@@ -157,7 +159,7 @@ impl Core {
         }
     }
 
-    fn endue_call_failed(&self, e: PlatformError) -> String {
+    pub(crate) fn endue_call_failed(&self, e: PlatformError) -> String {
         if e.kind == ErrorKind::SignedOut {
             return self.endue_key_refused();
         }
