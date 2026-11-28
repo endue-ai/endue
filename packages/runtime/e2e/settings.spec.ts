@@ -334,6 +334,31 @@ test.describe("endue account settings", () => {
     await expect(identity).toContainText("Ada King");
   });
 
+  test("Connections turns on the endue account's connectors and says what the desk may do", async ({
+    page,
+  }, info) => {
+    // ADR 0407: off until the person turns it on, then the key's powers and the account's connectors.
+    await open(page, "?core=1&platform=mac&account=1");
+    await page.keyboard.press("Meta+,");
+    await dialog(page).locator('[data-key="settings-connections"]').click();
+    const section = dialog(page).locator("[data-endue-connectors]");
+    await expect(section.getByRole("heading", { name: "endue 계정" })).toBeVisible();
+    await expect(section).toContainText("켜기 전에는 endue 에 아무것도 보내지 않습니다.");
+    await page.screenshot({ path: info.outputPath("settings-endue-connectors-off.png") });
+
+    await section.getByRole("button", { name: "켜기", exact: true }).click();
+    await expect(section).toContainText("이 데스크가 할 수 있는 일: 읽기.");
+    const rows = section.locator("[data-endue-connector]");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(1)).toContainText("만료됐습니다. endue.ai 에서 다시 연결하세요.");
+    await expect(rows.nth(1).getByRole("button", { name: "endue.ai 열기" })).toBeVisible();
+    await page.screenshot({ path: info.outputPath("settings-endue-connectors-on.png") });
+
+    await section.getByRole("button", { name: "끄기", exact: true }).click();
+    await expect(rows).toHaveCount(0);
+    await expect(section.getByRole("button", { name: "켜기", exact: true })).toBeVisible();
+  });
+
   test("signed out, it offers endue ID and shows the code to confirm", async ({ page }) => {
     await open(page, "?core=1&platform=mac&account=signedout");
     await page.keyboard.press("Meta+,");
