@@ -46,7 +46,7 @@ export async function mountStudio(ctx, doc, options = {}) {
     select: (key) => act().select(key),
     connect: () => act().connect(),
   });
-  studio = createStudio(ctx, page);
+  studio = createStudio(ctx, page, { reason: (what) => ctx.messages.t(`grant.${what}`) });
   const words = () => {
     doc.documentElement.lang = ctx.messages.language();
     studio?.redraw();

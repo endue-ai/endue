@@ -39,6 +39,7 @@ function idsRead(): string[] {
     "media.": ["image", "video", "link", "other"],
     "empty.": ["feed", "replies", "numbers"],
     "series.": ["followers", "reach", "engagement"],
+    "grant.": ["read", "accounts"],
   };
   return [
     ...new Set([...plain, ...Object.entries(built).flatMap(([p, ids]) => ids.map((i) => p + i))]),

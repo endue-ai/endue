@@ -53,5 +53,7 @@
   "state.error": "동기화 안 됨",
   "state.paused": "멈춤",
   "reconnect": "endue.ai 에서 다시 연결",
-  "post": "{author}의 글"
+  "post": "{author}의 글",
+  "grant.read": "연결한 SNS 계정의 게시물, 답글, 지표를 보여 주려고 합니다.",
+  "grant.accounts": "어떤 SNS 계정이 연결돼 있고 동기화되는지 보여 주려고 합니다."
 }

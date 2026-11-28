@@ -57,5 +57,7 @@
   "state.error": "Not syncing",
   "state.paused": "Paused",
   "reconnect": "Reconnect on endue.ai",
-  "post": "Post by {author}"
+  "post": "Post by {author}",
+  "grant.read": "To show the posts, replies and numbers of your social accounts.",
+  "grant.accounts": "To show which social accounts are connected and whether they sync."
 }

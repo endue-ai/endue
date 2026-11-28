@@ -1,9 +1,11 @@
+import { basename, join } from "node:path";
 import { expect, type Frame, type Page, test } from "@playwright/test";
 
 // endue.social-studio (plugins/social-studio) on the browser stub over three endue.social accounts,
 // in the sandboxed frame a plugin page gets: the Feed, Replies and Numbers at 360 px and at 900 px,
 // in the dark and the light scheme. Each run writes a screenshot of the window to its output folder.
 const SURFACE = '[data-surface="endue.social-studio"]';
+const PLUGIN = join(import.meta.dirname, "../../../plugins/social-studio");
 const SIZES = { narrow: { width: 360, height: 640 }, wide: { width: 900, height: 600 } };
 
 test.use({ timezoneId: "UTC", locale: "en-US", viewport: { width: 1280, height: 900 } });
@@ -16,6 +18,14 @@ const run = (page: Page, command: string, args: Record<string, unknown> = {}) =>
 
 /** Open the fixture page and the studio at `size`, and resolve with its frame once the feed shows. */
 async function open(page: Page, size: { width: number; height: number }, scheme: "dark" | "light") {
+  // The SDK reads a plugin's catalogs at /<id>/<path> on its origin, as the app serves them.
+  await page
+    .context()
+    .route("**/endue.social-studio/messages/*.json", (route) =>
+      route.fulfill({
+        path: join(PLUGIN, "messages", basename(new URL(route.request().url()).pathname)),
+      }),
+    );
   await page.goto("/social-studio.html");
   await page.waitForFunction(() => window.__desk !== undefined);
   await page.evaluate(() => window.__desk.runtime.plugins?.ready);

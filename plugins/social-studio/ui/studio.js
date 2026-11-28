@@ -41,6 +41,7 @@ export const PAGES = 10;
 const SEEN_MAX = 5000;
 const LINKS = { permission: "shell:open", schemes: ["https"] };
 const CONNECTORS = { permission: "connector:manage" };
+const READ = { permission: "data:read", kinds: QUERY.kinds };
 
 const codeOf = (/** @type {unknown} */ e) =>
   String(/** @type {{ code?: unknown }} */ (e)?.code ?? (e instanceof Error ? e.message : e));
@@ -48,8 +49,9 @@ const codeOf = (/** @type {unknown} */ e) =>
 /**
  * @param {Pick<PluginContext, "bridge" | "commands" | "data" | "surface">} ctx
  * @param {Page} page
+ * @param {{ reason(what: "read" | "accounts"): string }} words why the studio asks for a grant
  */
-export function createStudio(ctx, page) {
+export function createStudio(ctx, page, words) {
   /** @type {State} */
   const s = {
     view: "feed",
@@ -123,11 +125,34 @@ export function createStudio(ctx, page) {
     return undefined;
   };
 
+  /**
+   * `call`, and once more after asking the person for `permission` when the plugin does not hold
+   * it yet: the desk asks them once, at first use.
+   * @template T
+   * @param {() => Promise<T>} call
+   * @param {import("@endue-ai/bridge").Permission} permission
+   * @param {"read" | "accounts"} what
+   */
+  const granted = async (call, permission, what) => {
+    try {
+      return await call();
+    } catch (error) {
+      if (codeOf(error) !== "permission_denied") throw error;
+      const answer = await ctx.bridge
+        .call("perm.request", { permission, reason: words.reason(what) })
+        .catch(() => ({ granted: false }));
+      if (!answer.granted) throw error;
+      return call();
+    }
+  };
+
   /** The social accounts: instances of a connector that publishes posts or brought social items. */
   const readAccounts = async () => {
-    const list = await ctx.bridge
-      .call("connector.list", { scope: CONNECTORS })
-      .catch(() => ({ connectors: [] }));
+    const list = await granted(
+      () => ctx.bridge.call("connector.list", { scope: CONNECTORS }),
+      CONNECTORS,
+      "accounts",
+    ).catch(() => ({ connectors: [] }));
     const brought = new Set([...s.items.values()].map((i) => accountKey(i.source)));
     s.instances = list.connectors.flatMap((c) => {
       const posts = c.resources.some(
@@ -176,7 +201,7 @@ export function createStudio(ctx, page) {
     const kept = /** @type {{ value?: unknown }} */ (seen).value;
     if (Array.isArray(kept)) for (const key of kept) if (typeof key === "string") s.seen.add(key);
     try {
-      await load();
+      await granted(load, READ, "read");
       await ctx.data.subscribe(QUERY, (changes) => {
         for (const c of changes) {
           if (c.change === "removed") s.items.delete(itemKey(c.source, c.id));
