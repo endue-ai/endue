@@ -4,210 +4,25 @@
 //! here is examples/brain-echo for sessions and leases, with scripted turns.
 
 mod common;
+mod eris_brain;
 mod support;
 
 use std::fs;
-use std::path::Path;
+use std::sync::Arc;
 use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use common::Echo;
 use desk_brain::{
     Brain, BrainFailure, CreateSessionRequest, Lease, LeaseAcquireRequest, LeaseRenewRequest,
-    Session, StopReason, TextDeltaEvent, ToolCall, ToolCallEvent, ToolResultRequest,
-    TurnCompletedEvent, TurnEvent, TurnRequest, TurnStartedEvent,
+    Session, ToolResultRequest, TurnEvent, TurnRequest,
 };
 use desk_brain_endue::HttpBrain;
-use desk_core::{BrainOptions, Core, Delivery, MAX_STEPS, TOO_MANY_LINE};
+use desk_core::{Core, Delivery, MAX_STEPS, TOO_MANY_LINE};
 use serde_json::{Value, json};
 use support::*;
 
-const MAIL: &str = "example.mail";
-const LATEST: &str = "example.mail.latest";
-
-/// brain-echo, except that a turn offering tools calls `example_mail_latest` (forever, when
-/// `endless`) and then says what the tool answered. It keeps each turn's request.
-struct Errands {
-    inner: HttpBrain,
-    endless: bool,
-    asked: Mutex<Vec<TurnRequest>>,
-    results: Mutex<Vec<Value>>,
-}
-
-macro_rules! pass {
-    ($($name:ident($($arg:ident: $ty:ty),*) -> $out:ty;)*) => {$(
-        fn $name(&self, $($arg: $ty),*) -> Result<$out, BrainFailure> {
-            self.inner.$name($($arg),*)
-        }
-    )*};
-}
-
-fn event(turn: &str, kind: &str, extra: Value) -> TurnEvent {
-    let mut value = json!({ "type": kind, "turnId": turn });
-    value
-        .as_object_mut()
-        .unwrap()
-        .extend(extra.as_object().unwrap().clone());
-    serde_json::from_value(value).unwrap()
-}
-
-fn ask_latest(turn: &str, n: usize, on: &mut dyn FnMut(TurnEvent)) {
-    let call = ToolCall {
-        call_id: format!("call{n}"),
-        name: "example_mail_latest".to_owned(),
-        arguments: json!({ "limit": 3 }).as_object().cloned().unwrap(),
-        agent_id: None,
-    };
-    on(TurnEvent::ToolCall(ToolCallEvent {
-        r#type: Default::default(),
-        turn_id: turn.to_owned(),
-        call,
-    }));
-    on(TurnEvent::TurnCompleted(TurnCompletedEvent {
-        r#type: Default::default(),
-        turn_id: turn.to_owned(),
-        stop_reason: StopReason::ToolCall,
-    }));
-}
-
-impl Brain for Errands {
-    pass! {
-        create_session(request: &CreateSessionRequest) -> Session;
-        get_session(session: &str) -> Session;
-        get_lease(session: &str) -> Lease;
-        acquire_lease(session: &str, request: &LeaseAcquireRequest) -> Lease;
-        renew_lease(session: &str, lease: &str, request: &LeaseRenewRequest) -> Lease;
-        release_lease(session: &str, lease: &str) -> ();
-    }
-    fn create_turn(
-        &self,
-        _session: &str,
-        request: &TurnRequest,
-        on: &mut dyn FnMut(TurnEvent),
-    ) -> Result<(), BrainFailure> {
-        self.asked.lock().unwrap().push(request.clone());
-        on(TurnEvent::TurnStarted(TurnStartedEvent {
-            r#type: Default::default(),
-            turn_id: "turn1".to_owned(),
-        }));
-        ask_latest("turn1", 1, on);
-        Ok(())
-    }
-    fn submit_tool_result(
-        &self,
-        _session: &str,
-        turn: &str,
-        request: &ToolResultRequest,
-        on: &mut dyn FnMut(TurnEvent),
-    ) -> Result<(), BrainFailure> {
-        let mut results = self.results.lock().unwrap();
-        results.push(request.output.clone());
-        if self.endless {
-            ask_latest(turn, results.len() + 1, on);
-            return Ok(());
-        }
-        let said = format!("You have mail: {}", request.output);
-        let text = TurnEvent::TextDelta(TextDeltaEvent {
-            r#type: Default::default(),
-            turn_id: turn.to_owned(),
-            text: said,
-        });
-        on(text);
-        on(event(
-            turn,
-            "turn.completed",
-            json!({ "stopReason": "end_turn" }),
-        ));
-        Ok(())
-    }
-}
-
-/// A shared core on `brain`, with example.mail installed and its two commands registered: one a
-/// tool for Eris, one not. The person says yes to every prompt.
-fn core_on(brain: Arc<dyn Brain>, home: &Path) -> (Arc<Core>, Receiver<Delivery>) {
-    let dir = home.join("plugins/mail");
-    fs::create_dir_all(dir.join("ui")).unwrap();
-    fs::write(dir.join("ui/index.html"), "<p>mail</p>").unwrap();
-    let manifest = json!({
-        "id": MAIL, "version": "0.1.0", "kind": "ui", "entry": "ui/index.html",
-        "contributes": { "commands": [
-            { "id": LATEST, "title": "Latest mail", "agent": true, "readOnly": true,
-                "description": "The newest messages in the inbox.",
-                "args": { "type": "object", "properties": { "limit": { "type": "integer" } } } },
-            { "id": "example.mail.compose", "title": "New message" },
-        ] },
-    });
-    fs::write(dir.join("plugin.json"), manifest.to_string()).unwrap();
-    let options = BrainOptions {
-        retry: Duration::from_millis(50),
-        ..BrainOptions::default()
-    };
-    let core = Core::new(roots(home))
-        .with_prompter(SayYes)
-        .with_brain(brain, options);
-    core.install_plugin(&dir, false);
-    let core = Arc::new(core);
-    core.route_tools();
-    grant(&core, "desk", json!({ "permission": "brain:converse" }));
-    for (id, title) in [
-        (LATEST, "Latest mail"),
-        ("example.mail.compose", "New message"),
-    ] {
-        call(
-            &core,
-            MAIL,
-            "cmd.register",
-            json!({ "id": id, "title": title }),
-        )
-        .unwrap();
-    }
-    let deliveries = core.events().subscribe_addressed();
-    (core, deliveries)
-}
-
-fn errands(echo: &Echo, endless: bool) -> Arc<Errands> {
-    Arc::new(Errands {
-        inner: HttpBrain::new(echo.url()).unwrap(),
-        endless,
-        asked: Mutex::default(),
-        results: Mutex::default(),
-    })
-}
-
-fn say(core: &Core, text: &str) -> String {
-    let params = json!({ "text": text, "scope": { "permission": "brain:converse" } });
-    let said = call(core, "desk", "brain.say", params).unwrap();
-    said["turnId"].as_str().unwrap().to_owned()
-}
-
-/// The turn's brain.turn data up to its completed or error, answering every cmd.invoked of the
-/// mail plugin with two messages.
-fn play(core: &Core, deliveries: &Receiver<Delivery>, turn: &str) -> Vec<Value> {
-    let mut steps = Vec::new();
-    loop {
-        let delivery = deliveries
-            .recv_timeout(Duration::from_secs(10))
-            .expect("a delivery within 10 s");
-        let seen = serde_json::to_value(&delivery.event).unwrap();
-        let data = seen["data"].clone();
-        if seen["event"] == "cmd.invoked" {
-            assert_eq!(data["caller"], "agent:eris");
-            let answered = json!({ "invocationId": data["invocationId"],
-                "result": { "messages": [{ "subject": "Lunch?" }, { "subject": "Invoice" }] } });
-            call(core, MAIL, "cmd.answer", answered).unwrap();
-            continue;
-        }
-        if seen["event"] != "brain.turn" || data["turnId"] != turn {
-            continue;
-        }
-        let kind = data["kind"].as_str().unwrap().to_owned();
-        steps.push(data);
-        if kind == "completed" || kind == "error" {
-            return steps;
-        }
-    }
-}
+use eris_brain::*;
 
 #[test]
 fn a_turn_offers_the_commands_plugins_mark_as_tools() {
@@ -374,4 +189,103 @@ fn a_brain_that_wants_an_endue_id_token_has_eris_ask_the_person_to_sign_in() {
     let last = steps.last().unwrap();
     assert_eq!(last["kind"], "error");
     assert_eq!(last["text"], desk_core::SIGN_IN_LINE);
+}
+
+/// The data of the next event named `event` (and, for brain.turn, of `turn` and one of `kinds`).
+fn next(deliveries: &Receiver<Delivery>, event: &str, turn: &str, kinds: &[&str]) -> Value {
+    loop {
+        let delivery = deliveries
+            .recv_timeout(Duration::from_secs(10))
+            .expect("a delivery within 10 s");
+        let seen = serde_json::to_value(&delivery.event).unwrap();
+        let data = seen["data"].clone();
+        let kind = data["kind"].as_str().unwrap_or_default();
+        let ours = event != "brain.turn" || (data["turnId"] == turn && kinds.contains(&kind));
+        if seen["event"] == event && ours {
+            return data;
+        }
+    }
+}
+
+fn stop(core: &Core, caller: &str, turn: &str) -> Result<Value, desk_bridge::BridgeError> {
+    let params = json!({ "turnId": turn, "scope": { "permission": "brain:converse" } });
+    call(core, caller, "brain.stop", params)
+}
+
+#[test]
+fn stop_starts_no_further_call_and_ends_the_turn_as_stopped() {
+    let echo = Echo::start();
+    let home = home("eris-stop");
+    let brain = errands(&echo, true);
+    let (core, deliveries) = core_on(brain.clone(), &home);
+    let turn = say(&core, "Check my latest mail");
+    next(&deliveries, "cmd.invoked", &turn, &[]);
+    // Only the caller that said the line stops it.
+    grant(&core, MAIL, json!({ "permission": "brain:converse" }));
+    let other = stop(&core, MAIL, &turn).unwrap_err();
+    assert_eq!(
+        serde_json::to_value(other.code).unwrap(),
+        "permission_denied"
+    );
+    assert_eq!(stop(&core, "desk", &turn).unwrap()["stopped"], true);
+    let end = next(&deliveries, "brain.turn", &turn, &["error", "completed"]);
+    assert_eq!(end["reason"], "stopped");
+    assert_eq!(end["text"], "Stopped.");
+    // The call in flight is not answered to the brain, and nothing more of the turn is said.
+    std::thread::sleep(Duration::from_millis(400));
+    assert!(brain.results.lock().unwrap().is_empty());
+    let after: Vec<Value> = deliveries
+        .try_iter()
+        .map(|d| serde_json::to_value(&d.event).unwrap())
+        .filter(|e| e["event"] == "cmd.invoked" || e["data"]["turnId"] == turn.as_str())
+        .collect();
+    assert_eq!(after, Vec::<Value>::new());
+    assert_eq!(stop(&core, "desk", &turn).unwrap()["stopped"], false);
+}
+
+#[cfg(unix)]
+#[test]
+fn stop_ends_a_local_run_the_turn_started() {
+    use std::os::unix::fs::PermissionsExt;
+    let echo = Echo::start();
+    let home = home("eris-stop-run");
+    let bin = home.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    let codex = bin.join("codex");
+    fs::write(&codex, "#!/bin/sh\nexec /bin/sleep 30\n").unwrap();
+    fs::set_permissions(&codex, fs::Permissions::from_mode(0o755)).unwrap();
+    let (core, deliveries) = core_with(errands(&echo, false), &home, Some(bin));
+    let turn = say(&core, "Ask Codex to rename the loader");
+    next(&deliveries, "cmd.invoked", &turn, &[]);
+    // The command the turn waits on starts a local run, as desk.agents.ask does.
+    let ask = json!({ "agent": "codex", "prompt": "Rename the loader",
+        "scope": { "permission": "agents:manage" } });
+    let run = call(&core, "desk", "agents.ask", ask).unwrap()["run"]["runId"].clone();
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(stop(&core, "desk", &turn).unwrap()["stopped"], true);
+    let runs = json!({ "agent": "codex", "scope": { "permission": "agents:manage" } });
+    let runs = call(&core, "desk", "agents.runs", runs).unwrap()["runs"].clone();
+    let ours = runs
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["runId"] == run)
+        .unwrap();
+    assert_eq!(ours["state"], "stopped");
+}
+
+#[test]
+fn a_failed_call_carries_its_message_first_line() {
+    let echo = Echo::start();
+    let home = home("eris-failed-call");
+    let (core, deliveries) = core_on(errands(&echo, false), &home);
+    let turn = say(&core, "Check my latest mail");
+    let invoked = next(&deliveries, "cmd.invoked", &turn, &[]);
+    let failure = json!({ "code": "failed",
+        "message": "The inbox is not reachable\n  at fetch (mail.js:12)" });
+    let answered = json!({ "invocationId": invoked["invocationId"], "error": failure });
+    call(&core, MAIL, "cmd.answer", answered).unwrap();
+    let back = next(&deliveries, "brain.turn", &turn, &["tool-result"]);
+    assert_eq!(back["tool"]["ok"], false);
+    assert_eq!(back["tool"]["message"], "The inbox is not reachable");
 }

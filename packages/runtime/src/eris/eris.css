@@ -169,6 +169,93 @@
 .eris-said-heard[hidden] { display: none; }
 .eris-said-close { position: absolute; top: var(--space-1); right: var(--space-1); }
 
+/* The card of her turn in flight (FT-06, ADR 0409): the line, a row per component, her answer, the
+   foot. The star marks only a row at work; a done row has a check, one that needs the person a
+   warning dot, one that failed its words in danger text. */
+.turn-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding-right: var(--space-6);
+}
+.turn-card[hidden] { display: none; }
+.turn-line {
+  margin: 0;
+  overflow: hidden;
+  color: var(--desk-text-muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.turn-line[hidden] { display: none; }
+.turn-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.turn-rows[hidden] { display: none; }
+.turn-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.turn-row-main {
+  display: grid;
+  flex: 1;
+  grid-template-columns: var(--space-4) auto 1fr auto;
+  gap: var(--space-2);
+  min-width: 0;
+  height: auto;
+  min-height: var(--control-sm);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+}
+.turn-row-main > svg { color: var(--desk-text-muted); }
+.turn-mark { justify-self: center; width: var(--space-3); height: var(--space-3); }
+.turn-row[data-state="working"] .turn-mark {
+  background: var(--desk-star);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: turn-star calc(var(--motion-slow) * 5.5) ease-in-out infinite;
+}
+.turn-row[data-state="needs"] .turn-mark {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: var(--desk-warning);
+}
+@keyframes turn-star { 50% { transform: scale(0.74); opacity: 0.6; } }
+.turn-name { font-weight: 600; white-space: nowrap; }
+.turn-name small { margin-left: var(--space-1); color: var(--desk-text-muted); font-weight: 400; }
+.turn-say { min-width: 0; overflow: hidden; color: var(--desk-text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.turn-row[data-state="failed"] .turn-say { color: var(--desk-danger-text); white-space: normal; }
+.turn-count { color: var(--desk-text-muted); font-variant-numeric: tabular-nums; }
+.turn-answer {
+  min-height: 0;
+  overflow-y: auto;
+  color: var(--desk-text);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.turn-answer[hidden] { display: none; }
+.turn-answer p { margin: 0 0 var(--space-2); }
+.turn-answer p:last-child { margin-bottom: 0; }
+.turn-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.turn-fold {
+  padding: 0;
+  color: var(--desk-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+}
+/* While the turn runs the foot's line is words, not a control. */
+.shell .turn-fold:disabled { opacity: 1; text-decoration: none; cursor: default; }
+.turn-stop[hidden] { display: none; }
+[data-motion="reduce"] .turn-row[data-state="working"] .turn-mark { animation: none; }
+
 /* Soul text: one line at a time in one grid cell, so a line leaving and the next arriving overlap
    and the card is as tall as the taller of them; its words wrap. */
 .soul {

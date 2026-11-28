@@ -2,6 +2,8 @@
 //! answer so far, and the tool call the turn waits on.
 
 use std::mem;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use desk_brain::{StopReason, ToolCall, TurnEvent};
 use desk_bridge::{
@@ -24,6 +26,8 @@ pub(crate) struct Sink<'a> {
     pub(crate) prefix: Option<String>,
     /// The commands the turn's errands ran, for its episode (ADR 0096).
     pub(crate) steps: Vec<MemoryStep>,
+    /// Raised by brain.stop (ADR 0409): the sink says nothing more and takes no further call.
+    pub(crate) stop: Option<Arc<AtomicBool>>,
 }
 
 impl<'a> Sink<'a> {
@@ -38,7 +42,13 @@ impl<'a> Sink<'a> {
             failed: false,
             prefix: None,
             steps: Vec::new(),
+            stop: None,
         }
+    }
+
+    /// Whether the person stopped the turn.
+    pub(crate) fn stopped(&self) -> bool {
+        self.stop.as_ref().is_some_and(|s| s.load(Ordering::SeqCst))
     }
 
     pub(crate) fn publish(&self, kind: BrainTurnKind, text: Option<&str>) {
@@ -52,6 +62,9 @@ impl<'a> Sink<'a> {
         text: Option<&str>,
         reason: Option<BrainTurnReason>,
     ) {
+        if self.stopped() {
+            return;
+        }
         self.events.publish(BridgeEvent::BrainTurn(BrainTurnEvent {
             event: Default::default(),
             data: BrainTurnData {
@@ -67,6 +80,9 @@ impl<'a> Sink<'a> {
 
     /// A tool step: Eris hands work to a command (`Tool`), or its answer went back (`ToolResult`).
     pub(crate) fn step(&mut self, kind: BrainTurnKind, tool: BrainTurnTool) {
+        if self.stopped() {
+            return;
+        }
         if kind == BrainTurnKind::ToolResult {
             let ok = tool.ok.unwrap_or(true);
             self.steps.push(MemoryStep {
@@ -95,6 +111,10 @@ impl<'a> Sink<'a> {
     }
 
     pub(crate) fn on(&mut self, event: TurnEvent) {
+        // What the brain still streams after a stop is dropped.
+        if self.stopped() {
+            return;
+        }
         self.reached();
         match event {
             TurnEvent::TurnStarted(_) => {

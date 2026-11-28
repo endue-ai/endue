@@ -5041,6 +5041,31 @@ pub struct BrainSayResult {
     pub turn_id: String,
 }
 
+/// Stop a brain.say turn the caller started (FT-06, ADR 0409): the core starts no further tool call of it, drops what the brain still streams, stops a local agent run it started, and ends it with an error whose reason is stopped. A call already sent to a command runs on; it cannot be taken back.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrainStopRequest {
+    pub id: RequestId,
+    pub method: BrainStopRequestMethod,
+    pub params: BrainStopParams,
+}
+
+/// Parameters of brain.stop: the turn, by the id brain.say answered. Only the caller that said the line may stop it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrainStopParams {
+    #[serde(rename = "turnId")]
+    pub turn_id: String,
+    pub scope: BrainConversePermission,
+}
+
+/// Result of brain.stop: whether the turn was running and is now stopped. False for a turn that had already ended.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrainStopResult {
+    pub stopped: bool,
+}
+
 /// Ask the brain one question and get the answer as structured values: the arguments it calls the caller's tool with.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -5292,7 +5317,7 @@ pub struct BrainTurnData {
     pub reason: Option<BrainTurnReason>,
 }
 
-/// error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people.
+/// error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; stopped: the person stopped it (brain.stop, FT-06); failed: anything else, kept in the desk's log. text stays the sentence for people.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BrainTurnReason {
     #[serde(rename = "no_brain")]
@@ -5303,6 +5328,8 @@ pub enum BrainTurnReason {
     ReadOnly,
     #[serde(rename = "too_many_steps")]
     TooManySteps,
+    #[serde(rename = "stopped")]
+    Stopped,
     #[serde(rename = "failed")]
     Failed,
 }
@@ -5344,6 +5371,9 @@ pub struct BrainTurnTool {
     /// tool-result only: whether the command answered without an error.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ok: Option<bool>,
+    /// tool-result with ok false only: the first line of the command's error, for people (FT-06). Never its arguments or its result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 /// Chosen by the caller, unique among its requests in flight. The response repeats it.
@@ -5431,6 +5461,7 @@ pub enum BridgeRequest {
     InitGet(InitGetRequest),
     BrainSay(BrainSayRequest),
     BrainAsk(BrainAskRequest),
+    BrainStop(BrainStopRequest),
     BrainAgentsList(BrainAgentsListRequest),
     BrainAgentsCard(BrainAgentsCardRequest),
     BrainSpacesList(BrainSpacesListRequest),
@@ -14027,6 +14058,14 @@ pub enum BrainSayRequestMethod {
     #[default]
     #[serde(rename = "brain.say")]
     BrainSay,
+}
+
+/// The `method` of [`BrainStopRequest`]: always `"brain.stop"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum BrainStopRequestMethod {
+    #[default]
+    #[serde(rename = "brain.stop")]
+    BrainStop,
 }
 
 /// The `method` of [`BrainAskRequest`]: always `"brain.ask"`.

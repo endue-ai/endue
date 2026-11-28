@@ -34,6 +34,33 @@ describe("where her card goes", () => {
     const narrow = placeSaid(her(0, 40), { width: 400, height: 500 });
     expect(narrow.width).toBe(368);
   });
+
+  it("the_card_does_not_cover_the_field_in_use", () => {
+    // She floats over the window in use, its field just under her: the card goes above her.
+    const field = { x: 420, y: 460, width: 440, height: 36 };
+    const over = placeSaid(her(576, 300), DESK, { field });
+    expect(over.bottom).toBe(DESK.height - 300 + 12);
+    // A field above her and the talk line below: beside her, on the side that covers neither.
+    const both = placeSaid(her(400, 300), DESK, {
+      field: { ...field, y: 200 },
+      line: { x: 400, y: 460, width: 480, height: 48 },
+    });
+    expect(both).toEqual({ left: 16, top: 300, width: 372, maxHeight: 484 });
+    // Nothing to keep clear of: where it always went.
+    expect(placeSaid(her(576, 40), DESK, {})).toEqual(placeSaid(her(576, 40), DESK));
+  });
+
+  it("it_opens_from_the_talk_line_while_she_rests_there", () => {
+    const line = { x: 380, y: 720, width: 520, height: 48 };
+    const low = placeSaid(her(380, 720), DESK, { line, resting: true });
+    expect(low).toEqual({ left: 400, bottom: DESK.height - 720 + 12, width: 480, maxHeight: 692 });
+    // A talk line high on the desk: the card opens under it.
+    const high = placeSaid(her(380, 40), DESK, {
+      line: { ...line, y: 40 },
+      resting: true,
+    });
+    expect(high.top).toBe(40 + 48 + 12);
+  });
 });
 
 describe("what is kept as text", () => {

@@ -21,7 +21,9 @@ Before a UI change, people read this page and agents follow `.claude/skills/desi
    it, and her ring turns in it while she reads a line (ADR 0271, ADR 0275). A trail runs in it when
    a line or a step of work is handed to an agent; a window the person puts away or brings back runs
    a muted one, since nobody is at work (ADR 0408). A trail never moves on its own: it runs once,
-   because of an act of the person or a step of an agent, and nothing loops or idles.
+   because of an act of the person or a step of an agent, and nothing loops or idles. In the card of
+   her turn the star marks only the rows of components at work; a done row has a check, one that
+   needs the person a warning dot after its words, one that failed its words in danger text (ADR 0409).
 3. **Status is a sentence.** Say who is doing what ("Eris is reading the file."); a badge or dot comes
    after the words, never alone. A coloured surface only for a warning, a failure or what needs the
    person (`.desk-callout[data-tone="warning"|"danger"]`, `.desk-error`).

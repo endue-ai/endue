@@ -11,10 +11,10 @@ export function cloudTurns(
 } {
   const signals = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
   return {
-    async say(text, onStep, desk) {
+    async say(...args) {
+      const send = () => ctx.bridge.brain.say(...args);
       const body = shell().querySelector<HTMLElement>(".eris-body");
-      if (!body || ctx.store.get().brain.mode !== "cloud")
-        return ctx.bridge.brain.say(text, onStep, desk);
+      if (!body || ctx.store.get().brain.mode !== "cloud") return send();
       const signal = h("span", { class: "eris-signal", "aria-hidden": "true", "data-leg": "out" });
       const bounds = body.getBoundingClientRect();
       if (bounds.right + 60 > body.ownerDocument.documentElement.clientWidth && bounds.left > 60)
@@ -27,7 +27,7 @@ export function cloudTurns(
         }, 320),
       );
       try {
-        return await ctx.bridge.brain.say(text, onStep, desk);
+        return await send();
       } finally {
         if (signals.has(signal)) {
           clearTimeout(signals.get(signal));

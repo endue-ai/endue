@@ -54,13 +54,13 @@ impl Core {
                 "brain.say needs some text".to_owned(),
             ));
         }
-        json(BrainSayResult {
-            turn_id: picked.conversation.say(
-                text,
-                params.desk,
-                picked.fallback,
-                caller == "desk" || self.trusted_builtin(caller, "endue.eris"),
-            ),
-        })
+        let turn_id = picked.conversation.say(
+            text,
+            params.desk,
+            picked.fallback,
+            caller == "desk" || self.trusted_builtin(caller, "endue.eris"),
+        );
+        self.turn_stops.said(&turn_id, caller);
+        json(BrainSayResult { turn_id })
     }
 }

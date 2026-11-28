@@ -3098,6 +3098,24 @@ export interface BrainSayResult {
   turnId: string;
 }
 
+/** Stop a brain.say turn the caller started (FT-06, ADR 0409): the core starts no further tool call of it, drops what the brain still streams, stops a local agent run it started, and ends it with an error whose reason is stopped. A call already sent to a command runs on; it cannot be taken back. */
+export interface BrainStopRequest {
+  id: RequestId;
+  method: "brain.stop";
+  params: BrainStopParams;
+}
+
+/** Parameters of brain.stop: the turn, by the id brain.say answered. Only the caller that said the line may stop it. */
+export interface BrainStopParams {
+  turnId: string;
+  scope: BrainConversePermission;
+}
+
+/** Result of brain.stop: whether the turn was running and is now stopped. False for a turn that had already ended. */
+export interface BrainStopResult {
+  stopped: boolean;
+}
+
 /** Ask the brain one question and get the answer as structured values: the arguments it calls the caller's tool with. */
 export interface BrainAskRequest {
   id: RequestId;
@@ -3268,8 +3286,14 @@ export interface BrainTurnData {
   reason?: BrainTurnReason;
 }
 
-/** error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people. */
-export type BrainTurnReason = "no_brain" | "signed_out" | "read_only" | "too_many_steps" | "failed";
+/** error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; stopped: the person stopped it (brain.stop, FT-06); failed: anything else, kept in the desk's log. text stays the sentence for people. */
+export type BrainTurnReason =
+  | "no_brain"
+  | "signed_out"
+  | "read_only"
+  | "too_many_steps"
+  | "stopped"
+  | "failed";
 
 /** started, delta (more text), completed; error (the turn failed, for example read-only after a takeover); offline (the brain is unreachable, the turn waits) and online (it resumed); tool (Eris hands work to a plugin command: the core runs the brain's call) and tool-result (the command answered and its answer went back to the brain). */
 export type BrainTurnKind =
@@ -3293,6 +3317,8 @@ export interface BrainTurnTool {
   title?: string;
   /** tool-result only: whether the command answered without an error. */
   ok?: boolean;
+  /** tool-result with ok false only: the first line of the command's error, for people (FT-06). Never its arguments or its result. */
+  message?: string;
 }
 
 /** Chosen by the caller, unique among its requests in flight. The response repeats it. */
@@ -3372,6 +3398,7 @@ export type BridgeRequest =
   | InitGetRequest
   | BrainSayRequest
   | BrainAskRequest
+  | BrainStopRequest
   | BrainAgentsListRequest
   | BrainAgentsCardRequest
   | BrainSpacesListRequest
@@ -8545,6 +8572,7 @@ export interface BridgeMethodMap {
   "init.get": { params: InitGetParams; result: InitGetResult };
   "brain.say": { params: BrainSayParams; result: BrainSayResult };
   "brain.ask": { params: BrainAskParams; result: BrainAskResult };
+  "brain.stop": { params: BrainStopParams; result: BrainStopResult };
   "brain.agents.list": { params: BrainAgentsListParams; result: BrainAgentsListResult };
   "brain.agents.card": { params: BrainAgentsCardParams; result: BrainAgentsCardResult };
   "brain.spaces.list": { params: BrainSpacesListParams; result: BrainSpacesListResult };
@@ -8757,6 +8785,7 @@ export const BRIDGE_METHODS = [
   "init.get",
   "brain.say",
   "brain.ask",
+  "brain.stop",
   "brain.agents.list",
   "brain.agents.card",
   "brain.spaces.list",

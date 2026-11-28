@@ -159,6 +159,7 @@ export function mountDesk(options: DeskOptions): Desk {
       fail: (text, reason) => pending.fail?.(text, reason),
       setState: (s) => pending.setState(s),
       talk: () => pending.talk?.(),
+      turn: (line, about) => pending.turn?.(line, about),
     },
   };
 
@@ -203,6 +204,7 @@ export function mountDesk(options: DeskOptions): Desk {
   pending.say = eris.say;
   pending.fail = eris.fail;
   pending.talk = eris.talk;
+  pending.turn = eris.turn;
   pending.setState = eris.setState;
   parts.push(mountPan(root, ctx));
   // Cmd+drag on the empty desk: Pan, Arrange, Ask Eris or Select (ADR 0296).

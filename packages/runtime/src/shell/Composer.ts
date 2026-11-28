@@ -250,9 +250,11 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
     ctx.eris.setState("thinking");
     errands.ask(arrived);
     let reply: Awaited<ReturnType<typeof ctx.bridge.brain.say>>;
+    // What the line is about: "this" is that window, and its plugin's tools come first (ADR 0407).
+    const about = windowsOf(addressBook(ctx.store).current(ctx.store.get())).slice(0, 16);
+    // Its turn's card (FT-06): a row per component she goes to, her answer as it comes, Stop.
+    const turn = ctx.eris.turn?.(text, about);
     try {
-      // What the line is about: "this" is that window, and its plugin's tools come first (ADR 0407).
-      const about = windowsOf(addressBook(ctx.store).current(ctx.store.get())).slice(0, 16);
       const desk = {
         ...(await deskSnapshot(ctx)),
         ...(about.length ? { about: { windows: about } } : {}),
@@ -261,14 +263,22 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
       const context = ctx.store.get().sweep.context;
       if (context) ctx.store.set((s) => ({ sweep: { ...s.sweep, context: null } }));
       const line = context ? `${context.text}\n\n${text}` : text;
-      reply = await errands.say(line, (step) => errands.step(step), desk);
+      const step = (s: Parameters<typeof errands.step>[0]) => {
+        errands.step(s);
+        turn?.step(s);
+      };
+      reply = turn
+        ? await errands.say(line, step, desk, turn.hooks)
+        : await errands.say(line, step, desk);
     } catch {
+      turn?.end({ text: "", reason: "failed" });
       // An errand left out comes home.
       await errands.finish();
       ctx.eris.setState("idle");
       ctx.runtime.notify({ caller: "desk", title: ctx.tr("brainFailed"), level: "error" });
       return;
     }
+    turn?.end(reply);
     await errands.finish();
     if (reply.reason && ctx.eris.fail) ctx.eris.fail(reply.text, reply.reason);
     else ctx.eris.say(reply.text, reply.words);

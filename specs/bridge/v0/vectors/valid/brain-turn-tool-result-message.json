@@ -1,0 +1,19 @@
+{
+  "target": "BridgeEvent",
+  "description": "a command failed, and its error's first line says why",
+  "instance": {
+    "event": "brain.turn",
+    "data": {
+      "turnId": "t1",
+      "kind": "tool-result",
+      "tool": {
+        "callId": "call2",
+        "command": "endue.files.list",
+        "provider": "endue.files",
+        "title": "List files",
+        "ok": false,
+        "message": "Downloads is not a folder the desk may read"
+      }
+    }
+  }
+}

@@ -85,6 +85,8 @@ enum Stop {
     TooMany,
     /// The brain wants an endue ID token: nobody is signed in, or the token is no longer good.
     SignedOut,
+    /// The person stopped the turn (brain.stop, ADR 0409), which said so already.
+    Stopped,
 }
 
 impl Conversation {
@@ -213,11 +215,23 @@ impl Conversation {
         state.store.record(Speaker::Person, line.text);
         let mut sink = Sink::new(&self.events, turn);
         sink.prefix = prefix.map(str::to_owned);
+        sink.stop = self
+            .tools
+            .get()
+            .and_then(Weak::upgrade)
+            .and_then(|tools| tools.stop(turn));
         let mut held = Held::default();
         let (mut wait, mut again) = (self.options.retry, 0);
         let mut waited = Duration::ZERO;
         loop {
-            let attempt = self.attempt(&mut state, &mut sink, &mut held, line);
+            let attempt = match self.attempt(&mut state, &mut sink, &mut held, line) {
+                Err(_) if sink.stopped() => Err(Stop::Stopped),
+                attempt => attempt,
+            };
+            if matches!(attempt, Err(Stop::Stopped)) {
+                // brain.stop ended the turn and said so; nothing of it is kept.
+                return;
+            }
             if attempt.is_err() {
                 // A turn the brain completed and the desk still fails says both, as it always has.
                 held.release(&sink);
@@ -260,6 +274,9 @@ impl Conversation {
                     // Wait without the lock, so other calls are not held up by an absent brain.
                     drop(state);
                     thread::sleep(wait);
+                    if sink.stopped() {
+                        return;
+                    }
                     waited += wait;
                     wait = (wait * 2).min(self.options.max_retry);
                     state = self.lock();
@@ -281,6 +298,7 @@ impl Conversation {
                     self.failed(&mut state, &sink, BrainTurnReason::SignedOut, SIGN_IN_LINE);
                     return;
                 }
+                Err(Stop::Stopped) => return,
                 Err(Stop::Again | Stop::Failed) => {
                     self.failed(&mut state, &sink, BrainTurnReason::Failed, FAILED_LINE);
                     return;
@@ -359,6 +377,9 @@ impl Conversation {
         // until the brain answers in words or the turn has made MAX_STEPS calls.
         let mut steps = 0;
         while let Some((turn_id, call)) = sink.pending.take() {
+            if sink.stopped() {
+                return Err(Stop::Stopped);
+            }
             steps += 1;
             if steps > MAX_STEPS {
                 return Err(Stop::TooMany);
@@ -372,7 +393,18 @@ impl Conversation {
                 .map_or_else(|| echo(&call), |tools| tools.run(sink.turn, &call));
             if let Some(tool) = step {
                 let ok = Some(!failed);
-                sink.step(BrainTurnKind::ToolResult, BrainTurnTool { ok, ..tool });
+                let message = failed.then(|| failure_line(&output)).flatten();
+                sink.step(
+                    BrainTurnKind::ToolResult,
+                    BrainTurnTool {
+                        ok,
+                        message,
+                        ..tool
+                    },
+                );
+            }
+            if sink.stopped() {
+                return Err(Stop::Stopped);
             }
             let request = |lease_id| ToolResultRequest {
                 lease_id,
@@ -410,6 +442,18 @@ impl Conversation {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+}
+
+/// The first line of a failed call's error, for people (FT-06): at most 200 characters, never its
+/// arguments or its result.
+fn failure_line(output: &serde_json::Value) -> Option<String> {
+    let error = output.get("error")?;
+    let text = error
+        .get("message")
+        .and_then(|m| m.as_str())
+        .or(error.as_str())?;
+    let line = text.lines().map(str::trim).find(|l| !l.is_empty())?;
+    Some(line.chars().take(200).collect())
 }
 
 /// Map a refused call onto what the turn does next.

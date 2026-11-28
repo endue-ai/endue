@@ -1,5 +1,6 @@
 import type { BrainTurnReason } from "../bridge/types";
 import type { ErisState } from "../eris/states";
+import type { TurnHandle } from "../eris/turn";
 import type { Platform } from "../input";
 import type { PluginWindows } from "../surface/host";
 import type { WindowDocs } from "../surface/window-docs";
@@ -35,6 +36,8 @@ export interface ShellCtx extends Ctx {
     setState(state: ErisState): void;
     /** Start or end a spoken turn (FT-02), as a click on her does; the talk line's microphone. */
     talk?(): void;
+    /** A typed line's turn, shown on her card (FT-06); `about`, the windows the line names. */
+    turn?(line: string, about?: string[]): TurnHandle | undefined;
   };
 }
 
