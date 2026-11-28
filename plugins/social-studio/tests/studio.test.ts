@@ -170,7 +170,9 @@ describe("Social Studio", () => {
     const m = await mount({ items: [post("h1", { url: "http://example.com/h1" })] });
     click(m.$("#list .row"));
     expect(
-      [...(m.$("#detail")?.querySelectorAll("button") ?? [])].map((b) => b.textContent),
+      [...(m.$("#detail .detail-post")?.querySelectorAll("button") ?? [])].map(
+        (b) => b.textContent,
+      ),
     ).toEqual(["Close"]);
   });
 
@@ -198,7 +200,7 @@ describe("Social Studio", () => {
       view: "replies",
     });
     expect(tab(m, "Replies")?.getAttribute("aria-selected")).toBe("true");
-    await expect(m.host.invoke("endue.social-studio.view", { view: "drafts" })).rejects.toThrow();
+    await expect(m.host.invoke("endue.social-studio.view", { view: "outbox" })).rejects.toThrow();
   });
 
   it("speaks the desk's language", async () => {

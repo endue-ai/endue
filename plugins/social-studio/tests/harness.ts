@@ -4,12 +4,13 @@
 // endue.social; store.* keeps what the studio saves, so a remount reads it back.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type {
-  ConnectorInfo,
-  ConnectorInstance,
-  Item,
-  MessageCatalog,
-  Permission,
+import {
+  type ConnectorInfo,
+  type ConnectorInstance,
+  type Item,
+  type MessageCatalog,
+  type Permission,
+  StubError,
 } from "../../../packages/bridge/src/index";
 import { defineUiPlugin } from "../../../packages/plugin-sdk/src/index";
 import { createTestHost, type TestHost } from "../../../packages/plugin-sdk/src/testing/index";
@@ -148,9 +149,14 @@ export { instance };
 
 export const GRANTS: Permission[] = [
   { permission: "data:read", kinds: ["entry", "metric", "record"] },
-  { permission: "cmd:invoke", ids: ["desk.connectors.open"] },
+  {
+    permission: "cmd:invoke",
+    ids: ["desk.connectors.open", "*.post.publish", "*.post.reply", "*.post.delete"],
+  },
   { permission: "shell:open", schemes: ["https"] },
   { permission: "connector:manage" },
+  { permission: "brain:ask" },
+  { permission: "account:manage" },
 ];
 
 type MountOptions = {
@@ -158,7 +164,63 @@ type MountOptions = {
   instances?: ConnectorInstance[];
   store?: Record<string, unknown>;
   language?: "en" | "ko";
+  /** Files by path, kept between mounts when the same object is passed again. */
+  files?: Map<string, string>;
+  /** What dialog.open answers: the files the person picks. */
+  picked?: string[];
+  /** What the key may do, and what it may after account.connectors.enable (null: refused). */
+  may?: string[];
+  enabled?: string[] | null;
+  /** The social commands' answers by command id; a throw is the network's refusal. */
+  answers?: Record<string, (args: Record<string, unknown>) => unknown>;
+  /** The brain's answer to writing help. */
+  suggestion?: string;
+  settings?: Record<string, unknown>;
+  refuse?: Parameters<typeof createTestHost>[0]["refuse"];
 };
+
+/** The drafts folder in memory: fs.list, read, write, mkdir, copy and trash as the core does. */
+function memoryFiles(files: Map<string, string>, trashed: string[]) {
+  const under = (dir: string) => [...files.keys()].filter((p) => p.startsWith(`${dir}/`));
+  return {
+    "fs.list": ({ path }: { path: string }) => {
+      const names = new Map<string, { name: string; kind: string; size?: number }>();
+      for (const p of under(path)) {
+        const [name, ...deeper] = p.slice(path.length + 1).split("/");
+        if (!name) continue;
+        const size = files.get(p)?.length ?? 0;
+        names.set(name, deeper.length > 0 ? { name, kind: "dir" } : { name, kind: "file", size });
+      }
+      if (names.size === 0 && !files.has(`${path}/`))
+        throw new StubError("not_found", `${path} does not exist`);
+      return { entries: [...names.values()] };
+    },
+    "fs.read": ({ path }: { path: string }) => {
+      const content = files.get(path);
+      if (content === undefined) throw new StubError("not_found", `${path} does not exist`);
+      return { content, encoding: "utf8" };
+    },
+    "fs.write": ({ path, content }: { path: string; content: string }) => {
+      files.set(path, content);
+      return {};
+    },
+    "fs.mkdir": ({ path }: { path: string }) => {
+      if (under(path).length === 0) files.set(`${path}/`, "");
+      return {};
+    },
+    "fs.copy": ({ from, to }: { from: string; to: string }) => {
+      const content = files.get(from);
+      if (content === undefined) throw new StubError("not_found", `${from} does not exist`);
+      files.set(to, content);
+      return {};
+    },
+    "fs.trash": ({ path }: { path: string }) => {
+      for (const p of [...under(path), `${path}/`]) files.delete(p);
+      trashed.push(path);
+      return {};
+    },
+  };
+}
 
 export async function mount(options: MountOptions = {}) {
   const html = readFileSync(join(here, "../ui/index.html"), "utf8");
@@ -168,6 +230,22 @@ export async function mount(options: MountOptions = {}) {
   const store = options.store ?? {};
   const opened: string[] = [];
   const connectorsOpened: unknown[] = [];
+  const files = options.files ?? new Map<string, string>();
+  const trashed: string[] = [];
+  /** The social commands invoked, in order. */
+  const invoked: { id: string; args: Record<string, unknown> }[] = [];
+  const enabled: unknown[] = [];
+  const asked: string[] = [];
+  let may = options.may ?? ["read", "publish", "delete"];
+  const socialCommand = (id: string) => (args: unknown) => {
+    const a = args as Record<string, unknown>;
+    invoked.push({ id, args: a });
+    const answer = options.answers?.[id];
+    return answer
+      ? answer(a)
+      : { id: `p${invoked.length}`, url: `https://example.com/p${invoked.length}` };
+  };
+  const turns: string[] = [];
   const host: TestHost = createTestHost({
     pluginId: "endue.social-studio",
     handlers: {
@@ -181,13 +259,37 @@ export async function mount(options: MountOptions = {}) {
         opened.push(target);
         return { opened: true };
       },
+      ...memoryFiles(files, trashed),
+      "dialog.open": () =>
+        options.picked
+          ? { cancelled: false, paths: options.picked }
+          : { cancelled: true, paths: [] },
+      "account.connectors.status": () => ({ enabled: true, may, connectors: [] }),
+      "account.connectors.enable": ({ allow }) => {
+        enabled.push(allow);
+        if (options.enabled === null)
+          return { enabled: true, may, connectors: [], problem: "Not now." };
+        may = options.enabled ?? [...may, ...allow];
+        return { enabled: true, may, connectors: [] };
+      },
+      "brain.ask": ({ prompt }) => {
+        asked.push(prompt);
+        const turnId = `turn_${asked.length}`;
+        turns.push(turnId);
+        return { turnId };
+      },
     },
     commands: {
       "desk.connectors.open": (args) => {
         connectorsOpened.push(args);
         return {};
       },
+      "endue.social.post.publish": socialCommand("endue.social.post.publish"),
+      "endue.social.post.reply": socialCommand("endue.social.post.reply"),
+      "endue.social.post.delete": socialCommand("endue.social.post.delete"),
     },
+    settings: options.settings ?? {},
+    ...(options.refuse ? { refuse: options.refuse } : {}),
     manifestCommands: manifest().contributes.commands,
     grants: GRANTS,
     language: options.language ?? "en",
@@ -213,11 +315,25 @@ export async function mount(options: MountOptions = {}) {
   const $ = <T extends Element = HTMLElement>(selector: string) =>
     document.querySelector<T>(selector);
   const $$ = (selector: string) => [...document.querySelectorAll<HTMLElement>(selector)];
+  /** The brain answers the last writing help it was asked for. */
+  const answerHelp = (text = options.suggestion ?? "") => {
+    host.emit({
+      event: "brain.turn",
+      data: { turnId: turns.at(-1), kind: "completed", text: "", structured: { text } },
+    } as never);
+  };
   return {
     host,
     store,
     opened,
     connectorsOpened,
+    files,
+    trashed,
+    invoked,
+    enabled,
+    asked,
+    answerHelp,
+    writer: mounted.writer,
     settle,
     page: mounted.page,
     $,

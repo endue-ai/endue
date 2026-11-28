@@ -128,6 +128,10 @@ impl Core {
         let mut answered = connectors.call(&connector, &tool, arguments.clone(), &key);
         if answered.as_ref().is_err_and(lost) {
             answered = connectors.call(&connector, &tool, arguments, &key);
+            // Lost twice: it may have been done, and the person must look before asking again.
+            if answered.as_ref().is_err_and(lost) {
+                return Err(NO_ANSWER.to_owned());
+            }
         }
         let answered = answered.map_err(|e| self.endue_call_failed(e))?.value;
         if !answered.ok {
@@ -166,6 +170,10 @@ impl Core {
         e.message
     }
 }
+
+/// What a call says when its answer was lost twice: done or not, nobody knows.
+pub(crate) const NO_ANSWER: &str =
+    "No answer came back, so it may have gone through: look before trying again";
 
 /// Run and answer one invocation, as its provider would.
 fn answer(core: &Arc<Core>, provider: &str, data: &CmdInvokedData) {

@@ -5,12 +5,37 @@
   "kind": "ui",
   "entry": "ui/index.html",
   "messages": "messages",
-  "description": "Every social account the endue account connects in one window: the accounts' posts, the replies and mentions to them, and their numbers.",
+  "description": "Every social account the endue account connects in one window: the accounts' posts, the replies and mentions to them, their numbers, and drafts written once and published to each account.",
   "permissions": [
-    { "permission": "data:read", "kinds": ["entry", "metric", "record"] },
-    { "permission": "cmd:invoke", "ids": ["desk.connectors.open"] },
-    { "permission": "shell:open", "schemes": ["https"] },
-    { "permission": "connector:manage" }
+    {
+      "permission": "data:read",
+      "kinds": ["entry", "metric", "record"]
+    },
+    {
+      "permission": "cmd:invoke",
+      "ids": ["desk.connectors.open", "*.post.publish", "*.post.reply", "*.post.delete"]
+    },
+    {
+      "permission": "shell:open",
+      "schemes": ["https"]
+    },
+    {
+      "permission": "connector:manage"
+    },
+    {
+      "permission": "fs:read",
+      "paths": ["${home}/Documents/Social Studio/**", "/**"]
+    },
+    {
+      "permission": "fs:write",
+      "paths": ["${home}/Documents/Social Studio/**"]
+    },
+    {
+      "permission": "brain:ask"
+    },
+    {
+      "permission": "account:manage"
+    }
   ],
   "surfaces": [
     {
@@ -18,7 +43,12 @@
       "title": "Social Studio",
       "titleMessage": "title",
       "placement": "center",
-      "window": { "size": { "width": 1080, "height": 720 } }
+      "window": {
+        "size": {
+          "width": 1080,
+          "height": 720
+        }
+      }
     }
   ],
   "contributes": {
@@ -38,16 +68,26 @@
           "소셜",
           "SNS"
         ],
-        "runs": { "command": "desk.plugins.open", "args": { "plugin": "endue.social-studio" } }
+        "runs": {
+          "command": "desk.plugins.open",
+          "args": {
+            "plugin": "endue.social-studio"
+          }
+        }
       },
       {
         "id": "endue.social-studio.view",
         "title": "Switch the Social Studio view",
         "titleMessage": "view",
-        "keywords": ["social", "feed", "replies", "numbers"],
+        "keywords": ["social", "feed", "replies", "numbers", "drafts"],
         "args": {
           "type": "object",
-          "properties": { "view": { "type": "string", "enum": ["feed", "replies", "numbers"] } },
+          "properties": {
+            "view": {
+              "type": "string",
+              "enum": ["feed", "replies", "numbers", "drafts"]
+            }
+          },
           "required": ["view"],
           "additionalProperties": false
         }
@@ -57,10 +97,18 @@
         "title": "Social Studio: accounts as data",
         "keywords": ["social", "accounts", "networks"],
         "description": "The social accounts, by network, as data, leaving the screen as it is: each with source (to name it in posts and numbers), title, network, state, the sentence that explains an error or a pause, reauth (true when it must be reconnected on endue.ai), handle, followers and capabilities (what the network lets the account do).",
-        "args": { "type": "object", "properties": {}, "additionalProperties": false },
+        "args": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
         "result": {
           "type": "object",
-          "properties": { "accounts": { "type": "array" } }
+          "properties": {
+            "accounts": {
+              "type": "array"
+            }
+          }
         },
         "agent": true,
         "readOnly": true
@@ -75,19 +123,43 @@
           "properties": {
             "source": {
               "type": "object",
-              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "properties": {
+                "connector": {
+                  "type": "string"
+                },
+                "instance": {
+                  "type": "string"
+                }
+              },
               "required": ["connector", "instance"],
               "additionalProperties": false
             },
-            "network": { "type": "string", "maxLength": 100 },
-            "query": { "type": "string", "maxLength": 200 },
-            "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+            "network": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "query": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           },
           "additionalProperties": false
         },
         "result": {
           "type": "object",
-          "properties": { "posts": { "type": "array" }, "more": { "type": "boolean" } }
+          "properties": {
+            "posts": {
+              "type": "array"
+            },
+            "more": {
+              "type": "boolean"
+            }
+          }
         },
         "agent": true,
         "readOnly": true
@@ -102,23 +174,50 @@
           "properties": {
             "source": {
               "type": "object",
-              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "properties": {
+                "connector": {
+                  "type": "string"
+                },
+                "instance": {
+                  "type": "string"
+                }
+              },
               "required": ["connector", "instance"],
               "additionalProperties": false
             },
-            "id": { "type": "string", "minLength": 1, "maxLength": 1000 },
-            "network": { "type": "string", "maxLength": 100 },
-            "query": { "type": "string", "maxLength": 200 },
-            "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "network": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "query": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           },
           "additionalProperties": false
         },
         "result": {
           "type": "object",
           "properties": {
-            "replies": { "type": "array" },
-            "unseen": { "type": "integer" },
-            "more": { "type": "boolean" }
+            "replies": {
+              "type": "array"
+            },
+            "unseen": {
+              "type": "integer"
+            },
+            "more": {
+              "type": "boolean"
+            }
           }
         },
         "agent": true,
@@ -134,7 +233,14 @@
           "properties": {
             "source": {
               "type": "object",
-              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "properties": {
+                "connector": {
+                  "type": "string"
+                },
+                "instance": {
+                  "type": "string"
+                }
+              },
               "required": ["connector", "instance"],
               "additionalProperties": false
             }
@@ -144,7 +250,14 @@
         },
         "result": {
           "type": "object",
-          "properties": { "series": { "type": "array" }, "best": { "type": "array" } }
+          "properties": {
+            "series": {
+              "type": "array"
+            },
+            "best": {
+              "type": "array"
+            }
+          }
         },
         "agent": true,
         "readOnly": true
@@ -159,17 +272,308 @@
           "properties": {
             "source": {
               "type": "object",
-              "properties": { "connector": { "type": "string" }, "instance": { "type": "string" } },
+              "properties": {
+                "connector": {
+                  "type": "string"
+                },
+                "instance": {
+                  "type": "string"
+                }
+              },
               "required": ["connector", "instance"],
               "additionalProperties": false
             },
-            "id": { "type": "string", "minLength": 1, "maxLength": 1000 }
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
           },
           "required": ["source", "id"],
           "additionalProperties": false
         },
         "agent": true
+      },
+      {
+        "id": "endue.social-studio.draft",
+        "title": "Social Studio: make a draft",
+        "keywords": ["social", "draft", "write", "post"],
+        "description": "Make a draft in Social Studio (a folder under ~/Documents/Social Studio/Drafts) without publishing it: the text, a title for the networks that take one, the accounts to publish to as { connector, instance } (as accounts answers them) and pictures or videos as { path, alt } (JPEG, PNG, WebP, GIF, MP4 or QuickTime), copied into the draft. Answers the draft as drafts does.",
+        "args": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxLength": 10000
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "accounts": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "connector": {
+                    "type": "string"
+                  },
+                  "instance": {
+                    "type": "string"
+                  }
+                },
+                "required": ["connector", "instance"],
+                "additionalProperties": false
+              }
+            },
+            "media": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "alt": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": ["path"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["text"],
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "draft": {
+              "type": "string"
+            }
+          }
+        },
+        "agent": true
+      },
+      {
+        "id": "endue.social-studio.drafts",
+        "title": "Social Studio: drafts as data",
+        "keywords": ["social", "drafts"],
+        "description": "The drafts, the last changed first, as data: each with draft (its id), text, title, accounts, media (file, alt, type, size) and outcome (how each account answered: published with id and url, failed or unknown with why).",
+        "args": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "drafts": {
+              "type": "array"
+            }
+          }
+        },
+        "agent": true,
+        "readOnly": true
+      },
+      {
+        "id": "endue.social-studio.current",
+        "title": "Social Studio: the open draft as data",
+        "keywords": ["social", "draft"],
+        "description": "The draft open in Social Studio now, as drafts answers it, with what was typed last; null when none is open.",
+        "args": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "draft": {
+              "type": ["object", "null"]
+            }
+          }
+        },
+        "agent": true,
+        "readOnly": true
+      },
+      {
+        "id": "endue.social-studio.publish",
+        "title": "Social Studio: publish a draft",
+        "keywords": ["social", "publish", "post"],
+        "description": "Publish a draft to accounts, one after another; each answers on its own (published with id and url, refused with the problem, failed with why, or unknown when the answer was lost: look before asking again). text, title and media (file and alt, in order) must be the draft's as drafts answers them, or nothing is published: the approval shows exactly what goes out. An account that already published the draft is not published twice.",
+        "args": {
+          "type": "object",
+          "properties": {
+            "draft": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "accounts": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "connector": {
+                    "type": "string"
+                  },
+                  "instance": {
+                    "type": "string"
+                  }
+                },
+                "required": ["connector", "instance"],
+                "additionalProperties": false
+              }
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 10000
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "media": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "alt": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": ["file"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["draft", "accounts", "text"],
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "results": {
+              "type": "array"
+            }
+          }
+        },
+        "agent": true,
+        "irreversible": true
+      },
+      {
+        "id": "endue.social-studio.reply",
+        "title": "Social Studio: reply to a post",
+        "keywords": ["social", "reply", "comment"],
+        "description": "Reply to a post, reply or mention on its network, as the account it came to. The post is { source, id } as posts and replies answer them; its account's network must take replies (capabilities.reply).",
+        "args": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "object",
+              "properties": {
+                "connector": {
+                  "type": "string"
+                },
+                "instance": {
+                  "type": "string"
+                }
+              },
+              "required": ["connector", "instance"],
+              "additionalProperties": false
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 10000
+            }
+          },
+          "required": ["source", "id", "text"],
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "replied": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string"
+            }
+          }
+        },
+        "agent": true,
+        "irreversible": true
+      },
+      {
+        "id": "endue.social-studio.delete",
+        "title": "Social Studio: delete a post",
+        "keywords": ["social", "delete", "remove"],
+        "description": "Delete one of the accounts' own posts or replies on its network, where the network lets it (capabilities.delete_post, or delete_comment for a reply). The post is { source, id } as posts answers it.",
+        "args": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "object",
+              "properties": {
+                "connector": {
+                  "type": "string"
+                },
+                "instance": {
+                  "type": "string"
+                }
+              },
+              "required": ["connector", "instance"],
+              "additionalProperties": false
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "required": ["source", "id"],
+          "additionalProperties": false
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "deleted": {
+              "type": "boolean"
+            }
+          }
+        },
+        "agent": true,
+        "irreversible": true
       }
-    ]
+    ],
+    "settings": {
+      "endue.social-studio.keep-location": {
+        "kind": "boolean",
+        "default": false,
+        "description": "Keep where a picture was taken when publishing it. Off, the desk removes the location from a picture before it leaves."
+      }
+    }
   }
 }

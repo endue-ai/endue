@@ -1,7 +1,10 @@
-// The studio's page: the views (Feed, Replies, Numbers), the accounts by network, the filters, a
-// windowed list of posts with the open one beside it, and each account's numbers. It draws the
-// model studio.js hands it and says what the person did through `deps`; it reads no data itself.
+// The studio's page: the views (Feed, Replies, Numbers, Drafts), the accounts by network, the
+// filters, a windowed list of posts with the open one beside it (with Reply and Delete), each
+// account's numbers and the composer. It draws the models studio.js and writer.js hand it and says
+// what the person did through `deps`; it reads no data itself.
+import { mountComposer } from "./composer.js";
 import { el, mark, postDetail, postRow, ROW } from "./rows.js";
+import { mountTalk } from "./talk.js";
 import { createWindow } from "./window.js";
 
 /**
@@ -13,10 +16,12 @@ import { createWindow } from "./window.js";
  *   setFilter(filter: { network?: string | null, account?: string | null, text?: string }): void,
  *   select(key: string | null): void,
  *   connect(): void,
- * }} Deps
+ *   writing(): import("./composer.js").Writing,
+ *   write: import("./composer.js").Writer["actions"],
+ * } & Omit<import("./talk.js").Deps, "t">} Deps
  */
 
-const VIEWS = ["feed", "replies", "numbers"];
+const VIEWS = ["feed", "replies", "numbers", "drafts"];
 
 /** A line through a series' points, scaled to its own range; flat when it does not move. */
 function spark(
@@ -85,6 +90,7 @@ export function mountPage(doc, deps) {
   doc.addEventListener("keydown", (e) => {
     const target = /** @type {HTMLElement} */ (e.target);
     if (e.metaKey || e.ctrlKey || e.altKey || target.closest?.("input, textarea, select")) return;
+    if (!get("review").hidden) return;
     if (e.key === "Escape" && model?.selected) return deps.select(null);
     const view = VIEWS[Number(e.key) - 1];
     if (view) {
@@ -99,6 +105,8 @@ export function mountPage(doc, deps) {
     deps.setFilter({ network: /** @type {HTMLSelectElement} */ (e.target).value || null }),
   );
   get("connect").onclick = () => deps.connect();
+  const composer = mountComposer(doc, get("compose"), deps, deps.write);
+  const talk = mountTalk(doc, deps);
 
   const rowsOf = (/** @type {Model} */ m) =>
     m.view === "feed" ? m.feed.map((post) => ({ post })) : m.view === "replies" ? m.replies : [];
@@ -239,10 +247,46 @@ export function mountPage(doc, deps) {
     get("connect").textContent = t("connect");
   }
 
+  /** The open post's detail; Reply and Delete stay below it, built once. */
+  function detail(/** @type {Model} */ next, /** @type {boolean} */ listed) {
+    const box = get("detail");
+    const open = listed ? next.selected : undefined;
+    get("main").classList.toggle("has-detail", Boolean(open));
+    box.hidden = !open;
+    talk.draw(open);
+    if (!open) return box.replaceChildren();
+    const article = postDetail(doc, deps, {
+      post: open,
+      ...(next.answers ? { answers: next.answers } : {}),
+      close: () => deps.select(null),
+    });
+    const shown = box.firstElementChild;
+    if (shown && shown !== talk.box) shown.replaceWith(article);
+    else box.prepend(article);
+    if (talk.box.parentElement !== box) box.append(talk.box);
+  }
+
   function draw(/** @type {Model} */ next) {
     model = next;
     doc.title = get("title").textContent = t("title");
     views(next);
+    const drafting = next.view === "drafts";
+    get("studio").classList.toggle("is-drafting", drafting);
+    for (const id of ["accounts", "filters", "pane"]) get(id).hidden = drafting;
+    get("compose").hidden = !drafting;
+    if (drafting) {
+      get("empty").hidden = true;
+      get("connect").hidden = true;
+      get("status").textContent = "";
+      composer.draw(deps.writing(), get("review"));
+      return;
+    }
+    const review = get("review");
+    if (!review.hidden) {
+      review.hidden = true;
+      review.replaceChildren();
+      delete review.dataset.shows;
+    }
     accounts(next);
     filters(next);
     const rows = rowsOf(next);
@@ -252,24 +296,14 @@ export function mountPage(doc, deps) {
     get("numbers").hidden = listed;
     if (listed) list.set(rows);
     else numbers(next);
-    const open = listed && next.selected;
-    get("main").classList.toggle("has-detail", Boolean(open));
-    get("detail").hidden = !open;
-    if (open && next.selected) {
-      get("detail").replaceChildren(
-        postDetail(doc, deps, {
-          post: next.selected,
-          ...(next.answers ? { answers: next.answers } : {}),
-          close: () => deps.select(null),
-        }),
-      );
-    } else get("detail").replaceChildren();
+    detail(next, listed);
     words(next, listed ? rows.length : next.numbers.length);
   }
 
   return {
     draw,
     focus(/** @type {string} */ where) {
+      if (where === "compose") return composer.focus();
       /** @type {HTMLElement | null} */ (get(where)?.querySelector("button"))?.focus();
     },
     /** How many rows the list has in the page now. */

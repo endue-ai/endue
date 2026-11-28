@@ -12,7 +12,7 @@ import { createHelp } from "./help.js";
  * @typedef {import("./model.js").Account} Account
  * @typedef {import("./model.js").Post} Post
  * @typedef {{ items: import("@endue-ai/bridge").Item[], accounts: Account[] }} Snapshot
- * @typedef {"read" | "accounts" | "drafts" | "write" | "account" | "help"} Why
+ * @typedef {"drafts" | "write" | "pictures" | "account" | "help"} Why
  */
 
 const ACCOUNT = Object.freeze({ permission: "account:manage" });
@@ -41,6 +41,8 @@ export function createWriter(ctx, deps) {
     /** @type {Draft[]} */ drafts: [],
     /** @type {Draft | null} */ current: null,
     review: false,
+    /** What the key may do, as the review last read it; null when it could not. */
+    /** @type {string[] | null} */ may: null,
     busy: false,
     error: "",
     /** @type {{ what: string, network: string, state: "asking" | "ready" | "failed", text: string } | null} */
@@ -69,13 +71,14 @@ export function createWriter(ctx, deps) {
       return call();
     }
   };
+  /** The drafts' files through the bridge; a copied picture asks to read its source. */
   const fs = {
-    call: (/** @type {string} */ method, /** @type {Record<string, unknown>} */ params) =>
-      granted(
-        () => ctx.bridge.call(/** @type {never} */ (method), /** @type {never} */ (params)),
-        /** @type {any} */ (params).scope === READ ? READ : WRITE,
-        /** @type {any} */ (params).scope === READ ? "drafts" : "write",
-      ),
+    call: (/** @type {string} */ method, /** @type {Record<string, any>} */ params) => {
+      const call = () =>
+        ctx.bridge.call(/** @type {never} */ (method), /** @type {never} */ (params));
+      if (method === "fs.copy") return granted(call, params.fromScope, "pictures");
+      return params.scope === READ ? granted(call, READ, "drafts") : granted(call, WRITE, "write");
+    },
   };
   const store = createDrafts(fs);
 
@@ -167,7 +170,10 @@ export function createWriter(ctx, deps) {
 
   const actions = {
     async refresh() {
-      w.drafts = await store.list().catch((e) => (fail(e), w.drafts));
+      w.drafts = await store.list().catch((e) => {
+        fail(e);
+        return w.drafts;
+      });
       deps.redraw();
     },
     async create(/** @type {Partial<Draft>} */ init = {}) {
@@ -207,7 +213,9 @@ export function createWriter(ctx, deps) {
         await store
           .addMedium(draft, path)
           .catch((e) =>
-            fail(codeOf(e) === "unsupported_type" ? deps.t("fit.type", { name: messageOf(e) }) : e),
+            fail(
+              codeOf(e) === "unsupported_type" ? deps.t("notPicture", { name: messageOf(e) }) : e,
+            ),
           );
       }
       await flush().catch(fail);
@@ -230,8 +238,17 @@ export function createWriter(ctx, deps) {
       later();
       deps.redraw();
     },
-    review(/** @type {boolean} */ open) {
+    /** Open the review (and learn whether the key may publish yet), or close it. */
+    async review(/** @type {boolean} */ open) {
       w.review = open && Boolean(w.current) && readyOf(/** @type {Draft} */ (w.current)).length > 0;
+      deps.redraw();
+      if (!w.review) return;
+      const status = await granted(
+        () => ctx.bridge.call("account.connectors.status", { scope: ACCOUNT }),
+        ACCOUNT,
+        "account",
+      ).catch(() => null);
+      w.may = status ? (status.may ?? []) : null;
       deps.redraw();
     },
     async publish(/** @type {string[] | undefined} */ only) {
@@ -324,11 +341,12 @@ export function createWriter(ctx, deps) {
       titled: accounts.some((a) => a.chosen && takesTitle(a.caps)),
       ready: draft ? readyOf(draft) : [],
       review: w.review,
+      may: w.may,
       busy: w.busy,
       error: w.error,
       help: w.help,
     };
   }
 
-  return { actions, model, postActions, publishTo, store, state: w };
+  return { actions, model, postActions, publishTo, choices: accountsOf, store, state: w };
 }

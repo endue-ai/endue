@@ -1,0 +1,301 @@
+/* Social Studio's Drafts view, its review and a post's Reply and Delete: the theme's tokens only. */
+#studio.is-drafting {
+  grid-template-columns: 1fr;
+}
+#accounts[hidden],
+#filters[hidden],
+#pane[hidden],
+#compose[hidden] {
+  display: none;
+}
+#compose {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1.4fr) minmax(220px, 1fr);
+  min-height: 0;
+}
+.compose-drafts,
+.compose-editor,
+.compose-none,
+.compose-previews {
+  overflow: auto;
+  min-height: 0;
+  padding: var(--desk-space-3);
+}
+.compose-drafts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--desk-space-2);
+  border-inline-end: 1px solid var(--desk-border);
+}
+.draft-list,
+.compose-media,
+.preview-problems,
+.review-accounts,
+.review-media,
+.review-left {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.draft {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  text-align: start;
+}
+.draft[aria-current="true"] {
+  background: var(--desk-row-active-bg);
+  color: var(--desk-row-active-fg);
+}
+.draft-line {
+  overflow: hidden;
+  width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.draft-foot,
+.preview-count,
+.preview-media,
+.talk-note {
+  color: var(--desk-text-muted);
+  font-size: var(--desk-text-xs);
+}
+.compose-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--desk-space-2);
+}
+.compose-editor[hidden],
+.compose-none[hidden],
+.compose-previews[hidden],
+.compose-title[hidden],
+.talk[hidden],
+.talk-bar[hidden],
+.talk-form[hidden],
+.talk-confirm[hidden],
+.talk-bar > [hidden] {
+  display: none;
+}
+.compose-text,
+.talk-text {
+  min-height: 8em;
+  resize: vertical;
+  font: inherit;
+}
+.talk-text {
+  min-height: 4em;
+}
+.compose-medium {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--desk-space-2);
+  margin-block: var(--desk-space-1);
+}
+.medium-name {
+  font-size: var(--desk-text-sm);
+  overflow-wrap: anywhere;
+}
+.medium-alt {
+  flex: 1;
+  min-width: 10em;
+}
+.compose-accounts {
+  margin: 0;
+  padding: var(--desk-space-2);
+  border: 1px solid var(--desk-border);
+  border-radius: var(--desk-radius-md);
+}
+.compose-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--desk-space-2) var(--desk-space-3);
+}
+.compose-account {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--desk-space-1);
+}
+.compose-help,
+.compose-actions,
+.review-actions,
+.talk-bar,
+.talk-form,
+.talk-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--desk-space-2);
+}
+.compose-trash {
+  margin-inline-start: auto;
+}
+.help-answer {
+  flex-basis: 100%;
+  padding: var(--desk-space-2);
+  border: 1px solid var(--desk-border);
+  border-radius: var(--desk-radius-md);
+}
+.help-text,
+.review-text {
+  margin: 0 0 var(--desk-space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.compose-error:empty {
+  display: none;
+}
+.compose-error {
+  margin: 0;
+  color: var(--desk-danger-text);
+}
+.compose-previews {
+  display: flex;
+  flex-direction: column;
+  gap: var(--desk-space-2);
+  border-inline-start: 1px solid var(--desk-border);
+}
+.preview {
+  padding: var(--desk-space-2) var(--desk-space-3);
+  border: 1px solid var(--desk-border);
+  border-radius: var(--desk-card-radius);
+}
+.preview-title,
+.review-name {
+  display: flex;
+  align-items: center;
+  gap: var(--desk-space-1);
+  margin: 0 0 var(--desk-space-1);
+  font-size: var(--desk-text-sm);
+}
+.preview-count,
+.preview-media {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.preview-count.is-over,
+.preview-problems,
+.outcome-failed {
+  color: var(--desk-danger-text);
+}
+.preview-problems {
+  margin-block: var(--desk-space-1);
+  font-size: var(--desk-text-sm);
+}
+.outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--desk-space-2);
+  margin-block-start: var(--desk-space-2);
+  font-size: var(--desk-text-sm);
+}
+.outcome-published {
+  color: var(--desk-success-text);
+}
+.outcome-unknown {
+  color: var(--desk-warning-text);
+}
+.review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: var(--desk-space-3);
+  background: var(--desk-dialog-scrim);
+  backdrop-filter: var(--desk-dialog-scrim-filter);
+}
+.review-overlay[hidden] {
+  display: none;
+}
+.review {
+  overflow: auto;
+  box-sizing: border-box;
+  width: min(36rem, 100%);
+  max-height: 100%;
+  padding: var(--desk-dialog-padding);
+  border: 1px solid var(--desk-dialog-border);
+  border-radius: var(--desk-dialog-radius);
+  background: var(--desk-dialog-bg);
+  box-shadow: var(--desk-dialog-shadow);
+}
+.review-title {
+  margin: 0 0 var(--desk-space-3);
+  font-size: var(--desk-text-lg);
+}
+.review-account {
+  padding-block: var(--desk-space-2);
+  border-bottom: 1px solid var(--desk-border);
+}
+.review-heading {
+  margin: 0 0 var(--desk-space-1);
+  font-weight: 600;
+}
+.review-media,
+.review-left,
+.review-key,
+.review-final {
+  font-size: var(--desk-text-sm);
+  color: var(--desk-text-muted);
+}
+.review-key {
+  color: var(--desk-warning-text);
+}
+.review-actions {
+  justify-content: flex-end;
+}
+.talk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--desk-space-2);
+  margin-block-start: var(--desk-space-3);
+  padding-block-start: var(--desk-space-3);
+  border-top: 1px solid var(--desk-border);
+}
+.talk-text {
+  flex-basis: 100%;
+}
+.talk-question {
+  flex-basis: 100%;
+  margin: 0;
+}
+.talk-note:empty {
+  display: none;
+}
+@media (max-width: 900px) {
+  #compose {
+    grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+  }
+  .compose-previews {
+    grid-column: 2;
+    border-inline-start: 0;
+  }
+}
+@media (max-width: 640px) {
+  #compose {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+  .compose-drafts,
+  .compose-editor,
+  .compose-none,
+  .compose-previews {
+    overflow: visible;
+    border: 0;
+  }
+  .compose-drafts {
+    border-bottom: 1px solid var(--desk-border);
+  }
+  .draft-list {
+    display: flex;
+    gap: var(--desk-space-1);
+    overflow-x: auto;
+  }
+  .draft {
+    width: 12rem;
+  }
+}

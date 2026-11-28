@@ -59,5 +59,98 @@
   "reconnect": "Reconnect on endue.ai",
   "post": "Post by {author}",
   "grant.read": "To show the posts, replies and numbers of your social accounts.",
-  "grant.accounts": "To show which social accounts are connected and whether they sync."
+  "grant.accounts": "To show which social accounts are connected and whether they sync.",
+  "views.drafts": "Drafts",
+  "newDraft": "New draft",
+  "untitled": "Empty draft",
+  "publishedTo": {
+    "one": "Published to {count} account",
+    "other": "Published to {count} accounts"
+  },
+  "compose.empty": "Write a post once, see how each account takes it, and publish it to them.",
+  "compose.title": "Title, for the networks that take one",
+  "compose.text": "What do you want to say?",
+  "compose.noAccounts": "No social account is connected yet.",
+  "addPictures": "Add pictures or videos",
+  "alt": "Describe it for people who cannot see it",
+  "removeMedium": "Remove",
+  "removeNamed": "Remove {name}",
+  "notPicture": "{name} is not a picture or a video.",
+  "publishTo": "Publish to",
+  "publish": "Publish…",
+  "publishing": "Publishing…",
+  "deleteDraft": "Delete draft",
+  "previews": "How each account receives it",
+  "count.limit": "{count} of {max} characters",
+  "count.free": {
+    "one": "{count} character",
+    "other": "{count} characters"
+  },
+  "mediaCount.image": {
+    "one": "{count} picture",
+    "other": "{count} pictures"
+  },
+  "mediaCount.video": {
+    "one": "{count} video",
+    "other": "{count} videos"
+  },
+  "fit.reconnect": "Reconnect on endue.ai",
+  "fit.empty": "Write something or add a picture.",
+  "fit.tooLong": "{over} over {network}'s limit of {max} characters.",
+  "fit.textRequired": "{network} needs text.",
+  "fit.titleRequired": "{network} needs a title.",
+  "fit.titleTooLong": "The title is longer than {network} takes ({max} characters).",
+  "fit.mediaRequired": "{network} needs a picture or a video.",
+  "fit.no.image": "{network} does not take pictures from here.",
+  "fit.no.video": "{network} does not take videos from here.",
+  "fit.count.image": {
+    "one": "{network} takes {count} picture at most.",
+    "other": "{network} takes {count} pictures at most."
+  },
+  "fit.count.video": {
+    "one": "{network} takes {count} video at most.",
+    "other": "{network} takes {count} videos at most."
+  },
+  "fit.type": "{network} does not take a file like {name}.",
+  "fit.size": "{name} is over the {max} {network} takes.",
+  "fit.unknown": "{network} checks this post when it is published.",
+  "outcome.published": "Published",
+  "outcome.unknown": "No answer came back, so the post may be up on {network}: look there before trying again.",
+  "tryAgain": "Try again",
+  "review.title": {
+    "one": "Publish to {count} account?",
+    "other": "Publish to {count} accounts?"
+  },
+  "review.alt": "described as “{alt}”",
+  "review.noAlt": "no description",
+  "review.leftOut": "Left out: {account}. {why}",
+  "review.key": "Your endue key may not publish yet: publishing first asks the endue account to let it.",
+  "review.final": "A published post cannot be taken back from here.",
+  "review.publish": {
+    "one": "Publish to {count} account",
+    "other": "Publish to {count} accounts"
+  },
+  "cancel": "Cancel",
+  "help.shorten": "Shorten to {max}",
+  "help.adapt": "Adapt for {network}",
+  "help.asking": "Writing a suggestion…",
+  "help.failed": "No suggestion: {why}",
+  "help.keep": "Use this",
+  "help.discard": "Discard",
+  "talk.reply": "Reply",
+  "talk.delete": "Delete",
+  "talk.placeholder": "Write a reply",
+  "talk.send": "Send reply",
+  "talk.replied": "Replied on {network}.",
+  "talk.deleted": "Deleted on {network}. It leaves the list when the account syncs.",
+  "talk.failed": "It did not go through: {why}",
+  "talk.confirm": "Delete “{post}” on {network}? This cannot be undone.",
+  "talk.deleteYes": "Delete it",
+  "keyRefused": "The endue account did not let the key publish.",
+  "writeFailed": "Could not save the draft: {why}",
+  "grant.drafts": "To read your drafts in Documents, Social Studio.",
+  "grant.write": "To keep your drafts in Documents, Social Studio.",
+  "grant.pictures": "To copy the picture into its draft.",
+  "grant.account": "To publish, reply and delete through your endue account.",
+  "grant.help": "To ask the assistant to shorten or adapt the post."
 }

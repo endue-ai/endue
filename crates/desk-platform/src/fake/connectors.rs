@@ -47,6 +47,8 @@ pub struct FakeConnectors {
     pub limited: Option<u64>,
     /// The next connector API answer is this status, as when an answer is lost on the way.
     pub failing: Option<u16>,
+    /// The next this many connector API answers are 503, as when every answer is lost.
+    pub lost: u32,
     /// The files uploaded for publishing, in order.
     pub uploads: Vec<super::media::FakeUpload>,
 }
@@ -192,6 +194,10 @@ pub(super) fn api(state: &mut State, seen: &Seen) -> Option<Answer> {
     state.connectors.headers.remove("retry-after");
     if let Some(status) = state.connectors.failing.take() {
         return Some(error(status, "UNAVAILABLE", "Try again"));
+    }
+    if state.connectors.lost > 0 {
+        state.connectors.lost -= 1;
+        return Some(error(503, "UNAVAILABLE", "Try again"));
     }
     let may = |risk: &str| {
         let scope = match risk {

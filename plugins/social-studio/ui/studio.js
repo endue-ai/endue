@@ -29,7 +29,7 @@ import {
  * }} State
  */
 
-export const VIEWS = ["feed", "replies", "numbers"];
+export const VIEWS = ["feed", "replies", "numbers", "drafts"];
 /** What the studio reads: every social entry, metric and record. */
 export const QUERY = /** @type {import("@endue-ai/bridge").ItemQuery} */ ({
   kinds: ["entry", "metric", "record"],
@@ -49,7 +49,8 @@ const codeOf = (/** @type {unknown} */ e) =>
 /**
  * @param {Pick<PluginContext, "bridge" | "commands" | "data" | "surface">} ctx
  * @param {Page} page
- * @param {{ reason(what: "read" | "accounts"): string }} words why the studio asks for a grant
+ * @param {{ reason(what: "read" | "accounts"): string, entered?(view: string): void }} words why
+ *   the studio asks for a grant, and whom to tell when a view opens
  */
 export function createStudio(ctx, page, words) {
   /** @type {State} */
@@ -87,11 +88,13 @@ export function createStudio(ctx, page, words) {
   const actions = {
     /** @param {string} view */
     setView(view) {
-      if (!VIEWS.includes(view)) throw new Error(`No view ${view}: feed, replies or numbers.`);
+      if (!VIEWS.includes(view))
+        throw new Error(`No view ${view}: feed, replies, numbers or drafts.`);
       s.view = view;
       s.selected = null;
       s.sorted = new Set(s.seen);
       draw();
+      words.entered?.(view);
     },
     /** @param {Partial<typeof s.filter>} next */
     setFilter(next) {
@@ -224,7 +227,13 @@ export function createStudio(ctx, page, words) {
     await readAccounts();
     draw();
   };
-  return { start, actions, redraw: draw };
+  /** The items, the accounts and the posts as they are now, for the writing side. */
+  const snapshot = () => {
+    const items = [...s.items.values()];
+    const accounts = accountsOf(s.instances, items).flatMap((g) => g.accounts);
+    return { items, accounts, posts: allPosts() };
+  };
+  return { start, actions, redraw: draw, snapshot };
 }
 
 /** What the page draws, from the state and the posts. */
