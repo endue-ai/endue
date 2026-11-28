@@ -132,7 +132,11 @@ fn a_picture_from_a_file_goes_up_once_without_where_it_was_taken() {
 fn a_picture_too_big_goes_nowhere_and_a_person_may_keep_where_one_was_taken() {
     let (fake, desk, ig, _rd) = connected("endue-social-kept");
     desk.grant("desk", json!({ "permission": "fs:read", "paths": ["~/*"] }));
-    fs::write(desk.home.join("poster.png"), vec![0u8; 10 * 1024 * 1024 + 1]).unwrap();
+    fs::write(
+        desk.home.join("poster.png"),
+        vec![0u8; 10 * 1024 * 1024 + 1],
+    )
+    .unwrap();
     let big = json!({ "instance": ig, "media": [{ "path": "~/poster.png" }] });
     let answered = invoke(&desk, PUBLISH, big);
     assert!(
@@ -154,7 +158,11 @@ fn a_picture_too_big_goes_nowhere_and_a_person_may_keep_where_one_was_taken() {
     let answered = invoke(&desk, PUBLISH, json!({ "instance": ig, "media": kept }));
     assert_eq!(answered["ok"], true, "{answered}");
     let uploads = fake.state().connectors.uploads.clone();
-    assert_eq!(uploads[0].bytes, located_jpeg(), "the person kept it as it was");
+    assert_eq!(
+        uploads[0].bytes,
+        located_jpeg(),
+        "the person kept it as it was"
+    );
 }
 
 #[test]
