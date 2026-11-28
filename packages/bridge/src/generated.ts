@@ -1759,6 +1759,7 @@ export interface ViewProvenance {
 export interface ConnectorManifest {
   binding: ConnectorBinding;
   http?: HttpBinding;
+  endue?: EndueBinding;
   auth: ConnectorAuth;
   /** The kinds of item the connector brings in, one entry per kind. */
   resources: ConnectorResource[];
@@ -1767,11 +1768,11 @@ export interface ConnectorManifest {
   instanceSettings?: Record<string, ConnectorSetting>;
 }
 
-/** How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106). */
-export type ConnectorBinding = "wasm" | "mcp" | "http";
+/** How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0408). */
+export type ConnectorBinding = "wasm" | "mcp" | "http" | "endue";
 
-/** none (local files, the OS's own data), token (a key the person pastes) or oauth. */
-export type ConnectorAuthKind = "none" | "token" | "oauth";
+/** none (local files, the OS's own data), token (a key the person pastes), oauth, or endue: the endue account the desk signed in to, with no connect step on the desk (binding endue). */
+export type ConnectorAuthKind = "none" | "token" | "oauth" | "endue";
 
 /** How an instance signs in. Tokens are kept by the core and never handed to the connector's code; with binding http the core itself sends the token (http.auth). No v0 method starts an OAuth flow yet. */
 export interface ConnectorAuth {
@@ -1869,6 +1870,79 @@ export interface HttpRead {
 export interface HttpConst {
   /** This value for every record. */
   const: unknown;
+}
+
+/** A connector as data over the endue account's connectors (binding endue, ADR 0408): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch. */
+export interface EndueBinding {
+  /** The tool endings an account connector must offer, all of them, to be an instance: social_read matches <type>__social_read. The core never reads the type. */
+  tools: EndueToolName[];
+  /** What one sync asks for, in order. The same item from two requests is one item, the last one read. */
+  requests: EndueRequest[];
+  /** How a record becomes an item, by name, as the http binding's maps; each request names one. */
+  maps: Record<string, HttpItemMap>;
+  /** By id of a command the plugin declares in contributes.commands: the tool that command calls. */
+  actions?: Record<string, EndueAction>;
+  /** Tool calls one sync of one instance makes at most; 30 when absent. A sync that spends it writes what it read and removes nothing. */
+  budget?: number;
+}
+
+/** A tool's name after its connector's type and two underscores: social_read. */
+export type EndueToolName = string;
+
+/** The name of one argument a tool takes: operation, cursor, since. */
+export type EndueArgumentName = string;
+
+/** One tool call of a sync and the pages after it: the records at items in the answer's data, the next page's cursor at next. */
+export interface EndueRequest {
+  tool: EndueToolName;
+  /** The tool's arguments, by name. */
+  arguments?: Record<string, EndueRequestArgument>;
+  /** Where the records are in the answer's data: a JSON pointer to an array; empty for data that is the array. */
+  items: JsonPointer;
+  /** Where the next page's cursor is in the answer's data. Absent, or nothing there: the last page. */
+  next?: JsonPointer;
+  /** Pages read at most; 10 when absent. */
+  maxPages?: number;
+  map: HttpMapName;
+  /** A refusal whose reason is unsupported skips this request instead of failing the sync. */
+  optional?: boolean;
+}
+
+/** One argument of a request: the same value every time; page, the cursor the previous page's next pointed to (absent on the first page); or since, the time of the instance's last good sync (RFC 3339, absent before the first). A request with since only adds and changes items. */
+export type EndueRequestArgument = HttpConst | EnduePage | EndueSince;
+
+/** The next page's cursor. */
+export interface EnduePage {
+  page: true;
+}
+
+/** The time of the last good sync. */
+export interface EndueSince {
+  since: true;
+}
+
+/** What a tool's call does: read; write; send (others see it); destructive (cannot be taken back). An action on a send or destructive tool is an irreversible command, and a tool whose risk is higher than its action says is refused before it is called. */
+export type EndueRisk = "read" | "write" | "send" | "destructive";
+
+/** The tool a command calls and its arguments. Every call carries one Idempotency-Key per invocation, the same on a retry. */
+export interface EndueAction {
+  tool: EndueToolName;
+  risk: EndueRisk;
+  /** The tool's arguments, by name. */
+  arguments?: Record<string, EndueActionArgument>;
+}
+
+/** One argument of an action: the same value every time; arg, the command's argument of that name (left out when the command has none); or file, the path a command argument names, uploaded first and sent as what the upload answered. */
+export type EndueActionArgument = HttpConst | EndueArg | EndueFile;
+
+/** The command's argument of this name. */
+export interface EndueArg {
+  arg: EndueArgumentName;
+}
+
+/** The file at the path the command's argument of this name holds. */
+export interface EndueFile {
+  file: EndueArgumentName;
 }
 
 /** One kind of item the connector brings in, and the commands that act on it. */

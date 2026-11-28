@@ -1,0 +1,10 @@
+{
+  "target": "ConnectorManifest",
+  "description": "binding endue without the endue block it runs",
+  "instance": {
+    "binding": "endue",
+    "auth": { "kind": "endue" },
+    "resources": [{ "kind": "entry" }],
+    "sync": { "mode": "pull", "intervalSeconds": 900 }
+  }
+}

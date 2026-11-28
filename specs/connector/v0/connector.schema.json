@@ -10,6 +10,7 @@
       "properties": {
         "binding": { "$ref": "#/$defs/ConnectorBinding" },
         "http": { "$ref": "#/$defs/HttpBinding" },
+        "endue": { "$ref": "#/$defs/EndueBinding" },
         "auth": { "$ref": "#/$defs/ConnectorAuth" },
         "resources": {
           "description": "The kinds of item the connector brings in, one entry per kind.",
@@ -32,18 +33,29 @@
           "if": { "properties": { "binding": { "const": "http" } }, "required": ["binding"] },
           "then": { "properties": { "http": true }, "required": ["http"] },
           "else": { "properties": { "http": false } }
+        },
+        {
+          "if": { "properties": { "binding": { "const": "endue" } }, "required": ["binding"] },
+          "then": {
+            "properties": {
+              "endue": true,
+              "auth": { "type": "object", "properties": { "kind": { "const": "endue" } } }
+            },
+            "required": ["endue"]
+          },
+          "else": { "properties": { "endue": false } }
         }
       ]
     },
     "ConnectorBinding": {
-      "description": "How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106).",
+      "description": "How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0408).",
       "type": "string",
-      "enum": ["wasm", "mcp", "http"]
+      "enum": ["wasm", "mcp", "http", "endue"]
     },
     "ConnectorAuthKind": {
-      "description": "none (local files, the OS's own data), token (a key the person pastes) or oauth.",
+      "description": "none (local files, the OS's own data), token (a key the person pastes), oauth, or endue: the endue account the desk signed in to, with no connect step on the desk (binding endue).",
       "type": "string",
-      "enum": ["none", "token", "oauth"]
+      "enum": ["none", "token", "oauth", "endue"]
     },
     "ConnectorAuth": {
       "description": "How an instance signs in. Tokens are kept by the core and never handed to the connector's code; with binding http the core itself sends the token (http.auth). No v0 method starts an OAuth flow yet.",
@@ -266,6 +278,157 @@
       "type": "object",
       "properties": { "const": { "description": "This value for every record." } },
       "required": ["const"],
+      "additionalProperties": false
+    },
+    "EndueBinding": {
+      "description": "A connector as data over the endue account's connectors (binding endue, ADR 0408): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch.",
+      "type": "object",
+      "properties": {
+        "tools": {
+          "description": "The tool endings an account connector must offer, all of them, to be an instance: social_read matches <type>__social_read. The core never reads the type.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/EndueToolName" },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "requests": {
+          "description": "What one sync asks for, in order. The same item from two requests is one item, the last one read.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/EndueRequest" },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "maps": {
+          "description": "How a record becomes an item, by name, as the http binding's maps; each request names one.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/HttpMapName" },
+          "additionalProperties": { "$ref": "#/$defs/HttpItemMap" },
+          "minProperties": 1
+        },
+        "actions": {
+          "description": "By id of a command the plugin declares in contributes.commands: the tool that command calls.",
+          "type": "object",
+          "propertyNames": { "$ref": "../../plugin/v0/contributes.schema.json#/$defs/CommandId" },
+          "additionalProperties": { "$ref": "#/$defs/EndueAction" }
+        },
+        "budget": {
+          "description": "Tool calls one sync of one instance makes at most; 30 when absent. A sync that spends it writes what it read and removes nothing.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": ["tools", "requests", "maps"],
+      "additionalProperties": false
+    },
+    "EndueToolName": {
+      "description": "A tool's name after its connector's type and two underscores: social_read.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "EndueArgumentName": {
+      "description": "The name of one argument a tool takes: operation, cursor, since.",
+      "type": "string",
+      "pattern": "^[a-z][a-zA-Z0-9_]{0,63}$"
+    },
+    "EndueRequest": {
+      "description": "One tool call of a sync and the pages after it: the records at items in the answer's data, the next page's cursor at next.",
+      "type": "object",
+      "properties": {
+        "tool": { "$ref": "#/$defs/EndueToolName" },
+        "arguments": {
+          "description": "The tool's arguments, by name.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/EndueArgumentName" },
+          "additionalProperties": { "$ref": "#/$defs/EndueRequestArgument" }
+        },
+        "items": {
+          "description": "Where the records are in the answer's data: a JSON pointer to an array; empty for data that is the array.",
+          "$ref": "#/$defs/JsonPointer"
+        },
+        "next": {
+          "description": "Where the next page's cursor is in the answer's data. Absent, or nothing there: the last page.",
+          "$ref": "#/$defs/JsonPointer"
+        },
+        "maxPages": {
+          "description": "Pages read at most; 10 when absent.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "map": { "$ref": "#/$defs/HttpMapName" },
+        "optional": {
+          "description": "A refusal whose reason is unsupported skips this request instead of failing the sync.",
+          "type": "boolean"
+        }
+      },
+      "required": ["tool", "items", "map"],
+      "additionalProperties": false
+    },
+    "EndueRequestArgument": {
+      "description": "One argument of a request: the same value every time; page, the cursor the previous page's next pointed to (absent on the first page); or since, the time of the instance's last good sync (RFC 3339, absent before the first). A request with since only adds and changes items.",
+      "oneOf": [
+        { "$ref": "#/$defs/HttpConst" },
+        { "$ref": "#/$defs/EnduePage" },
+        { "$ref": "#/$defs/EndueSince" }
+      ]
+    },
+    "EnduePage": {
+      "description": "The next page's cursor.",
+      "type": "object",
+      "properties": { "page": { "const": true } },
+      "required": ["page"],
+      "additionalProperties": false
+    },
+    "EndueSince": {
+      "description": "The time of the last good sync.",
+      "type": "object",
+      "properties": { "since": { "const": true } },
+      "required": ["since"],
+      "additionalProperties": false
+    },
+    "EndueRisk": {
+      "description": "What a tool's call does: read; write; send (others see it); destructive (cannot be taken back). An action on a send or destructive tool is an irreversible command, and a tool whose risk is higher than its action says is refused before it is called.",
+      "type": "string",
+      "enum": ["read", "write", "send", "destructive"]
+    },
+    "EndueAction": {
+      "description": "The tool a command calls and its arguments. Every call carries one Idempotency-Key per invocation, the same on a retry.",
+      "type": "object",
+      "properties": {
+        "tool": { "$ref": "#/$defs/EndueToolName" },
+        "risk": { "$ref": "#/$defs/EndueRisk" },
+        "arguments": {
+          "description": "The tool's arguments, by name.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/EndueArgumentName" },
+          "additionalProperties": { "$ref": "#/$defs/EndueActionArgument" }
+        }
+      },
+      "required": ["tool", "risk"],
+      "additionalProperties": false
+    },
+    "EndueActionArgument": {
+      "description": "One argument of an action: the same value every time; arg, the command's argument of that name (left out when the command has none); or file, the path a command argument names, uploaded first and sent as what the upload answered.",
+      "oneOf": [
+        { "$ref": "#/$defs/HttpConst" },
+        { "$ref": "#/$defs/EndueArg" },
+        { "$ref": "#/$defs/EndueFile" }
+      ]
+    },
+    "EndueArg": {
+      "description": "The command's argument of this name.",
+      "type": "object",
+      "properties": { "arg": { "$ref": "#/$defs/EndueArgumentName" } },
+      "required": ["arg"],
+      "additionalProperties": false
+    },
+    "EndueFile": {
+      "description": "The file at the path the command's argument of this name holds.",
+      "type": "object",
+      "properties": { "file": { "$ref": "#/$defs/EndueArgumentName" } },
+      "required": ["file"],
       "additionalProperties": false
     },
     "ConnectorResource": {

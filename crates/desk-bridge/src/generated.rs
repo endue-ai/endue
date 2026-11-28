@@ -2937,6 +2937,8 @@ pub struct ConnectorManifest {
     pub binding: ConnectorBinding,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub http: Option<HttpBinding>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endue: Option<EndueBinding>,
     pub auth: ConnectorAuth,
     /// The kinds of item the connector brings in, one entry per kind.
     pub resources: Vec<ConnectorResource>,
@@ -2950,7 +2952,7 @@ pub struct ConnectorManifest {
     pub instance_settings: Option<BTreeMap<String, ConnectorSetting>>,
 }
 
-/// How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106).
+/// How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0408).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConnectorBinding {
     #[serde(rename = "wasm")]
@@ -2959,9 +2961,11 @@ pub enum ConnectorBinding {
     Mcp,
     #[serde(rename = "http")]
     Http,
+    #[serde(rename = "endue")]
+    Endue,
 }
 
-/// none (local files, the OS's own data), token (a key the person pastes) or oauth.
+/// none (local files, the OS's own data), token (a key the person pastes), oauth, or endue: the endue account the desk signed in to, with no connect step on the desk (binding endue).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConnectorAuthKind {
     #[serde(rename = "none")]
@@ -2970,6 +2974,8 @@ pub enum ConnectorAuthKind {
     Token,
     #[serde(rename = "oauth")]
     Oauth,
+    #[serde(rename = "endue")]
+    Endue,
 }
 
 /// How an instance signs in. Tokens are kept by the core and never handed to the connector's code; with binding http the core itself sends the token (http.auth). No v0 method starts an OAuth flow yet.
@@ -3116,6 +3122,122 @@ pub struct HttpRead {
 pub struct HttpConst {
     /// This value for every record.
     pub r#const: serde_json::Value,
+}
+
+/// A connector as data over the endue account's connectors (binding endue, ADR 0408): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueBinding {
+    /// The tool endings an account connector must offer, all of them, to be an instance: social_read matches <type>__social_read. The core never reads the type.
+    pub tools: Vec<EndueToolName>,
+    /// What one sync asks for, in order. The same item from two requests is one item, the last one read.
+    pub requests: Vec<EndueRequest>,
+    /// How a record becomes an item, by name, as the http binding's maps; each request names one.
+    pub maps: BTreeMap<String, HttpItemMap>,
+    /// By id of a command the plugin declares in contributes.commands: the tool that command calls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actions: Option<BTreeMap<String, EndueAction>>,
+    /// Tool calls one sync of one instance makes at most; 30 when absent. A sync that spends it writes what it read and removes nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<u64>,
+}
+
+/// A tool's name after its connector's type and two underscores: social_read.
+pub type EndueToolName = String;
+
+/// The name of one argument a tool takes: operation, cursor, since.
+pub type EndueArgumentName = String;
+
+/// One tool call of a sync and the pages after it: the records at items in the answer's data, the next page's cursor at next.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueRequest {
+    pub tool: EndueToolName,
+    /// The tool's arguments, by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<BTreeMap<String, EndueRequestArgument>>,
+    /// Where the records are in the answer's data: a JSON pointer to an array; empty for data that is the array.
+    pub items: JsonPointer,
+    /// Where the next page's cursor is in the answer's data. Absent, or nothing there: the last page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<JsonPointer>,
+    /// Pages read at most; 10 when absent.
+    #[serde(rename = "maxPages", default, skip_serializing_if = "Option::is_none")]
+    pub max_pages: Option<u64>,
+    pub map: HttpMapName,
+    /// A refusal whose reason is unsupported skips this request instead of failing the sync.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optional: Option<bool>,
+}
+
+/// One argument of a request: the same value every time; page, the cursor the previous page's next pointed to (absent on the first page); or since, the time of the instance's last good sync (RFC 3339, absent before the first). A request with since only adds and changes items.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EndueRequestArgument {
+    HttpConst(HttpConst),
+    EnduePage(EnduePage),
+    EndueSince(EndueSince),
+}
+
+/// The next page's cursor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EnduePage {
+    pub page: True,
+}
+
+/// The time of the last good sync.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueSince {
+    pub since: True,
+}
+
+/// What a tool's call does: read; write; send (others see it); destructive (cannot be taken back). An action on a send or destructive tool is an irreversible command, and a tool whose risk is higher than its action says is refused before it is called.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EndueRisk {
+    #[serde(rename = "read")]
+    Read,
+    #[serde(rename = "write")]
+    Write,
+    #[serde(rename = "send")]
+    Send,
+    #[serde(rename = "destructive")]
+    Destructive,
+}
+
+/// The tool a command calls and its arguments. Every call carries one Idempotency-Key per invocation, the same on a retry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueAction {
+    pub tool: EndueToolName,
+    pub risk: EndueRisk,
+    /// The tool's arguments, by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<BTreeMap<String, EndueActionArgument>>,
+}
+
+/// One argument of an action: the same value every time; arg, the command's argument of that name (left out when the command has none); or file, the path a command argument names, uploaded first and sent as what the upload answered.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EndueActionArgument {
+    HttpConst(HttpConst),
+    EndueArg(EndueArg),
+    EndueFile(EndueFile),
+}
+
+/// The command's argument of this name.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueArg {
+    pub arg: EndueArgumentName,
+}
+
+/// The file at the path the command's argument of this name holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueFile {
+    pub file: EndueArgumentName,
 }
 
 /// One kind of item the connector brings in, and the commands that act on it.
