@@ -18,9 +18,9 @@ use std::sync::MutexGuard;
 use desk_bridge::{
     BridgeEvent, CmdAnswerParams, CmdAnswerResult, CmdAnsweredData, CmdAnsweredEvent,
     CmdChangedData, CmdChangedEvent, CmdInvokeParams, CmdInvokeResult, CmdInvokedData,
-    CmdInvokedEvent, CmdListParams, CmdListResult, CmdRegisterParams, CmdRegisterResult,
-    CmdUnregisterParams, CmdUnregisterResult, CommandChange, CommandFailure, CommandFailureCode,
-    CommandInfo, ErrorCode, EventName, Permission,
+    CmdListParams, CmdListResult, CmdRegisterParams, CmdRegisterResult, CmdUnregisterParams,
+    CmdUnregisterResult, CommandChange, CommandFailure, CommandFailureCode, CommandInfo, ErrorCode,
+    EventName, Permission,
 };
 use serde_json::{Map, Value};
 
@@ -226,14 +226,7 @@ impl Core {
             approved,
             file_open_granted,
         };
-        if !self.invoke_endue(&info.provider, &data) {
-            let to = self.recipients(EventName::CmdInvoked, vec![info.provider]);
-            let event = CmdInvokedEvent {
-                event: Default::default(),
-                data,
-            };
-            self.events().publish_to(to, BridgeEvent::CmdInvoked(event));
-        }
+        self.deliver_invoked(info.provider, data);
         Ok(invocation_id)
     }
 

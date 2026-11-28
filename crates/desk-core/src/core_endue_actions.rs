@@ -5,8 +5,8 @@
 
 use std::sync::Arc;
 
+use desk_bridge::{BridgeEvent, CmdInvokedData, CmdInvokedEvent, EndueRisk, EventName};
 use desk_bridge::{CmdAnswerParams, CmdRegisterParams, CommandFailure, CommandFailureCode};
-use desk_bridge::{CmdInvokedData, EndueRisk};
 use desk_platform::wire_connectors::Risk;
 use desk_platform::{ErrorKind, PlatformError};
 use serde_json::{Map, Value};
@@ -58,9 +58,22 @@ impl Core {
         }
     }
 
-    /// `cmd.invoked` for an endue plugin: the core runs it on a thread of its own and answers.
-    /// Returns false when `provider` is not one, so the event goes out as usual.
-    pub(crate) fn invoke_endue(&self, provider: &str, data: &CmdInvokedData) -> bool {
+    /// `cmd.invoked` to the provider, or, for an endue plugin, the command run by the core itself.
+    pub(crate) fn deliver_invoked(&self, provider: String, data: CmdInvokedData) {
+        if self.invoke_endue(&provider, &data) {
+            return;
+        }
+        let to = self.recipients(EventName::CmdInvoked, vec![provider]);
+        let event = CmdInvokedEvent {
+            event: Default::default(),
+            data,
+        };
+        self.events().publish_to(to, BridgeEvent::CmdInvoked(event));
+    }
+
+    /// An endue plugin's invocation runs on a thread of its own and is answered from there.
+    /// False when `provider` is not one.
+    fn invoke_endue(&self, provider: &str, data: &CmdInvokedData) -> bool {
         if !self.is_endue(provider) {
             return false;
         }

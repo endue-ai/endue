@@ -56,6 +56,7 @@ mod core_dialog;
 mod core_directory;
 mod core_endue;
 mod core_endue_actions;
+mod core_endue_refresh;
 mod core_endue_sync;
 mod core_events;
 mod core_files_gesture;

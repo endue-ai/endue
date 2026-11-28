@@ -1,16 +1,18 @@
 # endue connector v0
 
 A connector brings an app's data into endue as items (`specs/item/v0`) and its actions as commands; it
-has no screen of its own (ADR 0032). One contract, three bindings: `wasm`, a component the plugin's
-`entry` names (local and light, no VM), `mcp`, an MCP server inside the VM (ADR 0002), and `http`,
-requests and a mapping the core runs from the manifest, with no code and no `entry` (ADR 0106). A plugin of
+has no screen of its own (ADR 0032). One contract, four bindings: `wasm`, a component the plugin's
+`entry` names (local and light, no VM), `mcp`, an MCP server inside the VM (ADR 0002), `http`,
+requests and a mapping the core runs from the manifest, with no code and no `entry` (ADR 0106), and
+`endue`, the endue account's connectors, whose tools the core calls with the desk's own key (no code,
+no `entry`; ADR 0408). A plugin of
 kind `connector` declares it under `connector` in `plugin.json`: `ConnectorManifest` in
 `connector.schema.json`. v0 may break on any minor release (ADR 0004).
 
 | Field | Meaning |
 | --- | --- |
-| `binding` | `wasm`, `mcp` or `http` (then `http` says what the core runs) |
-| `auth` | `kind` `none`, `token` (pasted; `title` says what) or `oauth` (`authorizationUrl`, `tokenUrl`, `scopes`; declared only: no v0 method starts a flow) |
+| `binding` | `wasm`, `mcp`, `http` or `endue` (then `http` or `endue` says what the core runs) |
+| `auth` | `kind` `none`, `token` (pasted; `title` says what), `oauth` (`authorizationUrl`, `tokenUrl`, `scopes`; declared only: no v0 method starts a flow) or `endue` (the endue account the desk signed in to; binding `endue` only) |
 | `resources` | One entry per item kind it brings in: `kind`, `actions` (command ids), `live` (it also answers queries beyond the index) |
 | `sync` | `mode` `pull`, `push` or `both`; `intervalSeconds` between pulls, 60 to 86400, 900 when absent |
 | `instanceSettings` | What the person fills in per instance, by name: `kind` (`string`, `integer`, `boolean`), `title`, `description`, `default`, `required`, `secret` |
@@ -40,6 +42,38 @@ kind `connector` declares it under `connector` in `plugin.json`: `ConnectorManif
 - `desk_bridge::manifest_problems` checks the names: `auth.setting` is a declared secret setting,
   `auth.kind` is `token`, each request's `map` is in `maps`, each map's `kind` is in `resources`, and
   each map's `fields` give `id` and `title`.
+
+## endue binding
+
+`endue` (`EndueBinding`) is a connector as data over the endue account's connectors (ADR 0408). The
+core runs it with the desk's own key (ADR 0407); nothing of the plugin's runs, and it needs no
+`net:fetch`.
+
+| Field | Meaning |
+| --- | --- |
+| `tools` | The tool endings an account connector must offer, all of them, to be an instance: `social_read` matches `<type>__social_read` |
+| `requests` | The `tool` a sync calls with `arguments` (`{ const }`, `{ page: true }`, the cursor the previous page's `next` pointed to, or `{ since: true }`, the last good sync's time); the records at the pointer `items` in the answer's `data`; `next`, the pointer to the next page's cursor; `maxPages` (10); the `map`; `optional` (a refusal `unsupported` skips it) |
+| `maps` | The http binding's maps, by name |
+| `actions` | By command id: the `tool` it calls, its `risk` (`read`, `write`, `send`, `destructive`) and its `arguments` (`{ const }`, `{ arg }`, the command's argument of that name, or `{ file }`) |
+| `budget` | Tool calls one sync makes at most: 1 to 200, 30 when absent |
+
+- Instances are the account's connectors that offer every tool, kept as the account changes (at
+  start, every sync interval, on `connector.sync`, when the key is turned on or off); one that leaves
+  takes its instance and items. The instance id is the account connector's id in lowercase, its title
+  the connector's display name; `settings` say which connector it is (`connector`) and how many records
+  the last sync skipped (`skipped`). `connector.connect` and `connector.disconnect` are `unsupported`.
+- A tool answer with `ok: false` is `error` in the tool's own words, and `truncated: true` too; neither
+  writes anything. A sync that spends its budget or reaches the limit writes what it read and removes
+  nothing; a request with `since` only adds and changes. A 429 or `X-RateLimit-Remaining: 0` holds the
+  next call until the wait. An expired account connector is `error` with `reauth`; with the desk's key
+  off, instances are `paused` with a sentence that says where to turn it on.
+- The core registers the commands of `actions` while the plugin is on and answers them: the command's
+  `instance` argument names the instance. Each invocation carries one `Idempotency-Key`, the same on the
+  one retry after a lost answer. A tool whose risk is higher than its action's is refused uncalled. A
+  `{ file }` argument is refused until endue AI's connector API takes an upload.
+- `desk_bridge::manifest_problems` checks the names: each request's and action's `tool` is in `tools`,
+  each request's `map` in `maps`, each map's `kind` in `resources` with `id` and `title`, each action a
+  command in `contributes.commands`, and each action on a `send` or `destructive` tool `irreversible`.
 
 Host-facing: `ConnectorInstance` (an id unique within its connector, which items carry in `source`; its
 settings but the secret ones; status), `ConnectorStatus` (`connected`, `syncing`, `stale`, `error` with

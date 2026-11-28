@@ -4,145 +4,14 @@
 //! answers into items, and its command calls the send tool, all with the desk's own key (ADR 0407)
 //! against the in-process fake platform. Syncs run on an explicit tick and a fake clock.
 
+mod endue_fixture;
 mod layer;
 
-use std::fs;
-use std::path::Path;
-use std::sync::Arc;
-use std::time::Duration;
-
-use desk_core::account::{Account, AccountOptions, Keychain, NetIdClient};
-use desk_core::studio_tokens;
-use desk_platform::Platform;
-use desk_platform::fake::{FakeConnector, FakePlatform, Seen};
-use desk_sys::keychain::fake::FakeKeychain;
+use desk_platform::fake::{FakePlatform, Seen};
+use endue_fixture::*;
 use layer::fixtures::state;
-use layer::{Desk, connector_manage, ids, source};
+use layer::{ids, source};
 use serde_json::{Value, json};
-
-const GADGET: &str = "fixture.gadget";
-const SEND: &str = "fixture.gadget.thing.send";
-
-fn manifest() -> Value {
-    let args = json!({ "type": "object", "required": ["instance", "text"],
-        "properties": { "instance": { "type": "string" }, "text": { "type": "string" } } });
-    json!({
-        "id": GADGET, "name": "Gadget", "version": "0.1.0", "kind": "connector",
-        "description": "Things from the endue account's gadget connectors.",
-        "contributes": { "commands": [{ "id": SEND, "title": "Send a thing", "irreversible": true,
-            "agent": true, "description": "Send a thing from an instance.", "args": args }] },
-        "connector": {
-            "binding": "endue", "auth": { "kind": "endue" },
-            "resources": [{ "kind": "entry", "actions": [SEND] }],
-            "sync": { "mode": "pull", "intervalSeconds": 900 },
-            "endue": {
-                "tools": ["thing_read", "thing_send"],
-                "requests": [{ "tool": "thing_read", "items": "/items", "next": "/next_cursor",
-                    "arguments": { "operation": { "const": "things" }, "cursor": { "page": true },
-                        "since": { "since": true } },
-                    "map": "thing" }],
-                "maps": { "thing": { "kind": "entry", "fields": {
-                    "id": "/id", "title": "/text", "body": "/text", "publishedAt": "/at",
-                    "updatedAt": "/at", "url": "/url", "feed": { "const": "Gadget" },
-                    "raw": "" } } },
-                "actions": { SEND: { "tool": "thing_send", "risk": "send", "arguments": {
-                    "operation": { "const": "send" }, "text": { "arg": "text" } } } },
-                "budget": 5
-            }
-        }
-    })
-}
-
-/// A desk signed in to `fake`, its key in a fake keychain, the fixture plugin installed.
-fn desk(tag: &str, fake: &FakePlatform) -> Desk {
-    let keychain = Arc::new(FakeKeychain::default());
-    let url = fake.url().to_owned();
-    let desk = Desk::built(tag, move |core, data| {
-        let account = account(data, &url);
-        let platform = Platform::new(&url, studio_tokens(&account)).unwrap();
-        core.with_account(account)
-            .with_platform(platform)
-            .with_account_connectors(Some(keychain as Arc<dyn Keychain>))
-    });
-    desk.grant("desk", json!({ "permission": "account:manage" }));
-    let dir = desk.home.join("plugins/gadget");
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("plugin.json"), manifest().to_string()).unwrap();
-    desk.core.install_plugin(&dir, true);
-    desk
-}
-
-fn account(data: &Path, url: &str) -> Arc<Account> {
-    let file = data.join("account.json");
-    let saved = json!({ "version": 2, "note": "test", "accessToken": "token-1",
-        "refreshCookie": "rt-1", "issuedAt": 1_767_225_300_u64, "expiresAt": 4_102_444_800_u64 });
-    fs::write(&file, saved.to_string()).unwrap();
-    let mut options = AccountOptions::new(url, "http://127.0.0.1:9");
-    options.file = Some(file);
-    options.retry = vec![Duration::from_millis(5); 3];
-    Account::open(options, NetIdClient)
-}
-
-/// account.connectors.enable, with publish so the send tool may be called.
-fn turn_on(desk: &Desk) {
-    let params = json!({ "allow": ["publish"], "scope": { "permission": "account:manage" } });
-    desk.ok("desk", "account.connectors.enable", params);
-}
-
-/// An account connector of type gadget offering `endings`; its id.
-fn gadget(fake: &FakePlatform, display: &str, endings: &[(&str, &str)]) -> String {
-    let mut state = fake.state();
-    let id = format!("conn_{}", state.connectors.connectors.len() + 1);
-    let tools = endings.iter().map(|(ending, risk)| {
-        json!({ "name": format!("gadget__{ending}"), "risk": risk, "input_schema": {} })
-    });
-    state.connectors.connectors.push(FakeConnector {
-        id: id.clone(),
-        kind: "gadget".into(),
-        name: "gadget".into(),
-        display_name: Some(display.into()),
-        expired: false,
-        tools: tools.collect(),
-    });
-    id
-}
-
-const BOTH: [(&str, &str); 2] = [("thing_read", "read"), ("thing_send", "send")];
-
-/// What the read tool of `connector` answers next, once each.
-fn pages(fake: &FakePlatform, connector: &str, answers: Vec<Value>) {
-    let key = format!("{connector}/gadget__thing_read");
-    fake.state().connectors.queued.insert(key, answers.into());
-}
-
-fn page(items: Value, next: Option<&str>) -> Value {
-    json!({ "ok": true, "content": "", "data": { "items": items, "next_cursor": next } })
-}
-
-fn thing(id: &str, text: &str) -> Value {
-    let url = format!("https://gadget.example/{id}");
-    json!({ "id": id, "text": text, "at": "2026-10-29T08:00:00Z", "url": url })
-}
-
-fn entries(desk: &Desk, instance: &str) -> Vec<Value> {
-    let query = json!({ "sources": [format!("{GADGET}/{instance}")], "limit": 100 });
-    let mut items = desk.items(query);
-    items.sort_by_key(|i| i["id"].as_str().unwrap().to_owned());
-    items
-}
-
-/// The calls of `tool` the fake has seen, in order.
-fn calls(fake: &FakePlatform, connector: &str, tool: &str) -> Vec<Seen> {
-    let path = format!("/api/public/v1/connectors/{connector}/tools/gadget__{tool}/call");
-    fake.seen_at("POST", &path)
-}
-
-fn sync_now(desk: &Desk, instance: &str) -> Value {
-    let params = json!({ "connector": GADGET, "instance": instance, "scope": connector_manage() });
-    desk.grant("desk", connector_manage());
-    desk.ok("desk", "connector.sync", params)
-}
-
 #[test]
 fn instances_are_the_account_connectors_that_offer_every_tool() {
     let fake = FakePlatform::start();
@@ -350,31 +219,6 @@ fn a_sync_spends_its_budget_and_waits_as_the_limit_asks() {
     assert_eq!(calls(&fake, &a, "thing_read").len(), 8);
 }
 
-/// cmd.list of the send command as the person.
-fn commands(desk: &Desk) -> Value {
-    desk.grant("desk", json!({ "permission": "cmd:invoke", "ids": [SEND] }));
-    let scope = json!({ "permission": "cmd:invoke", "ids": [SEND] });
-    desk.ok("desk", "cmd.list", json!({ "scope": scope }))
-}
-
-/// cmd.invoke of the send command as the person; the cmd.answered it ends with.
-fn send(desk: &Desk, instance: &str, text: &str) -> Value {
-    desk.grant("desk", json!({ "permission": "cmd:invoke", "ids": [SEND] }));
-    let scope = json!({ "permission": "cmd:invoke", "ids": [SEND] });
-    let args = json!({ "instance": instance, "text": text });
-    let started = desk.ok(
-        "desk",
-        "cmd.invoke",
-        json!({ "id": SEND, "args": args, "scope": scope }),
-    );
-    loop {
-        let (_, data) = desk.wait_for("cmd.answered");
-        if data["invocationId"] == started["invocationId"] {
-            return data;
-        }
-    }
-}
-
 #[test]
 fn a_command_runs_its_tool_with_one_idempotency_key_per_invocation() {
     let fake = FakePlatform::start();
@@ -488,7 +332,7 @@ fn removing_the_plugin_removes_its_instances_items_and_store() {
     assert!(desk.core.remove_plugin(GADGET));
     assert!(entries(&desk, &a).is_empty());
     assert!(!desk.connectors().iter().any(|c| c["id"] == GADGET));
-    let store = fs::read_to_string(desk.data.join("store.json")).unwrap_or_default();
+    let store = std::fs::read_to_string(desk.data.join("store.json")).unwrap_or_default();
     assert!(!store.contains(GADGET), "its store went with it");
     assert_eq!(commands(&desk)["commands"], json!([]));
 }
