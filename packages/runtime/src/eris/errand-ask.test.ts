@@ -145,7 +145,7 @@ describe("a line on its way into Eris, and what she does with it", () => {
     off();
   });
 
-  it("the talk line flies into Eris, and she answers once every errand is home", async () => {
+  it("the talk line sends a trail into Eris, and she answers once every errand is home", async () => {
     const order: string[] = [];
     const say = vi.fn(async (_text: string, onStep?: (step: BrainStep) => void) => {
       onStep?.(TOOL);
@@ -170,11 +170,10 @@ describe("a line on its way into Eris, and what she does with it", () => {
     input.value = "check my mail";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    // Into her body's centre (664, 109) from the input, which jsdom puts at (0, 0).
+    // The line fades where it stands, and a trail carries it into her (FT-05, ADR 0408).
     const ghost = shell.querySelector<HTMLElement>(".absorb");
-    expect(ghost?.style.transform).toContain(
-      "translate(calc(-50% + 664.0px), calc(-50% + 109.0px))",
-    );
+    expect(ghost?.style.transform).toBe("");
+    expect(shell.querySelector('.trail[data-tone="star"]')).not.toBeNull();
     await vi.waitFor(() =>
       expect(talk.eris.say).toHaveBeenCalledWith("Two new messages.", undefined),
     );

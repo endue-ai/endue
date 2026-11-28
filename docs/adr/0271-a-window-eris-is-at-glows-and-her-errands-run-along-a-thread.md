@@ -9,6 +9,8 @@ Status: amended by ADR 0275: no window glows because she only looks at it (the l
 wait until the line is in her and read, and the answer flies back in the star's colour.
 Amended 2026-11-21: the spark and its thread end on the window's border, at the point that faces
 Eris, and follow her, the window and the desk's pan on every frame while the spark is out.
+Amended by ADR 0408: the spark is the head of a trail, three followers behind it on its arc, with
+its timing and thread unchanged.
 
 Amends ADR 0089 (where the window of an errand glows, which windows do, and what the spark runs
 along) and ADR 0265 (the star's colour also lights where an agent is at work: the window's glow

@@ -21,6 +21,7 @@ import type { Runtime } from "../runtime";
 import type { WindowManagerHost } from "../wm/host";
 import type { Edit, Saved } from "../wm/types";
 import { idAt, layoutIn } from "../wm/view";
+import { handOvers } from "./hand-over";
 import type { DeskState, Store } from "./state";
 import { surfaceTitle, type Titled } from "./titles";
 
@@ -111,7 +112,9 @@ export function togglePin(ctx: Ctx, id: string): Promise<unknown[]> {
 }
 
 /** Put a surface away in the drawer under its title (the title bar's, when the caller has it). */
+/** Put window `id` in the drawer; it is seen going there (`hand-over.ts`). */
 export function stash(ctx: Ctx, id: string, name = surfaceTitle(ctx, id)): Promise<unknown[]> {
+  handOvers(ctx.store).tell({ act: "away", window: id });
   return edit(ctx, { op: "put-away", id, name, now: Math.round(ctx.wall()) });
 }
 
@@ -126,6 +129,7 @@ export function openSurface(
 
 export function raise(ctx: Ctx, itemId: string): Promise<unknown[]> {
   ctx.store.set({ popover: null });
+  handOvers(ctx.store).tell({ act: "back", item: itemId });
   return edit(ctx, { op: "bring-back", item: itemId });
 }
 
