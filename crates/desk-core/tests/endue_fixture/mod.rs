@@ -54,6 +54,11 @@ pub fn manifest() -> Value {
 
 /// A desk signed in to `fake`, its key in a fake keychain, the fixture plugin installed.
 pub fn desk(tag: &str, fake: &FakePlatform) -> Desk {
+    desk_with(tag, fake, "gadget", &manifest())
+}
+
+/// A desk signed in to `fake` with the plugin `manifest` installed as `plugins/<name>`.
+pub fn desk_with(tag: &str, fake: &FakePlatform, name: &str, manifest: &Value) -> Desk {
     let keychain = Arc::new(FakeKeychain::default());
     let url = fake.url().to_owned();
     let desk = Desk::built(tag, move |core, data| {
@@ -64,9 +69,9 @@ pub fn desk(tag: &str, fake: &FakePlatform) -> Desk {
             .with_account_connectors(Some(keychain as Arc<dyn Keychain>))
     });
     desk.grant("desk", json!({ "permission": "account:manage" }));
-    let dir = desk.home.join("plugins/gadget");
+    let dir = desk.home.join("plugins").join(name);
     fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join("plugin.json"), manifest().to_string()).unwrap();
+    fs::write(dir.join("plugin.json"), manifest.to_string()).unwrap();
     desk.core.install_plugin(&dir, true);
     desk
 }
@@ -82,23 +87,34 @@ pub fn account(data: &Path, url: &str) -> Arc<Account> {
     Account::open(options, NetIdClient)
 }
 
-/// account.connectors.enable, with publish so the send tool may be called.
+/// account.connectors.enable, with publish and delete so those tools may be called.
 pub fn turn_on(desk: &Desk) {
-    let params = json!({ "allow": ["publish"], "scope": { "permission": "account:manage" } });
+    let allow = ["publish", "delete"];
+    let params = json!({ "allow": allow, "scope": { "permission": "account:manage" } });
     desk.ok("desk", "account.connectors.enable", params);
 }
 
 /// An account connector of type gadget offering `endings`; its id.
 pub fn gadget(fake: &FakePlatform, display: &str, endings: &[(&str, &str)]) -> String {
+    connector(fake, "gadget", display, endings)
+}
+
+/// An account connector of type `kind` offering `endings` (`<kind>__<ending>`); its id.
+pub fn connector(
+    fake: &FakePlatform,
+    kind: &str,
+    display: &str,
+    endings: &[(&str, &str)],
+) -> String {
     let mut state = fake.state();
     let id = format!("conn_{}", state.connectors.connectors.len() + 1);
     let tools = endings.iter().map(|(ending, risk)| {
-        json!({ "name": format!("gadget__{ending}"), "risk": risk, "input_schema": {} })
+        json!({ "name": format!("{kind}__{ending}"), "risk": risk, "input_schema": {} })
     });
     state.connectors.connectors.push(FakeConnector {
         id: id.clone(),
-        kind: "gadget".into(),
-        name: "gadget".into(),
+        kind: kind.into(),
+        name: kind.into(),
         display_name: Some(display.into()),
         expired: false,
         tools: tools.collect(),
@@ -110,7 +126,12 @@ pub const BOTH: [(&str, &str); 2] = [("thing_read", "read"), ("thing_send", "sen
 
 /// What the read tool of `connector` answers next, once each.
 pub fn pages(fake: &FakePlatform, connector: &str, answers: Vec<Value>) {
-    let key = format!("{connector}/gadget__thing_read");
+    queue(fake, connector, "gadget__thing_read", answers);
+}
+
+/// What `tool` (its full name) of `connector` answers next, once each.
+pub fn queue(fake: &FakePlatform, connector: &str, tool: &str, answers: Vec<Value>) {
+    let key = format!("{connector}/{tool}");
     fake.state().connectors.queued.insert(key, answers.into());
 }
 

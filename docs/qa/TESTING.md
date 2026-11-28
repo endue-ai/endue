@@ -37,6 +37,12 @@ The endue connector binding follows [ADR 0409](../adr/0409-a-connector-plugin-ca
 platform: instances from the account, pages and since, skipped records, truncated and refused answers,
 budget and limits, one idempotency key per invocation, expired connectors, the key off and removal.
 `names.rs` unit tests and `crates/desk-cli/tests/validate.rs` check the names an endue block uses.
+Social posts follow [ADR 0410](../adr/0410-a-social-post-is-an-entry-with-a-social-profile.md).
+`crates/desk-core/tests/endue_social.rs` loads `plugins/social` against two fake networks and compares
+its entries, account record and followers metric with `specs/item/v0/vectors/valid/*social*.json`;
+it checks the same `raw` keys on both networks, absent counts, a skipped inbox and insights, and the
+three irreversible commands. Mail's and Chat's `mail.test.ts` and `chat.test.ts` hold a social entry
+in the index and show the same lists.
 
 | Layer | What it checks | Tool and location | When | Status |
 | --- | --- | --- | --- | --- |

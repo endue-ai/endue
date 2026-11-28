@@ -81,6 +81,47 @@ settings but the secret ones; status), `ConnectorStatus` (`connected`, `syncing`
 `message` and `reauth`, or `paused`; `lastSyncAt`) and `ConnectorSyncResult` (`changes`, the next
 `cursor`, `done`).
 
+## Social profile
+
+A post, a reply and a mention from a social network are `entry` items with this profile in `raw`;
+a direct message is a `message`, never a social entry. `endue.social` (`plugins/social`) brings them
+from the endue account's social connectors. An entry from one network and one from another differ
+only in values.
+
+| `raw` field | Meaning |
+| --- | --- |
+| `network` | The network's id (`instagram`, `reddit`, ...). Its presence marks a social entry |
+| `account` | The instance it came from |
+| `destination` | Where in the account (a page, a community); absent when the account is the only place |
+| `postKind` | `post`, `reply` or `mention` |
+| `replyTo` | The id of the entry this one answers |
+| `handle`, `authorName`, `avatar` | Who wrote it (`handle` without `@` or `u/`) |
+| `self` | Written by the account itself |
+| `media` | `[{ kind, url?, preview_url?, alt? }]`, `kind` one of `image`, `video`, `link`, `other` |
+| `truncated` | The body is cut; the network has the whole text |
+| `likes`, `replies`, `reposts`, `views` | Counts, each absent when the network does not say, never 0 |
+
+The envelope: `title` (the post's title, else the text's first line), `body` (the text), `url` (the
+post on its network), `feed` (the account's name), `publishedAt` and `updatedAt`.
+
+The account is a `record` (`schema` `https://endue.ai/schemas/desk/social-account.json`) whose
+`fields` are its profile: `network`, `account { id, handle, name?, avatar_url?, url?, followers?,
+following?, posts? }`, `destinations? [{ id, name, kind, url? }]`, `capabilities` and `limits?`
+(sentences). What it cannot do is read from `capabilities`: `text { max, required }`, `title { max,
+required } | false`, `media { image, video, required }` (each `{ max_count, max_bytes, types } |
+false`), `link`, `reply`, `delete_post`, `delete_comment`, `insights`, `inbox`, `destinations`,
+`schedule`. Its numbers are `metric` items, `series` `followers`, `reach`, `engagement`, with `unit`
+`count`, `ratio` or `seconds`. Both carry `raw.network` and `raw.account`.
+
+| Command | Args | Result |
+| --- | --- | --- |
+| `<connector>.post.publish` | `{ instance, destination?, text?, title?, media?: [{ url, alt? }], link?, replyTo? }` | `{ id, url?, status }`, `status` one of `published`, `processing`, `scheduled` |
+| `<connector>.post.reply` | `{ instance, id, text }` | `{ id, url? }` |
+| `<connector>.post.delete` | `{ instance, id }` | none |
+
+All three are `irreversible` and `agent: true`. A network that cannot do one refuses it with the
+reason `unsupported`, in its own words.
+
 ## MCP profile
 
 Any MCP server is a weak connector (tools only, for the brain); one that follows this profile is strong.

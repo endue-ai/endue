@@ -93,6 +93,23 @@ describe("the mailbox", () => {
     expect(view.navs.at(-1)?.mailboxes.find((b) => b.id === "inbox")?.count).toBe("2");
   });
 
+  it("leaves social posts and replies, which are entries, to the social plugins", async () => {
+    const reply = {
+      id: "18011",
+      source: { connector: "endue.social", instance: "conn_1" },
+      kind: "entry" as const,
+      title: "Autumn drop",
+      updatedAt: "2026-11-20T09:00:00Z",
+      url: "https://instagram.example/p/18011",
+      feed: "Studio on Instagram",
+      publishedAt: "2026-11-20T09:00:00Z",
+      raw: { network: "instagram", postKind: "reply", handle: "studio" },
+    };
+    const { view } = await mount({ items: [...sample(), reply] });
+    expect(view.shown()).toHaveLength(3);
+    expect(view.navs.at(-1)?.mailboxes.find((b) => b.id === "inbox")?.count).toBe("2");
+  });
+
   it("names the installed message connectors when no account is connected", async () => {
     const handlers = installed(
       ["acme.fastmail", "Fastmail", ["message"]],

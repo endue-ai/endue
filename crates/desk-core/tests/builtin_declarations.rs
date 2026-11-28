@@ -286,11 +286,14 @@ fn every_builtin_plugin_declares_what_it_uses() {
     for plugin in &installed {
         let ready = plugin.status == PluginStatus::Ready;
         assert!(ready, "{}: {:?}", plugin.id, plugin.error);
-        let kind = plugin.manifest.as_ref().unwrap().kind;
+        let manifest = plugin.manifest.as_ref().unwrap();
+        // A connector bound to the endue account declares nothing: the core calls the account's
+        // connectors for it, with the desk's key (ADR 0409).
+        let endue = serde_json::to_value(manifest).unwrap()["connector"]["binding"] == "endue";
         let audited = uses.iter().any(|(id, _)| *id == plugin.id);
         assert_eq!(
             audited,
-            runs_code(kind),
+            runs_code(manifest.kind) && !endue,
             "{} is in the table if it runs code",
             plugin.id
         );

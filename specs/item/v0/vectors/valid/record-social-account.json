@@ -1,0 +1,61 @@
+{
+  "target": "Item",
+  "description": "a social account: a record whose fields are its profile; what it cannot do is read from capabilities",
+  "instance": {
+    "id": "1784",
+    "source": {
+      "connector": "endue.social",
+      "instance": "conn_1"
+    },
+    "kind": "record",
+    "title": "Studio",
+    "updatedAt": "2026-11-29T00:00:00Z",
+    "deepLink": "https://instagram.example/studio",
+    "raw": {
+      "network": "instagram",
+      "account": "conn_1"
+    },
+    "schema": "https://endue.ai/schemas/desk/social-account.json",
+    "fields": {
+      "network": "instagram",
+      "account": {
+        "id": "1784",
+        "handle": "studio",
+        "name": "Studio",
+        "url": "https://instagram.example/studio",
+        "followers": 1200,
+        "following": 80,
+        "posts": 45
+      },
+      "capabilities": {
+        "text": {
+          "max": 2200,
+          "required": false
+        },
+        "title": false,
+        "media": {
+          "image": {
+            "max_count": 10,
+            "max_bytes": 8388608,
+            "types": ["image/jpeg", "image/png"]
+          },
+          "video": {
+            "max_count": 1,
+            "max_bytes": 104857600,
+            "types": ["video/mp4"]
+          },
+          "required": true
+        },
+        "link": false,
+        "reply": true,
+        "delete_post": false,
+        "delete_comment": true,
+        "insights": true,
+        "inbox": true,
+        "destinations": false,
+        "schedule": false
+      },
+      "limits": ["100 posts in 24 hours"]
+    }
+  }
+}
