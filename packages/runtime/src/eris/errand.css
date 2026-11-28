@@ -115,3 +115,24 @@
   .errand[data-leg="there"] .errand-spark,
   .errand-thread-flow { animation: none; }
 }
+
+/* The talk line's link (shell/talk-link.ts, ADR 0407): from a dot on the line's edge to a ring on
+   the window its next line is about. Nobody is at work, so it is muted, not the star, and its
+   dashes stand still. 60% at rest; whole under the pointer, open or pinned. */
+.talk-link {
+  position: absolute;
+  z-index: var(--z-float);
+  overflow: visible;
+  pointer-events: none;
+}
+.talk-link[hidden] { display: none; }
+.talk-link[data-strength="rest"] { opacity: 0.6; }
+.talk-link-line {
+  fill: none;
+  stroke: var(--desk-text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  stroke-linecap: round;
+}
+.talk-link-dot { fill: var(--desk-text-muted); }
+.talk-link-ring { fill: var(--desk-card); stroke: var(--desk-text-muted); stroke-width: 1.5; }

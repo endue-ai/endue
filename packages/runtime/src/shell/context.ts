@@ -33,6 +33,8 @@ export interface ShellCtx extends Ctx {
     /** A turn that failed: her sentence, kept with what fixes it, and her oops (FT-01). */
     fail?(text: string, reason: BrainTurnReason): void;
     setState(state: ErisState): void;
+    /** Start or end a spoken turn (FT-02), as a click on her does; the talk line's microphone. */
+    talk?(): void;
   };
 }
 

@@ -36,9 +36,9 @@ const besideStrip = (vh: number) => (vh < 734 ? 92 : 24) + 202 + 12;
  */
 export function pillSize(state: State, vw: number, vh?: number): { w: number; h: number } {
   const room = Math.min(vw - 280, vh === undefined ? Infinity : vw - 2 * besideStrip(vh));
-  if (state === "edit") return { w: Math.min(640, room), h: 72 };
-  // Folded, at rest or under the pointer, it is one size: the small orb, the hint and the key.
-  return { w: Math.min(440, room), h: 40 };
+  // Open, two rows (ADR 0407); under the pointer one row, wider; at rest the orb, hint, chip and key.
+  if (state === "edit") return { w: Math.min(640, room), h: 96 };
+  return { w: Math.min(state === "hover" ? 560 : 440, room), h: 40 };
 }
 
 /** A stored place, or null for the default (missing, malformed or out of range). */
@@ -66,8 +66,8 @@ export function placeAt(cx: number, by: number, size: { vw: number; vh: number }
   return { x: share(cx, size.vw), y: share(by, size.vh) };
 }
 
-/** Presses that do something of their own: typing, the agent button, the lists. */
-const OWN = "input, .talk-agent-button, .talk-agent-list, .composer-list";
+/** Presses that do something of their own: typing, the buttons, the chip, the lists. */
+const OWN = "input, .talk-agent-button, .talk-agent-list, .composer-list, .talk-chip, .talk-mic";
 
 /**
  * Make the pill movable. `state` reads the pill's state from its `data-state` (TalkChrome sets it);

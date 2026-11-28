@@ -30,12 +30,13 @@ test("the folded pill moves where it is dropped, stays there across a reload, an
   const pill = page.locator(".talk-pill");
   const home = await pill.boundingBox();
   if (!home) throw new Error("no pill");
-  // Folded it is 440 by 40, Eris's small orb, the hint and the key (ADR 0254); the pointer on it
-  // changes its border, not its size.
+  // Folded it is 440 by 40, Eris's small orb, the hint and the key (ADR 0254); under the pointer it
+  // widens to 560 from its centre (ADR 0407).
   expect([Math.round(home.width), Math.round(home.height)]).toEqual([440, 40]);
   await pill.hover();
   await expect(pill).toHaveAttribute("data-state", "hover");
-  expect(await pill.boundingBox()).toEqual(home);
+  await step(page, 400);
+  expect(await pill.boundingBox()).toEqual({ ...home, x: home.x - 60, width: 560 });
   // From the bottom centre to the upper right.
   await drag(page, home.x + 40, home.y + 20, 420, -560);
   await expect(pill).toHaveClass(/is-placed/);

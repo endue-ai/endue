@@ -50,9 +50,24 @@
           "items": { "$ref": "#/$defs/BrainDeskClosed" },
           "maxItems": 20
         },
-        "capabilities": { "$ref": "#/$defs/BrainDeskCapabilities" }
+        "capabilities": { "$ref": "#/$defs/BrainDeskCapabilities" },
+        "about": { "$ref": "#/$defs/BrainDeskAbout" }
       },
       "required": ["screen", "windows"],
+      "additionalProperties": false
+    },
+    "BrainDeskAbout": {
+      "description": "What the line is about (FT-04, ADR 0407): the windows the talk line names, by id, each one of this snapshot's windows. \"This\" in the line means them, and their plugins' tools come first. It grants nothing: a line about a window still asks every question it would ask without. Absent: the line is about nothing in particular.",
+      "type": "object",
+      "properties": {
+        "windows": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      },
+      "required": ["windows"],
       "additionalProperties": false
     },
     "BrainDeskDesktop": {
@@ -242,7 +257,7 @@
         "open": { "type": "boolean" },
         "views": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
           "maxItems": 16
         }
       },

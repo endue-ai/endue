@@ -54,7 +54,7 @@ test("at rest Eris is in the talk line, and comes out above it while she speaks"
   await expect(eris).toHaveAttribute("aria-hidden", "true");
   await expect(eris).toHaveAttribute("tabindex", "-1");
   expect(await sizeOf(page.locator(".talk-pill"))).toEqual({ w: 440, h: 40 });
-  expect(await sizeOf(page.locator(".talk-pill .talk-orb"))).toEqual({ w: 18, h: 18 });
+  expect(await sizeOf(page.locator(".talk-launch .talk-orb"))).toEqual({ w: 24, h: 24 });
   await expect(page.locator(".talk-pill .talk-shortcut")).toBeVisible();
 
   await page.evaluate(() => window.__shell.desk.eris.say("Quiet morning."));

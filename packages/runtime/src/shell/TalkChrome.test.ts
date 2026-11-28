@@ -13,6 +13,7 @@ import type { ShellCtx } from "./context";
 import { t } from "./copy";
 import { emptyState, Store } from "./state";
 import { mountTalkChrome } from "./TalkChrome";
+import { pillSize } from "./talk-place";
 import { Ticker } from "./ticker";
 
 const cleanups: (() => void)[] = [];
@@ -64,9 +65,18 @@ function setup() {
       followSurface: () => {},
     },
     bridge: { agents: { card: async () => ({}) } },
+    eris: { say: () => {}, setState: () => {}, talk: () => {} },
   } as unknown as ShellCtx;
   cleanups.push(mountComposer(root, ctx), mountTalkChrome(root, ctx), () => ticker.dispose());
-  return { root, store, clock, keymap, shortcuts, input: get<HTMLInputElement>(root, "input") };
+  return {
+    root,
+    store,
+    wm,
+    clock,
+    keymap,
+    shortcuts,
+    input: get<HTMLInputElement>(root, "input"),
+  };
 }
 it("previews on hover without stealing focus, opens on click, and folds on Escape", () => {
   const { root, input } = setup();
@@ -154,4 +164,56 @@ it("at rest the pill shows the small orb, the hint and the key", () => {
   launch.click();
   expect(store.get().composer.open).toBe(true);
   expect(document.activeElement).toBe(input);
+});
+it("the_pill_widens_under_the_pointer", () => {
+  const { root } = setup();
+  const pill = get(root, ".talk-pill");
+  pill.dispatchEvent(new Event("pointerenter"));
+  expect(pill.dataset.state).toBe("hover");
+  expect(pillSize("hover", 1440).w).toBeGreaterThan(pillSize("idle", 1440).w);
+  pill.dispatchEvent(new Event("pointerleave"));
+  // The keyboard on it widens it too.
+  get(root, ".talk-launch").dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+  expect(pill.dataset.state).toBe("hover");
+});
+it("the_open_line_is_two_rows", async () => {
+  const { root, store, wm } = setup();
+  await wm.edit([{ op: "adopt", id: "endue.notes", title: "Notes" }]);
+  store.set({ focused: "endue.notes" });
+  const chip = get(root, ".talk-chip");
+  // At rest too, the chip names the window in use.
+  expect(chip.hidden).toBe(false);
+  expect(get(root, ".talk-chip-pin").getAttribute("aria-label")).toMatch(/^About /);
+  get<HTMLButtonElement>(root, ".talk-launch").click();
+  const pill = get(root, ".talk-pill");
+  expect(pill.classList.contains("is-open")).toBe(true);
+  // Row 1: grip, chip, who answers. Row 2: orb, field, agents, microphone, key.
+  for (const part of [".talk-grip", ".talk-chip", ".talk-who"])
+    expect(get(root, part).hidden).toBe(false);
+  for (const part of [".talk-agent-button", ".talk-mic", ".talk-shortcut"])
+    expect(get(root, part).hidden).toBe(false);
+  expect(get(root, ".talk-launch").hidden).toBe(true);
+  // Tab order open: chip, field, agents, microphone.
+  const order = [".talk-chip-pin", ".composer-input", ".talk-agent-button", ".talk-mic"].map((q) =>
+    get(root, q),
+  );
+  for (let i = 1; i < order.length; i++) {
+    const before = order[i - 1] as HTMLElement;
+    expect(
+      before.compareDocumentPosition(order[i] as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  }
+});
+it("a press on the chip pins it, and Backspace in the empty field clears it", async () => {
+  const { root, store, wm, input } = setup();
+  await wm.edit([{ op: "adopt", id: "endue.notes", title: "Notes" }]);
+  store.set({ focused: "endue.notes" });
+  const pin = get<HTMLButtonElement>(root, ".talk-chip-pin");
+  pin.click();
+  expect(pin.getAttribute("aria-pressed")).toBe("true");
+  store.set({ focused: null });
+  expect(get(root, ".talk-chip").hidden).toBe(false);
+  get<HTMLButtonElement>(root, ".talk-launch").click();
+  input.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }));
+  expect(get(root, ".talk-chip").hidden).toBe(true);
 });

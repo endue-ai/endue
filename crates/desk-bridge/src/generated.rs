@@ -4726,6 +4726,15 @@ pub struct BrainDesk {
     pub closed: Option<Vec<BrainDeskClosed>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<BrainDeskCapabilities>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<BrainDeskAbout>,
+}
+
+/// What the line is about (FT-04, ADR 0407): the windows the talk line names, by id, each one of this snapshot's windows. "This" in the line means them, and their plugins' tools come first. It grants nothing: a line about a window still asks every question it would ask without. Absent: the line is about nothing in particular.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrainDeskAbout {
+    pub windows: Vec<String>,
 }
 
 /// One desktop (window view): its id, which windows name in `desktop`, its name for people, whether it is the one in front, and how far its canvas is panned.

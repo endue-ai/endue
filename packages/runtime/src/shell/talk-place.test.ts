@@ -17,14 +17,14 @@ import { Ticker } from "./ticker";
 const APP = { vw: 1440, vh: 900 };
 
 describe("where the pill is drawn", () => {
-  it("folded it is 440 by 40, at rest and under the pointer; open as before", () => {
+  it("at rest 440 by 40, under the pointer 560 by 40, open 640 by 96 (ADR 0407)", () => {
     expect(pillSize("idle", 1440)).toEqual({ w: 440, h: 40 });
-    expect(pillSize("hover", 1440)).toEqual({ w: 440, h: 40 });
+    expect(pillSize("hover", 1440)).toEqual({ w: 560, h: 40 });
     // No wider than the app leaves beside the bars.
     expect(pillSize("idle", 600)).toEqual({ w: 320, h: 40 });
     expect(pillSize("hover", 600)).toEqual({ w: 320, h: 40 });
-    expect(pillSize("edit", 1440)).toEqual({ w: 640, h: 72 });
-    expect(pillSize("edit", 800)).toEqual({ w: 520, h: 72 });
+    expect(pillSize("edit", 1440)).toEqual({ w: 640, h: 96 });
+    expect(pillSize("edit", 800)).toEqual({ w: 520, h: 96 });
   });
 
   it("folded, it keeps 12 clear of the strip under the map on both sides", () => {
@@ -36,7 +36,7 @@ describe("where the pill is drawn", () => {
     // 734 high or more, it is 24 from the right: 1024 − 2 × 238 = 548, so 440 fits.
     expect(pillSize("idle", 1024, 800)).toEqual({ w: 440, h: 40 });
     // Open, as bottom.css has drawn it since #296.
-    expect(pillSize("edit", 1024, 500)).toEqual({ w: 412, h: 72 });
+    expect(pillSize("edit", 1024, 500)).toEqual({ w: 412, h: 96 });
     expect(pillBox({ x: 0.5, y: 1 }, "idle", { vw: 1024, vh: 500 })).toMatchObject({
       left: 306,
       w: 412,
@@ -53,16 +53,16 @@ describe("where the pill is drawn", () => {
     });
     // Near an edge it stays 8 px inside the app at its new size; open, it grows leftwards.
     expect(pillBox({ x: 0.99, y: 0.95 }, "idle", APP).left).toBe(1440 - 440 - 8);
-    expect(pillBox({ x: 0.99, y: 0.95 }, "hover", APP).left).toBe(1440 - 440 - 8);
+    expect(pillBox({ x: 0.99, y: 0.95 }, "hover", APP).left).toBe(1440 - 560 - 8);
     expect(pillBox({ x: 0.01, y: 0.95 }, "idle", APP).left).toBe(8);
     expect(pillBox({ x: 0.5, y: 0 }, "idle", APP).bottom).toBe(900 - 40 - 8);
     expect(pillBox({ x: 0.99, y: 0.95 }, "edit", APP)).toMatchObject({
       left: 1440 - 640 - 8,
-      h: 72,
+      h: 96,
     });
     // At the very top it stays its height plus the margin below the app's top, its lists below it.
     expect(pillBox({ x: 0.5, y: 0 }, "edit", APP)).toMatchObject({
-      bottom: 900 - 72 - 8,
+      bottom: 900 - 96 - 8,
       high: true,
     });
     expect(pillBox({ x: 0.5, y: 1 }, "idle", APP).bottom).toBe(8);

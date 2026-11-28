@@ -187,5 +187,15 @@
   "shell.bar.newAgentLabel": "새 에이전트 만들기",
   "shell.bar.newSpace": "새 스페이스",
   "shell.bar.newSpaceLabel": "새 스페이스 만들기",
-  "shell.talkPlaceholder": "Eris에게 계속 말해 보세요"
+  "shell.talkPlaceholder": "Eris에게 계속 말해 보세요",
+  "shell.talkAbout": "대상: {x}",
+  "shell.talkTo": "받는 이: {x}",
+  "shell.talkToLaunch": "{x}에게 말하기",
+  "shell.talkWindows": "창 {n}개",
+  "shell.talkOnDesktop": "데스크톱 {n}",
+  "shell.talkPutAway": "서랍에 있음",
+  "shell.talkClear": "대신 Eris에게 말하기",
+  "shell.talkMic": "Eris에게 말로 하기",
+  "shell.talkAnswers": "답하는 곳: {x}",
+  "shell.talkAgentLater": "{x}의 창이 대화를 받게 되면 말하는 줄에서 보낼 수 있어요. 지금은 {x}의 창에서 써 주세요."
 }
