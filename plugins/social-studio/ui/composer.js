@@ -80,12 +80,15 @@ export function mountComposer(doc, box, w, act) {
   function draftList(/** @type {Writing} */ m) {
     fresh.textContent = w.t("newDraft");
     list.setAttribute("aria-label", w.t("views.drafts"));
-    const rows = m.drafts.map((d) => ({
-      id: d.id,
-      line: firstLines(d.text || d.title, 80) || w.t("untitled"),
-      when: d.updated ? w.when(d.updated) : "",
-      published: Object.values(d.outcome).filter((o) => o.state === "published").length,
-    }));
+    // The open draft as typed, the others as last listed.
+    const rows = m.drafts
+      .map((listed) => (listed.id === m.current?.id ? m.current : listed))
+      .map((d) => ({
+        id: d.id,
+        line: firstLines(d.text || d.title, 80) || w.t("untitled"),
+        when: d.updated ? w.when(d.updated) : "",
+        published: Object.values(d.outcome).filter((o) => o.state === "published").length,
+      }));
     if (once("drafts", [rows, m.current?.id, w.t("untitled")]))
       drafts.replaceChildren(
         ...rows.map((r) => {

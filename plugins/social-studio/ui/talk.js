@@ -3,6 +3,7 @@
 // shown or hidden, so a reply being written keeps its caret while the list changes around it.
 import { firstLines } from "./model.js";
 import { el } from "./rows.js";
+import { wordsOf } from "./writer.js";
 
 /**
  * @typedef {import("./model.js").Post} Post
@@ -13,8 +14,6 @@ import { el } from "./rows.js";
  *   deletePost(post: Post): Promise<unknown>,
  * }} Deps
  */
-
-const messageOf = (/** @type {unknown} */ e) => (e instanceof Error ? e.message : String(e));
 
 /** @param {Document} doc @param {Deps} deps */
 export function mountTalk(doc, deps) {
@@ -71,7 +70,7 @@ export function mountTalk(doc, deps) {
       said = t("talk.replied", { network: p.network.name });
       mode = "idle";
     } catch (e) {
-      said = t("talk.failed", { why: messageOf(e) });
+      said = t("talk.failed", { why: wordsOf(e) });
       mode = "replying";
     }
     draw(post);
@@ -85,7 +84,7 @@ export function mountTalk(doc, deps) {
       await deps.deletePost(p);
       said = t("talk.deleted", { network: p.network.name });
     } catch (e) {
-      said = t("talk.failed", { why: messageOf(e) });
+      said = t("talk.failed", { why: wordsOf(e) });
     }
     mode = "idle";
     draw(post);

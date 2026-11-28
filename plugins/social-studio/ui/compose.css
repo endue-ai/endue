@@ -43,6 +43,7 @@
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
+  white-space: normal;
   text-align: start;
 }
 .draft[aria-current="true"] {
@@ -98,9 +99,12 @@
   font-size: var(--desk-text-sm);
   overflow-wrap: anywhere;
 }
-.medium-alt {
+.medium-name {
   flex: 1;
-  min-width: 10em;
+}
+.medium-alt {
+  flex-basis: 100%;
+  order: 3;
 }
 .compose-accounts {
   margin: 0;
@@ -266,11 +270,24 @@
   display: none;
 }
 @media (max-width: 900px) {
+  /* The editor and the previews in one column that scrolls as one. */
   #compose {
     grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+    grid-template-rows: max-content max-content;
+    align-content: start;
+    overflow: auto;
+  }
+  .compose-drafts {
+    grid-row: 1 / span 2;
+  }
+  .compose-editor,
+  .compose-none,
+  .compose-previews {
+    overflow: visible;
   }
   .compose-previews {
     grid-column: 2;
+    padding-block-start: 0;
     border-inline-start: 0;
   }
 }
@@ -284,6 +301,7 @@
   .compose-editor,
   .compose-none,
   .compose-previews {
+    flex: none;
     overflow: visible;
     border: 0;
   }

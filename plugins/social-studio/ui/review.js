@@ -83,7 +83,9 @@ export function drawReview(doc, overlay, w, m, act) {
     w.t("review.final"),
   ]);
   if (overlay.dataset.shows === shows) return;
-  const opening = overlay.hidden;
+  // Opening, or drawn again with the focus in it: the focus goes to the button it is for.
+  const focus =
+    overlay.hidden || overlay.contains(doc.activeElement) || doc.activeElement === doc.body;
   overlay.dataset.shows = shows;
   overlay.hidden = false;
   const box = el(doc, "div", "review");
@@ -137,5 +139,5 @@ export function drawReview(doc, overlay, w, m, act) {
     }
   });
   overlay.replaceChildren(box);
-  if (opening) publish.focus();
+  if (focus) publish.focus();
 }

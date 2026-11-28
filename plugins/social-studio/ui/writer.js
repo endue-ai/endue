@@ -25,6 +25,11 @@ const LOST = ["timeout", "io_error", "unavailable", "cancelled"];
 const codeOf = (/** @type {unknown} */ e) =>
   String(/** @type {{ code?: unknown }} */ (e)?.code ?? "");
 const messageOf = (/** @type {unknown} */ e) => (e instanceof Error ? e.message : String(e));
+/** What went wrong in the network's own words: a failed command's message without its name. */
+export const wordsOf = (/** @type {unknown} */ e) =>
+  e instanceof Error && e.name === "CommandFailed"
+    ? e.message.replace(/^[^:]+: [a-z_]+: /, "")
+    : messageOf(e);
 const https = (/** @type {unknown} */ v) =>
   typeof v === "string" && v.startsWith("https://") ? v : undefined;
 
@@ -159,7 +164,7 @@ export function createWriter(ctx, deps) {
           ...(https(answer?.url) ? { url: https(answer.url) } : {}),
         };
       } catch (e) {
-        outcome = { state: LOST.includes(codeOf(e)) ? "unknown" : "failed", why: messageOf(e) };
+        outcome = { state: LOST.includes(codeOf(e)) ? "unknown" : "failed", why: wordsOf(e) };
       }
       draft.outcome[key] = outcome;
       await store.save(draft).catch(fail);
@@ -263,7 +268,8 @@ export function createWriter(ctx, deps) {
         await flush();
         await publishTo(draft, keys);
       } catch (e) {
-        fail(e);
+        // Nothing went out: the key may not publish, or the draft could not be saved first.
+        w.error = wordsOf(e);
       } finally {
         w.busy = false;
         await actions.refresh();
