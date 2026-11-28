@@ -126,6 +126,11 @@ pub fn boot(input: BootInput) -> Booted {
     if let Ok(input) = desk_sys::audio::os() {
         core = core.with_audio(Arc::from(input));
     }
+    // What turns a capture into words (ADR 0406): the OS's on-device recognition on macOS, none
+    // elsewhere yet. Nothing asks the OS until a capture with `transcribe` starts.
+    if let Some(speech) = desk_sys::speech::os() {
+        core = core.with_speech(Arc::from(speech));
+    }
     // Before plugins install, so a setup pulled from another desk applies from this start.
     sync_init(&core);
     // The person's own themes (ADR 0058) and what the market installed (ADR 0107).

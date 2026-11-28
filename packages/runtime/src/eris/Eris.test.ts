@@ -64,7 +64,11 @@ function shell(mic = false) {
     reduced: () => true,
     tr: (key: string) => key,
     bridge: {
-      audio: { levels: () => ({ user: [], eris: [] }) },
+      audio: {
+        levels: () => ({ user: [], eris: [] }),
+        // The core's microphone, which hears words (ADR 0406).
+        capture: async () => ({ captureId: "c1", stop: async () => {} }),
+      },
       perm: { request: async () => mic },
     },
     runtime: {

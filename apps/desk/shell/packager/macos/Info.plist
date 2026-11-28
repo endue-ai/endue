@@ -13,7 +13,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>endue and the plugins you allow can hear the microphone, such as Eris when you click her and talk.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Eris turns what you say to her into words, so she can answer it.</string>
+	<string>endue turns what you say into words on this Mac, for Eris and the plugins you allow.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>endue shows your reminders in the views you open. They stay on this Mac.</string>
 	<key>NSRemindersUsageDescription</key>

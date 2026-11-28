@@ -4487,7 +4487,7 @@ pub struct AgentsChangedEvent {
     pub data: AgentsChangedData,
 }
 
-/// Start capturing the microphone. With wakeWord, audio.wake events arrive when the wake word is heard.
+/// Start capturing the microphone. With transcribe, audio.heard events carry the words heard on this computer: unsupported when no on-device recogniser serves the language, forbidden when the OS refuses speech recognition; nothing opens for either. With wakeWord, audio.wake events arrive when the wake word is heard.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AudioCaptureStartRequest {
@@ -4510,7 +4510,25 @@ pub struct AudioCaptureStartParams {
         skip_serializing_if = "Option::is_none"
     )]
     pub sample_rate: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcribe: Option<AudioTranscribe>,
     pub scope: AudioCapturePermission,
+}
+
+/// Turn the capture into words on this computer, in the desk's language. No audio leaves the computer for recognition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioTranscribe {
+    pub lang: AudioLang,
+}
+
+/// A language a capture is transcribed in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AudioLang {
+    #[serde(rename = "ko")]
+    Ko,
+    #[serde(rename = "en")]
+    En,
 }
 
 /// Result of audio.capture.start.
@@ -4569,6 +4587,26 @@ pub struct AudioFrameData {
     pub rms_db: f64,
     #[serde(rename = "peakDb")]
     pub peak_db: f64,
+}
+
+/// The words heard so far in a capture that transcribes, for the caller that started it, then the final words once, before audio.ended.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioHeardEvent {
+    pub event: AudioHeardEventEvent,
+    pub data: AudioHeardData,
+}
+
+/// Payload of audio.heard.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioHeardData {
+    #[serde(rename = "captureId")]
+    pub capture_id: String,
+    /// Every word heard since the capture started; empty when none were.
+    pub text: String,
+    /// True once, for the final words, after the capture stopped.
+    pub r#final: bool,
 }
 
 /// A capture ended; no audio.frame for it follows. Comes once per capture.
@@ -5473,6 +5511,7 @@ pub enum BridgeEvent {
     DbParameter(DbParameterEvent),
     DbClosed(DbClosedEvent),
     AudioFrame(AudioFrameEvent),
+    AudioHeard(AudioHeardEvent),
     AudioEnded(AudioEndedEvent),
     AudioCapturing(AudioCapturingEvent),
     AudioWake(AudioWakeEvent),
@@ -13803,6 +13842,14 @@ pub enum AudioFrameEventEvent {
     #[default]
     #[serde(rename = "audio.frame")]
     AudioFrame,
+}
+
+/// The `event` of [`AudioHeardEvent`]: always `"audio.heard"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AudioHeardEventEvent {
+    #[default]
+    #[serde(rename = "audio.heard")]
+    AudioHeard,
 }
 
 /// The `event` of [`AudioEndedEvent`]: always `"audio.ended"`.

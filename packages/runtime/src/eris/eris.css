@@ -158,6 +158,15 @@
   margin-top: var(--space-3);
 }
 .eris-said-fixes[hidden] { display: none; }
+/* The person's words she heard so far (FT-02), muted, above her answer. */
+.eris-said-heard {
+  margin: 0 0 var(--space-2);
+  padding-right: var(--space-6);
+  color: var(--desk-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.eris-said-heard[hidden] { display: none; }
 .eris-said-close { position: absolute; top: var(--space-1); right: var(--space-1); }
 
 /* Soul text: one line at a time in one grid cell, so a line leaving and the next arriving overlap

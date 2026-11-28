@@ -8,8 +8,8 @@
   "eris.talk.summon": "Eris에게 말하기",
   "eris.status.warning": "경고",
   "eris.status.critical": "크리티컬",
-  "eris.talk.heard": "잘 들었어요. 지금은 샘플 답이에요.",
   "eris.talk.nothing": "잘 안 들렸어요. 다시 말해 주세요.",
-  "eris.talk.sample": "샘플 목소리를 들었어요. 이렇게 말해요.",
-  "eris.talk.refused": "마이크 없이는 들을 수 없어요. 대신 입력해 주세요."
+  "eris.talk.refused": "마이크 없이는 들을 수 없어요. 대신 입력해 주세요.",
+  "eris.talk.unheard": "이 컴퓨터에서는 아직 말을 글로 바꿀 수 없어요. 대신 입력해 주세요.",
+  "eris.talk.failed": "답을 받아 오지 못했어요. 잠시 뒤에 다시 해 주세요."
 }

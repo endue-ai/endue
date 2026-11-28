@@ -185,17 +185,29 @@ function microphone(core: BridgeClient): Pick<Audio, "capture" | "captures" | "s
     for (const listener of listeners) listener(inForce);
   });
   return {
-    async capture(onFrame, onEnded) {
+    async capture(onFrame, onEnded, options) {
       let captureId: string;
+      const transcribe = options?.transcribe;
       try {
-        ({ captureId } = await core.call("audio.capture.start", { scope: MIC }));
-      } catch {
+        ({ captureId } = await core.call("audio.capture.start", {
+          scope: MIC,
+          ...(transcribe ? { transcribe } : {}),
+        }));
+      } catch (e) {
+        // With words asked for, the core says why none can be had; no microphone opened (ADR 0406).
+        const code = (e as { code?: string }).code;
+        if (transcribe && code === "unsupported") return "unheard";
+        if (transcribe && code === "forbidden") return "speech-refused";
         return null;
       }
       const off = core.onEvent((event) => {
         if (event.event === "audio.ended" && event.data.captureId === captureId) {
           off();
           onEnded?.();
+          return;
+        }
+        if (event.event === "audio.heard" && event.data.captureId === captureId) {
+          options?.onHeard?.(event.data.text, event.data.final);
           return;
         }
         if (event.event !== "audio.frame" || event.data.captureId !== captureId) return;
