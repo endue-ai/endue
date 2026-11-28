@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/_desk/tokens.css" />
     <link rel="stylesheet" href="/_desk/base.css" />
     <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./compose.css" />
     <script type="importmap">
       { "imports": { "@endue-ai/plugin-sdk": "/_desk/plugin-sdk.js", "@endue-ai/ui": "/_desk/ui.js" } }
     </script>
@@ -31,12 +32,14 @@
           <div id="numbers" hidden></div>
           <section id="detail" hidden></section>
         </div>
+        <section id="compose" hidden></section>
         <div id="empty" hidden>
           <p id="empty-text"></p>
           <button id="connect" class="desk-btn desk-btn-primary" type="button" hidden></button>
         </div>
       </main>
     </div>
+    <div id="review" class="review-overlay" hidden></div>
     <script type="module" src="./main.js"></script>
   </body>
 </html>

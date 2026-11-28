@@ -159,6 +159,19 @@ pub struct ToolCall {
     pub error: Option<ToolError>,
 }
 
+/// What an upload answered (`POST /api/public/v1/connectors/media`): the id a tool's `media` takes
+/// for a day, and what endue AI kept.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MediaUploaded {
+    pub media_id: String,
+    pub mime: String,
+    pub size: u64,
+    #[serde(default)]
+    pub sha256: Option<String>,
+    #[serde(default)]
+    pub expires_at: Option<Value>,
+}
+
 /// A page of the connector API: `{ items, total }`.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Items<T> {

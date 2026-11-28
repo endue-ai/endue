@@ -70,8 +70,15 @@ core runs it with the desk's own key (ADR 0407); nothing of the plugin's runs, a
   off, instances are `paused` with a sentence that says where to turn it on.
 - The core registers the commands of `actions` while the plugin is on and answers them: the command's
   `instance` argument names the instance. Each invocation carries one `Idempotency-Key`, the same on the
-  one retry after a lost answer. A tool whose risk is higher than its action's is refused uncalled. A
-  `{ file }` argument is refused until endue AI's connector API takes an upload.
+  one retry after a lost answer. A tool whose risk is higher than its action's is refused uncalled.
+- A `{ file }` argument holds a path, or objects with `path` (`{ path, alt?, keepLocation? }`). The
+  caller must hold `fs:read` for each path. Each file is a JPEG, PNG, WebP or GIF up to 10 MiB or an MP4
+  or QuickTime up to 50 MiB; a picture loses its EXIF GPS and XMP unless `keepLocation` is true and the
+  caller is not an agent. It goes up as raw bytes with the desk's key to `POST
+  /api/public/v1/connectors/media` (`Content-Type`, `Content-Length`; 201 answers `{ media_id, mime,
+  size, sha256, expires_at }`, kept 24 hours; 411, 413, 415, 409 over the account's stored media, 429)
+  and `path` becomes that `media_id`; an object without `path` goes as it is. The same bytes go up once
+  while their `media_id` has an hour left. An upload is not idempotent; the call keeps its key.
 - `desk_bridge::manifest_problems` checks the names: each request's and action's `tool` is in `tools`,
   each request's `map` in `maps`, each map's `kind` in `resources` with `id` and `title`, each action a
   command in `contributes.commands`, and each action on a `send` or `destructive` tool `irreversible`.
@@ -115,7 +122,7 @@ false`), `link`, `reply`, `delete_post`, `delete_comment`, `insights`, `inbox`, 
 
 | Command | Args | Result |
 | --- | --- | --- |
-| `<connector>.post.publish` | `{ instance, destination?, text?, title?, media?: [{ url, alt? }], link?, replyTo? }` | `{ id, url?, status }`, `status` one of `published`, `processing`, `scheduled` |
+| `<connector>.post.publish` | `{ instance, destination?, text?, title?, media?: [{ url, alt? } \| { path, alt?, keepLocation? }], link?, replyTo? }` | `{ id, url?, status }`, `status` one of `published`, `processing`, `scheduled` |
 | `<connector>.post.reply` | `{ instance, id, text }` | `{ id, url? }` |
 | `<connector>.post.delete` | `{ instance, id }` | none |
 

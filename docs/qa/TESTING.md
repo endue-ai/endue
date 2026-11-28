@@ -46,8 +46,16 @@ in the index and show the same lists. Social Studio (`plugins/social-studio`) mo
 host over jsdom with those vectors: `studio.test.ts` covers the Feed, Replies (seen state across a
 remount) and Numbers, the accounts' status, text that is never HTML, https-only links and a windowed
 list of 5,000 posts; `agent.test.ts` covers the read-only agent commands and `show`.
+`compose.test.ts` covers drafts as files across a remount, each account's preview against its
+`capabilities`, the review (nothing invoked before its button), one account failing while the
+others publish, a lost answer, the key's permission to publish, writing help, and Reply and Delete;
+`agent-write.test.ts` covers `draft`, `drafts` and `publish` refusing a draft that changed.
+`endue_social_media.rs` uploads a picture from a file once for two accounts without its location,
+and says an answer lost twice may have gone through.
 `packages/runtime/e2e/social-studio.spec.ts` (`just test-e2e e2e/social-studio.spec.ts`) opens the
-window at 360 and 900 px in both schemes and writes a screenshot of each view.
+window at 360 and 900 px in both schemes and writes a screenshot of each view;
+`social-studio-compose.spec.ts` writes, reviews and publishes a draft there and screenshots the
+composer, the review and the outcome.
 
 | Layer | What it checks | Tool and location | When | Status |
 | --- | --- | --- | --- | --- |

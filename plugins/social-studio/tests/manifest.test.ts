@@ -33,13 +33,31 @@ function idsRead(): string[] {
     .join("\n");
   const plain = [...code.matchAll(/\bt\("([a-zA-Z.]+)"/g)].map((m) => m[1] ?? "");
   const built = {
-    "views.": ["feed", "replies", "numbers"],
+    "views.": ["feed", "replies", "numbers", "drafts"],
     "state.": ["connected", "syncing", "stale", "error", "paused"],
     "count.": ["likes", "replies", "reposts", "views"],
     "media.": ["image", "video", "link", "other"],
     "empty.": ["feed", "replies", "numbers"],
     "series.": ["followers", "reach", "engagement"],
-    "grant.": ["read", "accounts"],
+    "grant.": ["read", "accounts", "drafts", "write", "pictures", "account", "help"],
+    // fit.js names a draft's problems by id; composer.js says them.
+    "fit.": [
+      "reconnect",
+      "empty",
+      "tooLong",
+      "textRequired",
+      "titleRequired",
+      "titleTooLong",
+      "mediaRequired",
+      "no.image",
+      "no.video",
+      "count.image",
+      "count.video",
+      "type",
+      "size",
+      "unknown",
+    ],
+    "mediaCount.": ["image", "video"],
   };
   return [
     ...new Set([...plain, ...Object.entries(built).flatMap(([p, ids]) => ids.map((i) => p + i))]),
@@ -47,7 +65,7 @@ function idsRead(): string[] {
 }
 
 describe("plugin.json", () => {
-  it("is a UI plugin that reads social items, opens Connections and https links", () => {
+  it("is a UI plugin that reads social items and writes drafts it publishes through endue", () => {
     const validate = manifestValidator();
     const studio = manifest();
     expect(validate(studio), JSON.stringify(validate.errors)).toBe(true);
@@ -61,24 +79,48 @@ describe("plugin.json", () => {
     expect(studio.permissions).toEqual([
       { permission: "data:read", kinds: ["entry", "metric", "record"] },
       // The empty state's Open Connections.
-      { permission: "cmd:invoke", ids: ["desk.connectors.open"] },
+      {
+        permission: "cmd:invoke",
+        ids: ["desk.connectors.open", "*.post.publish", "*.post.reply", "*.post.delete"],
+      },
       // A post opens on its network.
       { permission: "shell:open", schemes: ["https"] },
       // connector.list: the accounts and their state.
       { permission: "connector:manage" },
+      // Drafts are files in Documents, Social Studio; a picture a person picks is read from where
+      // it is (dialog.open grants only the files chosen).
+      { permission: "fs:read", paths: ["${home}/Documents/Social Studio/**", "/**"] },
+      { permission: "fs:write", paths: ["${home}/Documents/Social Studio/**"] },
+      // Writing help: shorten or adapt a draft.
+      { permission: "brain:ask" },
+      // account.connectors.*: whether the key may publish, and asking the account to let it.
+      { permission: "account:manage" },
     ]);
+    expect(studio.permissions?.[1]).toEqual({
+      permission: "cmd:invoke",
+      ids: ["desk.connectors.open", "*.post.publish", "*.post.reply", "*.post.delete"],
+    });
+    expect(studio.contributes?.settings?.["endue.social-studio.keep-location"]).toMatchObject({
+      kind: "boolean",
+      default: false,
+    });
   });
 
-  it("lets an agent read without changing anything, and show a post", () => {
+  it("lets an agent read and draft freely, and publish, reply and delete only once approved", () => {
     const commands = manifest().contributes?.commands ?? [];
-    expect(commands.map((c) => c.id)).toEqual(
-      ["open", "view", "accounts", "posts", "replies", "numbers", "show"].map(
-        (id) => `endue.social-studio.${id}`,
-      ),
-    );
+    const ids = (list: typeof commands) =>
+      list.map((c) => c.id.replace("endue.social-studio.", ""));
+    expect(ids(commands)).toEqual([
+      ...["open", "view", "accounts", "posts", "replies", "numbers", "show"],
+      ...["draft", "drafts", "current", "publish", "reply", "delete"],
+    ]);
     const agent = commands.filter((c) => c.agent);
-    expect(agent.filter((c) => !c.readOnly).map((c) => c.id)).toEqual(["endue.social-studio.show"]);
-    expect(commands.some((c) => c.irreversible)).toBe(false);
+    expect(ids(agent.filter((c) => c.readOnly))).toEqual([
+      ...["accounts", "posts", "replies", "numbers", "drafts", "current"],
+    ]);
+    expect(ids(agent.filter((c) => !c.readOnly && !c.irreversible))).toEqual(["show", "draft"]);
+    expect(ids(commands.filter((c) => c.irreversible))).toEqual(["publish", "reply", "delete"]);
+    expect(commands.every((c) => !c.irreversible || c.agent)).toBe(true);
   });
 
   it("has every word it reads in English and Korean", () => {

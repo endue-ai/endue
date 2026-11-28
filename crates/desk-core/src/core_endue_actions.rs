@@ -112,7 +112,7 @@ impl Core {
             let risk = found.risks.get(&action.tool).copied();
             (found.connector.clone(), tool, risk)
         };
-        let arguments = action_arguments(action, args)?;
+        let mut arguments = action_arguments(action, args)?;
         let (connectors, _) = self
             .endue_connectors()
             .ok_or_else(|| crate::core_endue::off(instance))?;
@@ -122,10 +122,16 @@ impl Core {
                 data.id
             ));
         }
+        // Files go up only once the tool may be called: a refused call uploads nothing.
+        self.endue_files(&data.caller, action, &mut arguments, &connectors)?;
         let key = format!("desk-{}", self.endue_invocation_key(&data.invocation_id));
         let mut answered = connectors.call(&connector, &tool, arguments.clone(), &key);
         if answered.as_ref().is_err_and(lost) {
             answered = connectors.call(&connector, &tool, arguments, &key);
+            // Lost twice: it may have been done, and the person must look before asking again.
+            if answered.as_ref().is_err_and(lost) {
+                return Err(NO_ANSWER.to_owned());
+            }
         }
         let answered = answered.map_err(|e| self.endue_call_failed(e))?.value;
         if !answered.ok {
@@ -157,13 +163,17 @@ impl Core {
         }
     }
 
-    fn endue_call_failed(&self, e: PlatformError) -> String {
+    pub(crate) fn endue_call_failed(&self, e: PlatformError) -> String {
         if e.kind == ErrorKind::SignedOut {
             return self.endue_key_refused();
         }
         e.message
     }
 }
+
+/// What a call says when its answer was lost twice: done or not, nobody knows.
+pub(crate) const NO_ANSWER: &str =
+    "No answer came back, so it may have gone through: look before trying again";
 
 /// Run and answer one invocation, as its provider would.
 fn answer(core: &Arc<Core>, provider: &str, data: &CmdInvokedData) {

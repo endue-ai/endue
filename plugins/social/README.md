@@ -25,7 +25,8 @@ An entry carries the social profile in `raw` (`network`, `account`, `destination
 | `endue.social.post.delete` `{ instance, id }` | `social_delete`, `delete_post` |
 
 All three are `irreversible`, so an agent's call waits for the person (ADR 0078), and each carries
-one `Idempotency-Key`. Media goes by public https URL; files cannot be sent yet.
+one `Idempotency-Key`. Media is a file on this computer (`{ path, alt? }`), uploaded through the endue account
+when the post goes and named by its `media_id`, or a public https URL (`{ url, alt? }`).
 
 It asks for no permission: the core makes every call. With the account's connectors turned off in
 Settings, Connections, the instances are `paused` and say so.

@@ -47,6 +47,10 @@ pub struct FakeConnectors {
     pub limited: Option<u64>,
     /// The next connector API answer is this status, as when an answer is lost on the way.
     pub failing: Option<u16>,
+    /// The next this many connector API answers are 503, as when every answer is lost.
+    pub lost: u32,
+    /// The files uploaded for publishing, in order.
+    pub uploads: Vec<super::media::FakeUpload>,
 }
 
 impl FakeConnectors {
@@ -191,6 +195,10 @@ pub(super) fn api(state: &mut State, seen: &Seen) -> Option<Answer> {
     if let Some(status) = state.connectors.failing.take() {
         return Some(error(status, "UNAVAILABLE", "Try again"));
     }
+    if state.connectors.lost > 0 {
+        state.connectors.lost -= 1;
+        return Some(error(503, "UNAVAILABLE", "Try again"));
+    }
     let may = |risk: &str| {
         let scope = match risk {
             "destructive" => "connectors:delete",
@@ -233,6 +241,8 @@ pub(super) fn api(state: &mut State, seen: &Seen) -> Option<Answer> {
             None => error(404, "CONNECTOR_NOT_FOUND", "Connector not found"),
         },
         ("POST", [id, "tools", tool, "call"]) => call(state, seen, id, tool, &may),
+        ("POST", ["media"]) if may("send") => super::media::upload(state, seen),
+        ("POST", ["media"]) => error(403, "FORBIDDEN", "This key may not upload media"),
         _ => error(404, "NOT_FOUND", "No such route"),
     };
     Some(answer)
@@ -280,7 +290,8 @@ fn call(
         .queued
         .get_mut(&key)
         .and_then(VecDeque::pop_front);
-    let mut answer = queued
+    let mut answer = super::media::unknown_media(state, &seen.body["arguments"])
+        .or(queued)
         .or_else(|| state.connectors.answers.get(&key).cloned())
         .unwrap_or_else(|| json!({ "ok": true, "content": "{}", "data": {} }));
     answer["tool"] = json!(tool);
