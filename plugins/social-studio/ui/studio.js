@@ -24,7 +24,7 @@ import {
  * @typedef {{
  *   view: string, filter: { network: string | null, account: string | null, text: string },
  *   selected: string | null, items: Map<string, Item>, instances: import("./model.js").Instance[],
- *   seen: Set<string>, state: "reading" | "ready" | "failed" | "denied",
+ *   seen: Set<string>, sorted: Set<string>, state: "reading" | "ready" | "failed" | "denied",
  *   why: string,
  * }} State
  */
@@ -60,6 +60,9 @@ export function createStudio(ctx, page, words) {
     items: new Map(),
     instances: [],
     seen: new Set(),
+    // The seen replies when Replies last opened: the list keeps that order, so a reply the person
+    // reads stays where it is until they come back to the view.
+    sorted: new Set(),
     state: "reading",
     why: "",
   };
@@ -87,6 +90,7 @@ export function createStudio(ctx, page, words) {
       if (!VIEWS.includes(view)) throw new Error(`No view ${view}: feed, replies or numbers.`);
       s.view = view;
       s.selected = null;
+      s.sorted = new Set(s.seen);
       draw();
     },
     /** @param {Partial<typeof s.filter>} next */
@@ -184,6 +188,7 @@ export function createStudio(ctx, page, words) {
       if (!post)
         throw new Error("No such post in the index: name it { source, id } as posts answers.");
       s.view = post.self ? "feed" : "replies";
+      s.sorted = new Set(s.seen);
       s.filter = { network: null, account: null, text: "" };
       actions.select(key);
       ctx.surface.show();
@@ -200,6 +205,7 @@ export function createStudio(ctx, page, words) {
     const seen = await ctx.bridge.call("store.get", { key: "seen" }).catch(() => ({}));
     const kept = /** @type {{ value?: unknown }} */ (seen).value;
     if (Array.isArray(kept)) for (const key of kept) if (typeof key === "string") s.seen.add(key);
+    s.sorted = new Set(s.seen);
     try {
       await granted(load, READ, "read");
       await ctx.data.subscribe(QUERY, (changes) => {
@@ -227,7 +233,10 @@ export function modelOf(/** @type {State} */ s, /** @type {Post[]} */ posts) {
   const groups = accountsOf(s.instances, items);
   const filter = s.filter;
   const feed = s.view === "feed" ? feedOf(posts, filter) : [];
-  const replies = s.view === "replies" ? repliesOf(posts, s.seen, filter) : [];
+  const replies =
+    s.view === "replies"
+      ? repliesOf(posts, s.sorted, filter).map((r) => ({ ...r, seen: s.seen.has(r.post.key) }))
+      : [];
   const accounts = groups
     .flatMap((g) => g.accounts)
     .filter(

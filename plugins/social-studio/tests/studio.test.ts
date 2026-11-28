@@ -85,6 +85,16 @@ describe("Social Studio", () => {
     expect(tab(again, "Replies")?.querySelector(".badge")?.textContent).toBe("1");
   });
 
+  it("a reply the person reads stays where it is until Replies opens again", async () => {
+    const m = await mount();
+    click(tab(m, "Replies"));
+    click(m.$$("#list .row")[0]);
+    expect(m.rows()).toEqual(["A fan: u/studio_team made this", "A fan: Love the green one"]);
+    click(tab(m, "Feed"));
+    click(tab(m, "Replies"));
+    expect(m.rows()).toEqual(["A fan: Love the green one", "A fan: u/studio_team made this"]);
+  });
+
   it("numbers show each account's series and its best posts", async () => {
     const m = await mount({
       items: [
