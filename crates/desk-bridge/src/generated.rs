@@ -3941,6 +3941,115 @@ pub type AccountSettingsGetResult = AccountSettings;
 /// Result of account.settings.update: the settings now.
 pub type AccountSettingsUpdateResult = AccountSettings;
 
+/// What the desk's own key may do with the account's connectors: read (always), publish (send) and delete. publish and delete are asked for the first time the person does such a thing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AccountConnectorPower {
+    #[serde(rename = "read")]
+    Read,
+    #[serde(rename = "publish")]
+    Publish,
+    #[serde(rename = "delete")]
+    Delete,
+}
+
+/// active: the connector works. expired: it must be reconnected on endue.ai; the desk cannot reconnect it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AccountConnectorState {
+    #[serde(rename = "active")]
+    Active,
+    #[serde(rename = "expired")]
+    Expired,
+}
+
+/// What account.connectors.enable may add to the desk's key: publish (send) or delete.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AccountConnectorGrant {
+    #[serde(rename = "publish")]
+    Publish,
+    #[serde(rename = "delete")]
+    Delete,
+}
+
+/// One of the account's connectors as the desk's key sees it. expired ones must be reconnected on endue.ai: reconnectUrl is that page.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnector {
+    pub id: String,
+    pub r#type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub state: AccountConnectorState,
+    pub tools: u64,
+    #[serde(
+        rename = "reconnectUrl",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub reconnect_url: Option<String>,
+}
+
+/// Whether the desk uses the endue account's connectors, with what it may do, when its key was made (ms since the epoch), the connectors it can see and, for people, why the last step did not go through. No key is ever in it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectors {
+    pub enabled: bool,
+    pub may: Vec<AccountConnectorPower>,
+    #[serde(rename = "keyName", default, skip_serializing_if = "Option::is_none")]
+    pub key_name: Option<String>,
+    #[serde(rename = "createdAt", default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<u64>,
+    pub connectors: Vec<AccountConnector>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub problem: Option<String>,
+}
+
+/// Parameters of account.connectors.enable: the scope and, optionally, what else the key may do. The desk makes a key for itself with the session when there is none, and replaces it with a wider one when allow asks for more.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsEnableParams {
+    pub scope: AccountManagePermission,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow: Option<Vec<AccountConnectorGrant>>,
+}
+
+/// Whether the desk uses the endue account's connectors, and the connectors it can see. Nothing is sent without the desk's own key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsStatusRequest {
+    pub id: RequestId,
+    pub method: AccountConnectorsStatusRequestMethod,
+    pub params: AccountParams,
+}
+
+/// Turn on "Use my endue connectors on this desk", or let its key publish or delete too. The key is kept in the OS keychain only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsEnableRequest {
+    pub id: RequestId,
+    pub method: AccountConnectorsEnableRequestMethod,
+    pub params: AccountConnectorsEnableParams,
+}
+
+/// Turn it off: the desk revokes its key at endue AI and deletes it from the keychain. A revoke that cannot reach endue AI is said in problem and tried again at the next start.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsDisableRequest {
+    pub id: RequestId,
+    pub method: AccountConnectorsDisableRequestMethod,
+    pub params: AccountParams,
+}
+
+/// Result of account.connectors.status.
+pub type AccountConnectorsStatusResult = AccountConnectors;
+
+/// Result of account.connectors.enable.
+pub type AccountConnectorsEnableResult = AccountConnectors;
+
+/// Result of account.connectors.disable.
+pub type AccountConnectorsDisableResult = AccountConnectors;
+
 /// The account changed: a sign-in began, finished or failed, the session was renewed with a problem or ended, the profile arrived or changed, or the desk signed out. Sent to holders of account:manage.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -5367,6 +5476,9 @@ pub enum BridgeRequest {
     AccountSignOut(AccountSignOutRequest),
     AccountSettingsGet(AccountSettingsGetRequest),
     AccountSettingsUpdate(AccountSettingsUpdateRequest),
+    AccountConnectorsStatus(AccountConnectorsStatusRequest),
+    AccountConnectorsEnable(AccountConnectorsEnableRequest),
+    AccountConnectorsDisable(AccountConnectorsDisableRequest),
     AgentsList(AgentsListRequest),
     AgentsSessions(AgentsSessionsRequest),
     AgentsTranscript(AgentsTranscriptRequest),
@@ -13707,6 +13819,30 @@ pub enum AccountSettingsUpdateRequestMethod {
     #[default]
     #[serde(rename = "account.settings.update")]
     AccountSettingsUpdate,
+}
+
+/// The `method` of [`AccountConnectorsStatusRequest`]: always `"account.connectors.status"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AccountConnectorsStatusRequestMethod {
+    #[default]
+    #[serde(rename = "account.connectors.status")]
+    AccountConnectorsStatus,
+}
+
+/// The `method` of [`AccountConnectorsEnableRequest`]: always `"account.connectors.enable"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AccountConnectorsEnableRequestMethod {
+    #[default]
+    #[serde(rename = "account.connectors.enable")]
+    AccountConnectorsEnable,
+}
+
+/// The `method` of [`AccountConnectorsDisableRequest`]: always `"account.connectors.disable"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AccountConnectorsDisableRequestMethod {
+    #[default]
+    #[serde(rename = "account.connectors.disable")]
+    AccountConnectorsDisable,
 }
 
 /// The `event` of [`AccountChangedEvent`]: always `"account.changed"`.

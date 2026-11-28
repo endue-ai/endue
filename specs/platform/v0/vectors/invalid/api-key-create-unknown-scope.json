@@ -1,0 +1,8 @@
+{
+  "target": "ApiKeyCreateRequest",
+  "description": "a scope endue never asks for",
+  "instance": {
+    "name": "endue Desk",
+    "scopes": ["agents:invoke"]
+  }
+}

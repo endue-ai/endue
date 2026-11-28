@@ -1,0 +1,10 @@
+{
+  "target": "AccountConnectors",
+  "description": "a status that would carry the key",
+  "instance": {
+    "enabled": true,
+    "may": ["read"],
+    "connectors": [],
+    "key": "sk_live_abc"
+  }
+}

@@ -321,6 +321,121 @@
       "description": "Result of account.settings.update: the settings now.",
       "$ref": "#/$defs/AccountSettings"
     },
+    "AccountConnectorPower": {
+      "description": "What the desk's own key may do with the account's connectors: read (always), publish (send) and delete. publish and delete are asked for the first time the person does such a thing.",
+      "type": "string",
+      "enum": ["read", "publish", "delete"]
+    },
+    "AccountConnectorState": {
+      "description": "active: the connector works. expired: it must be reconnected on endue.ai; the desk cannot reconnect it.",
+      "type": "string",
+      "enum": ["active", "expired"]
+    },
+    "AccountConnectorGrant": {
+      "description": "What account.connectors.enable may add to the desk's key: publish (send) or delete.",
+      "type": "string",
+      "enum": ["publish", "delete"]
+    },
+    "AccountConnector": {
+      "description": "One of the account's connectors as the desk's key sees it. expired ones must be reconnected on endue.ai: reconnectUrl is that page.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "title": { "type": "string", "maxLength": 200 },
+        "state": { "$ref": "#/$defs/AccountConnectorState" },
+        "tools": { "type": "integer", "minimum": 0 },
+        "reconnectUrl": { "type": "string", "pattern": "^https://\\S+$", "maxLength": 2048 }
+      },
+      "required": ["id", "type", "state", "tools"],
+      "additionalProperties": false
+    },
+    "AccountConnectors": {
+      "description": "Whether the desk uses the endue account's connectors, with what it may do, when its key was made (ms since the epoch), the connectors it can see and, for people, why the last step did not go through. No key is ever in it.",
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "may": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/AccountConnectorPower" }
+        },
+        "keyName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "createdAt": { "type": "integer", "minimum": 0 },
+        "connectors": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/AccountConnector" }
+        },
+        "problem": { "type": "string", "minLength": 1, "maxLength": 500 }
+      },
+      "required": ["enabled", "may", "connectors"],
+      "additionalProperties": false
+    },
+    "AccountConnectorsEnableParams": {
+      "description": "Parameters of account.connectors.enable: the scope and, optionally, what else the key may do. The desk makes a key for itself with the session when there is none, and replaces it with a wider one when allow asks for more.",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "../../plugin/v0/permission.schema.json#/$defs/AccountManagePermission"
+        },
+        "allow": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/AccountConnectorGrant" }
+        }
+      },
+      "required": ["scope"],
+      "additionalProperties": false
+    },
+    "AccountConnectorsStatusRequest": {
+      "description": "Whether the desk uses the endue account's connectors, and the connectors it can see. Nothing is sent without the desk's own key.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "bridge.schema.json#/$defs/RequestId" },
+        "method": { "const": "account.connectors.status" },
+        "params": { "$ref": "#/$defs/AccountParams" }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "AccountConnectorsEnableRequest": {
+      "description": "Turn on \"Use my endue connectors on this desk\", or let its key publish or delete too. The key is kept in the OS keychain only.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "bridge.schema.json#/$defs/RequestId" },
+        "method": { "const": "account.connectors.enable" },
+        "params": { "$ref": "#/$defs/AccountConnectorsEnableParams" }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "AccountConnectorsDisableRequest": {
+      "description": "Turn it off: the desk revokes its key at endue AI and deletes it from the keychain. A revoke that cannot reach endue AI is said in problem and tried again at the next start.",
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "bridge.schema.json#/$defs/RequestId" },
+        "method": { "const": "account.connectors.disable" },
+        "params": { "$ref": "#/$defs/AccountParams" }
+      },
+      "required": ["id", "method", "params"],
+      "additionalProperties": false
+    },
+    "AccountConnectorsStatusResult": {
+      "description": "Result of account.connectors.status.",
+      "$ref": "#/$defs/AccountConnectors"
+    },
+    "AccountConnectorsEnableResult": {
+      "description": "Result of account.connectors.enable.",
+      "$ref": "#/$defs/AccountConnectors"
+    },
+    "AccountConnectorsDisableResult": {
+      "description": "Result of account.connectors.disable.",
+      "$ref": "#/$defs/AccountConnectors"
+    },
     "AccountChangedEvent": {
       "description": "The account changed: a sign-in began, finished or failed, the session was renewed with a problem or ended, the profile arrived or changed, or the desk signed out. Sent to holders of account:manage.",
       "type": "object",

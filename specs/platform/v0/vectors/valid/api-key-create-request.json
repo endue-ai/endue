@@ -1,0 +1,8 @@
+{
+  "target": "ApiKeyCreateRequest",
+  "description": "the desk's own key, read only",
+  "instance": {
+    "name": "endue Desk on ada-mac",
+    "scopes": ["connectors:read"]
+  }
+}

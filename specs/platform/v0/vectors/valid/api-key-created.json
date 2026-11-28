@@ -1,0 +1,11 @@
+{
+  "target": "ApiKeyCreated",
+  "description": "a key just made, with its secret this once",
+  "instance": {
+    "id": "key_1",
+    "name": "endue Desk on ada-mac",
+    "secret": "sk_live_abc123",
+    "scopes": ["connectors:read", "connectors:send"],
+    "created_at": "2026-11-29T09:00:00.000Z"
+  }
+}

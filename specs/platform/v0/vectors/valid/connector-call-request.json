@@ -1,0 +1,10 @@
+{
+  "target": "ConnectorToolCallRequest",
+  "description": "the arguments of one call",
+  "instance": {
+    "arguments": {
+      "operation": "posts",
+      "limit": 20
+    }
+  }
+}

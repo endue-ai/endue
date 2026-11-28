@@ -1,0 +1,9 @@
+{
+  "target": "ConnectorSummary",
+  "description": "a status endue does not know",
+  "instance": {
+    "connector_id": "conn_1",
+    "type": "instagram",
+    "status": "paused"
+  }
+}

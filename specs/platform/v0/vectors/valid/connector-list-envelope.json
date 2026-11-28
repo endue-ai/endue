@@ -1,0 +1,28 @@
+{
+  "target": "ConnectorListEnvelope",
+  "description": "the account's connectors, one expired",
+  "instance": {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "connector_id": "conn_1",
+          "type": "instagram",
+          "name": "Instagram",
+          "display_name": "@ada.studio",
+          "status": "active",
+          "tool_count": 13
+        },
+        {
+          "connector_id": "conn_2",
+          "type": "bluesky",
+          "name": "Bluesky",
+          "display_name": null,
+          "status": "expired",
+          "tool_count": 3
+        }
+      ],
+      "total": 2
+    }
+  }
+}

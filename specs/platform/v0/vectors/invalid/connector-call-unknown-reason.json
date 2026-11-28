@@ -1,0 +1,16 @@
+{
+  "target": "ConnectorToolCallEnvelope",
+  "description": "a refusal with a reason endue does not know",
+  "instance": {
+    "success": true,
+    "data": {
+      "ok": false,
+      "content": "no",
+      "tool": "x__social_read",
+      "error": {
+        "reason": "teapot",
+        "message": "no"
+      }
+    }
+  }
+}

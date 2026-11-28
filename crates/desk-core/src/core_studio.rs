@@ -30,6 +30,7 @@ pub(crate) fn failed(e: PlatformError) -> BridgeError {
         ErrorKind::NotFound => ErrorCode::NotFound,
         ErrorKind::Invalid => ErrorCode::InvalidParams,
         ErrorKind::Conflict => ErrorCode::AlreadyExists,
+        ErrorKind::RateLimited { .. } => ErrorCode::Timeout,
         ErrorKind::Failed => ErrorCode::IoError,
     };
     error(code, e.message)

@@ -25,6 +25,14 @@ approved cloud reply reaching the same Eris turn. `just test-e2e endue-windows.s
 the native agent and Front Desk question forms with a fake platform, and
 `endue-commands.test.ts` checks their tools and current web links.
 
+The endue account's connectors follow [ADR 0407](../adr/0407-the-desk-uses-the-endue-accounts-connectors-with-a-key-of-its-own.md).
+`crates/desk-platform/tests/connectors.rs` checks that connector calls carry the desk's key and never
+the session, that the key is made and revoked with the session, and that limits and refusals are
+typed. `crates/desk-core/tests/account_connectors.rs` checks consent, the read-only key kept only in
+the keychain (no file or answer holds it), widening by replacement, revoke on turn-off and sign-out,
+a revoke retried at the next start, a refused key forgotten once and the reconnect page.
+`connections.test.ts` drives the Settings section on the account stub.
+
 | Layer | What it checks | Tool and location | When | Status |
 | --- | --- | --- | --- | --- |
 | Static | fmt, clippy `-D warnings`, biome, tsc strict, actionlint, spec lint (Ajv strict compile of every schema, spectral for the OpenAPI), theme conformance (`scripts/ui-lint.mjs` ratchet), design system conformance (`scripts/ds-lint.mjs` ratchet) | `just check` | every PR (`ci`) | active |
