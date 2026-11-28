@@ -218,21 +218,22 @@ impl Core {
             self.run_went_on(run, Ok(&invocation_id));
         }
         self.note_invoked(&invocation_id, id, caller, &info.provider);
-        let to = self.recipients(EventName::CmdInvoked, vec![info.provider]);
-        self.events().publish_to(
-            to,
-            BridgeEvent::CmdInvoked(CmdInvokedEvent {
+        let data = CmdInvokedData {
+            invocation_id: invocation_id.clone(),
+            id: id.to_owned(),
+            args,
+            caller: caller.to_owned(),
+            approved,
+            file_open_granted,
+        };
+        if !self.invoke_endue(&info.provider, &data) {
+            let to = self.recipients(EventName::CmdInvoked, vec![info.provider]);
+            let event = CmdInvokedEvent {
                 event: Default::default(),
-                data: CmdInvokedData {
-                    invocation_id: invocation_id.clone(),
-                    id: id.to_owned(),
-                    args,
-                    caller: caller.to_owned(),
-                    approved,
-                    file_open_granted,
-                },
-            }),
-        );
+                data,
+            };
+            self.events().publish_to(to, BridgeEvent::CmdInvoked(event));
+        }
         Ok(invocation_id)
     }
 

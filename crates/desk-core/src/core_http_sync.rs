@@ -107,11 +107,18 @@ impl Core {
             sysnet::fetch(&request).map_err(|e| Failure::new(e.message))
         };
         let synced = http_binding::sync(&binding, &base, token.as_deref(), &source, &mut call)?;
-        self.write_http(&source, synced.items).map_err(Failure::new)
+        self.write_items(&source, synced.items, true)
+            .map_err(Failure::new)
     }
 
-    /// Write the items that are new or differ from the index's copy, remove the ones that left.
-    fn write_http(&self, source: &ItemSource, fresh: BTreeMap<String, Item>) -> Result<(), String> {
+    /// Write the items that are new or differ from the index's copy and, with `remove`, remove the
+    /// ones that left.
+    pub(crate) fn write_items(
+        &self,
+        source: &ItemSource,
+        fresh: BTreeMap<String, Item>,
+        remove: bool,
+    ) -> Result<(), String> {
         let index = self.index().map_err(|e| e.message)?.clone();
         let mut existing: BTreeMap<String, Value> = BTreeMap::new();
         let mut cursor: Option<String> = None;
@@ -144,7 +151,7 @@ impl Core {
         if !upserted.is_empty() {
             index.upsert(&upserted).map_err(|e| e.message)?;
         }
-        if !removed.is_empty() {
+        if remove && !removed.is_empty() {
             index.remove(source, &removed).map_err(|e| e.message)?;
         }
         Ok(())

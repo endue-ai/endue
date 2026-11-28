@@ -277,3 +277,44 @@ fn usage_errors_exit_2() {
     assert_eq!(desk(&["plugin"]).status.code(), Some(2));
     assert_eq!(desk(&["nope"]).status.code(), Some(2));
 }
+
+/// A connector over the endue account's connectors with made-up tools (ADR 0408).
+const GADGET: &str = r#"{ "id": "fixture.gadget", "name": "Gadget", "version": "0.1.0",
+  "kind": "connector",
+  "contributes": { "commands": [
+    { "id": "fixture.gadget.thing.send", "title": "Send a thing", "irreversible": true } ] },
+  "connector": { "binding": "endue", "auth": { "kind": "endue" },
+    "resources": [{ "kind": "entry", "actions": ["fixture.gadget.thing.send"] }],
+    "sync": { "mode": "pull" },
+    "endue": { "tools": ["thing_read", "thing_send"],
+      "requests": [{ "tool": "thing_read", "items": "/items", "map": "thing" }],
+      "maps": { "thing": { "kind": "entry", "fields": { "id": "/id", "title": "/text" } } },
+      "actions": { "fixture.gadget.thing.send": { "tool": "thing_send", "risk": "send" } } } } }"#;
+
+#[test]
+fn an_endue_connector_validates_without_an_entry_and_names_what_does_not_resolve() {
+    let good = plugin_dir("endue-good", GADGET);
+    let out = desk(&["plugin", "validate", good.to_str().unwrap()]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "ok fixture.gadget 0.1.0 (connector plugin)\n"
+    );
+
+    let broken = GADGET
+        .replace(r#""irreversible": true"#, r#""irreversible": false"#)
+        .replace(r#""map": "thing""#, r#""map": "other""#)
+        .replace(r#""actions": { "fixture"#, r#""actions": { "fixture.gadget.thing.forget": { "tool": "thing_send", "risk": "read" }, "fixture"#);
+    let bad = plugin_dir("endue-bad", &broken);
+    let out = desk(&["plugin", "validate", bad.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    for problem in [
+        "/connector/endue/requests/0/map: other is not one of the endue block's maps",
+        "/connector/endue/actions/fixture.gadget.thing.forget: fixture.gadget.thing.forget is not in contributes.commands",
+        "/connector/endue/actions/fixture.gadget.thing.send/risk: fixture.gadget.thing.send calls a send or destructive tool, so it must be irreversible",
+    ] {
+        assert!(stderr.contains(problem), "missing {problem} in:\n{stderr}");
+    }
+}

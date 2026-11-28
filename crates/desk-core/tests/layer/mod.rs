@@ -97,6 +97,17 @@ impl Desk {
         Self::open(home, data, Arc::new(FakeClock::new()), None, true)
     }
 
+    /// A desk whose person says yes, with `build` adding what the test needs (an account, a
+    /// platform) before the connectors start; `build` gets the data folder too.
+    pub fn built(tag: &str, build: impl FnOnce(Core, &std::path::Path) -> Core) -> Self {
+        let root = temp(tag);
+        let (home, data) = (root.join("home"), root.join("data"));
+        fs::create_dir_all(&home).unwrap();
+        fs::create_dir_all(&data).unwrap();
+        let clock = Arc::new(FakeClock::new());
+        Self::open_with(home, data, clock, None, true, build)
+    }
+
     /// A second desk over the same home, clock and files (store, secrets, plugins, index), as after
     /// a restart. The first one is dropped first.
     pub fn restart(self, calendar: Option<Arc<dyn CalendarSource>>) -> Self {
@@ -119,6 +130,17 @@ impl Desk {
         calendar: Option<Arc<dyn CalendarSource>>,
         yes: bool,
     ) -> Self {
+        Self::open_with(home, data, clock, calendar, yes, |core, _| core)
+    }
+
+    fn open_with(
+        home: PathBuf,
+        data: PathBuf,
+        clock: Arc<FakeClock>,
+        calendar: Option<Arc<dyn CalendarSource>>,
+        yes: bool,
+        build: impl FnOnce(Core, &std::path::Path) -> Core,
+    ) -> Self {
         let index = Arc::new(Index::open(data.join("index.sqlite")).unwrap());
         let shared: Arc<dyn ItemIndex> = index.clone();
         let mut core = Core::new(Roots { home: home.clone() })
@@ -133,7 +155,7 @@ impl Desk {
         if yes {
             core = core.with_prompter(SayYes);
         }
-        let core = Arc::new(core);
+        let core = Arc::new(build(core, &data));
         let seen = core.events().subscribe_addressed();
         core.start_connectors();
         Self {
