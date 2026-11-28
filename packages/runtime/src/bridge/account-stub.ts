@@ -1,12 +1,16 @@
 /**
  * account.* on the browser stub (the fixtures, unit tests and the dev page; never shipped): the
- * desk's endue ID and the account's own settings on endue (ADR 0111, ADR 0130), kept in memory as
+ * desk's endue ID, the account's own settings on endue (ADR 0111, ADR 0130) and the desk's use of
+ * the account's connectors (ADR 0407), kept in memory as
  * desk-core and endue keep them, so Settings, endue account can be drawn and driven without a core.
  * Signing in waits for `approve()`; a changed name reaches account.status and goes out as
  * account.changed, as the core's does. Fixture data only.
  * Mount it with `browserCore({ handlers: accountStub(emit).handlers })`.
  */
 import {
+  type AccountConnector,
+  type AccountConnectorPower,
+  type AccountConnectors,
   type AccountSettings,
   type AccountSettingsPart,
   type AccountStatus,
@@ -32,6 +36,8 @@ export interface AccountStub {
   approve(): void;
   /** The next account.settings.update fails with `code`. */
   failNext(code: ErrorCode, message: string): void;
+  /** The connectors the account has, as account.connectors.status lists them once it is on. */
+  connectors: AccountConnector[];
 }
 
 const DEVICE_PAGE = "https://auth.endue.ai/realms/endue/device";
@@ -60,6 +66,28 @@ export function sampleAccountSettings(): AccountSettings {
 }
 
 const copy = <T>(value: T): T => structuredClone(value);
+
+export function sampleAccountConnectors(): AccountConnector[] {
+  return [
+    {
+      id: "conn_1",
+      type: "instagram",
+      name: "Instagram",
+      title: "@ada.studio",
+      state: "active",
+      tools: 3,
+    },
+    {
+      id: "conn_2",
+      type: "threads",
+      name: "Threads",
+      title: "@ada",
+      state: "expired",
+      tools: 3,
+      reconnectUrl: "https://endue.ai/resources/connectors",
+    },
+  ];
+}
 
 export function accountStub(
   emit: (event: BridgeEvent) => void,
@@ -91,6 +119,18 @@ export function accountStub(
     }
     return now;
   };
+  const connectors = sampleAccountConnectors();
+  let key: { may: AccountConnectorPower[]; createdAt: number } | undefined;
+  const connectorsNow = (): AccountConnectors =>
+    key
+      ? {
+          enabled: true,
+          may: [...key.may],
+          keyName: "endue Desk on this computer",
+          createdAt: key.createdAt,
+          connectors: copy(connectors),
+        }
+      : { enabled: false, may: [], connectors: [] };
   const signedIn = () => {
     if (status.state !== "signed-in")
       throw new StubError("signed_out", "Sign in to endue to see your account's settings.");
@@ -109,7 +149,27 @@ export function accountStub(
           expiresAt: "2026-11-09T09:10:00Z",
         },
       }),
-    "account.signOut": () => changed({ state: "signed-out" }),
+    "account.signOut": () => {
+      key = undefined;
+      return changed({ state: "signed-out" });
+    },
+    "account.connectors.status": () => connectorsNow(),
+    "account.connectors.enable": (params) => {
+      if (status.state !== "signed-in")
+        throw new StubError(
+          "signed_out",
+          "Sign in to endue to use your endue connectors on this desk.",
+        );
+      const may = new Set<AccountConnectorPower>(["read", ...(key?.may ?? [])]);
+      for (const grant of params.allow ?? []) may.add(grant);
+      const order: AccountConnectorPower[] = ["read", "publish", "delete"];
+      key = { may: order.filter((p) => may.has(p)), createdAt: Date.parse("2026-11-29T09:00:00Z") };
+      return connectorsNow();
+    },
+    "account.connectors.disable": () => {
+      key = undefined;
+      return connectorsNow();
+    },
     "account.settings.get": () => {
       signedIn();
       return answer();
@@ -153,5 +213,6 @@ export function accountStub(
     failNext(code, message) {
       failure = new StubError(code, message);
     },
+    connectors,
   };
 }

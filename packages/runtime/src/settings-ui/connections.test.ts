@@ -4,6 +4,7 @@
 // call is made), and sync and disconnect. The stub bridge answers as the core does.
 import { BridgeClient, browserStub, stubCommands } from "@endue-ai/bridge";
 import { afterEach, describe, expect, it } from "vitest";
+import { accountStub } from "../bridge/account-stub";
 import { mountConnections } from "./connections";
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -26,7 +27,71 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+/** Connections with the endue account served too, as a desk signed in to endue ID. */
+function mountWithAccount() {
+  const core = stubCommands(() => {});
+  const opened: string[] = [];
+  const account = accountStub((event) => stub.emit(event));
+  const stub = browserStub({
+    ...core.handlers,
+    ...account.handlers,
+    "shell.open": ({ target }) => {
+      opened.push(target);
+      return { opened: true as const };
+    },
+  });
+  const bridge = new BridgeClient(stub);
+  const panel = mountConnections({ bridge, language: "en" });
+  document.body.append(panel.el);
+  return { bridge, panel, opened, calls: () => stub.calls.map((c) => c.method) };
+}
+
 describe("Settings, Connections", () => {
+  it("the endue account section turns on, shows what the desk may do and turns off", async () => {
+    const { panel, opened, calls } = mountWithAccount();
+    await panel.ready;
+    const section = panel.el.querySelector<HTMLElement>("[data-endue-connectors]");
+    if (!section) throw new Error("no endue account section");
+    const button = (key: string) => section.querySelector<HTMLButtonElement>(`[data-key="${key}"]`);
+    expect(section.querySelector("h2")?.textContent).toBe("endue account");
+    expect(section.textContent).toContain("Nothing is sent to endue until you turn it on.");
+    expect(section.querySelectorAll("[data-endue-connector]")).toHaveLength(0);
+    // The section comes first, above the desk's own connectors.
+    expect(panel.el.firstElementChild).toBe(section);
+    // Turned on: one filled button became an outline Turn off, and the key reads only.
+    const on = button("endue-connectors-on");
+    expect(on?.classList.contains("btn-primary")).toBe(true);
+    on?.click();
+    await panel.idle();
+    expect(calls()).toContain("account.connectors.enable");
+    expect(section.textContent).toContain("This desk may read.");
+    expect(section.textContent).toContain("Its key was made on");
+    const rows = [...section.querySelectorAll<HTMLElement>("[data-endue-connector]")];
+    expect(rows.map((r) => r.querySelector("span")?.textContent)).toEqual(["@ada.studio", "@ada"]);
+    expect(rows[0]?.textContent).toContain("Works, with 3 tools.");
+    expect(rows[1]?.textContent).toContain("Expired. Reconnect it on endue.ai.");
+    expect(rows[0]?.querySelector("button")).toBeNull();
+    rows[1]?.querySelector<HTMLButtonElement>('[data-key="endue-connector-reconnect"]')?.click();
+    await panel.idle();
+    expect(opened).toEqual(["https://endue.ai/resources/connectors"]);
+    expect(section.querySelectorAll(".btn-primary")).toHaveLength(0);
+    // Turned off: the connectors go and the key with them.
+    button("endue-connectors-off")?.click();
+    await panel.idle();
+    expect(calls()).toContain("account.connectors.disable");
+    expect(section.querySelectorAll("[data-endue-connector]")).toHaveLength(0);
+    expect(button("endue-connectors-on")).not.toBeNull();
+    expect(section.textContent).not.toMatch(/sk_/);
+    panel.dispose();
+  });
+
+  it("shows no endue account section on a desk without an endue ID", async () => {
+    const { panel } = mount();
+    await panel.ready;
+    expect(panel.el.querySelector("[data-endue-connectors]")?.childElementCount ?? 0).toBe(0);
+    panel.dispose();
+  });
+
   it("lists every connector with its instances and their status", async () => {
     const { panel } = mount();
     await panel.ready;

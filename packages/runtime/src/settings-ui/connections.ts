@@ -3,7 +3,8 @@
  * sync and disconnect, and a form drawn from the connector's instanceSettings to connect another. A
  * secret setting is a password field, emptied as soon as the call is made; the core keeps the value
  * and never lists it back (ADR 0036, ADR 0106). `desk.connectors.open { connector?, kinds? }` opens it
- * with that connector, or the ones that bring those kinds, first.
+ * with that connector, or the ones that bring those kinds, first. Above them, "endue account" uses
+ * the endue account's own connectors with a key of the desk's (ADR 0407, `endue-connectors.ts`).
  */
 import {
   BridgeCallError,
@@ -15,6 +16,7 @@ import {
 import { type KeyOf, moduleText } from "../i18n/messages";
 import { h, render } from "../shell/dom";
 import type { SettingsLanguage } from "./copy";
+import { mountEndueConnectors } from "./endue-connectors";
 import en from "./messages/en.json";
 import ko from "./messages/ko.json";
 
@@ -65,6 +67,9 @@ export function mountConnections(options: {
   const tr = (key: Copy, vars?: Record<string, string>) =>
     text(language, `connections.${key}` as Id, vars);
   const el = h("div", { class: "settings-panel-body settings-connections" });
+  const endue = mountEndueConnectors({ bridge, language });
+  const list = h("div", { class: "settings-connections-list" });
+  el.append(endue.el, list);
   let connectors: ConnectorInfo[] = [];
   let pending: Promise<void> = Promise.resolve();
   let disposed = false;
@@ -227,7 +232,7 @@ export function mountConnections(options: {
     const ordered = [...connectors].sort(
       (a, b) => Number(wanted(b)) - Number(wanted(a)) || a.id.localeCompare(b.id),
     );
-    render(el, () =>
+    render(list, () =>
       ordered.length === 0
         ? [h("p", { class: "settings-footnote" }, tr("empty"))]
         : ordered.map((info) =>
@@ -271,15 +276,16 @@ export function mountConnections(options: {
     stale = false;
     queueMicrotask(refresh);
   });
-  const ready = load();
+  const ready = Promise.all([load(), endue.ready]).then(() => {});
   pending = ready;
   return {
     el,
     ready,
-    idle: () => pending,
+    idle: () => Promise.all([pending, endue.idle()]).then(() => {}),
     dispose: () => {
       disposed = true;
       off();
+      endue.dispose();
       el.remove();
     },
   };
