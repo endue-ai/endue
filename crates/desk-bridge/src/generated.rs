@@ -1393,7 +1393,7 @@ pub type Role = String;
 /// Semantic version, for example 0.1.0 or 1.2.3-beta.1.
 pub type Version = String;
 
-/// ui runs in a sandboxed iframe, logic in a Wasm instance, tool as an MCP server inside the VM. policy runs no code: it only contributes data (ADR 0017). library runs no code of its own either: it is files other plugins import, served at /<id>/... like any plugin's, never mounted and never turned off. connector brings an app's data in as items, as a Wasm component, an MCP server or an http block the core runs (no entry; ADR 0106); view runs no code either: it is one or more views (ADR 0032). theme runs no code: it is a theme block and its font and image files, chosen with desk.theme.active (ADR 0056). design-system runs no code either: it is a designSystem block of component recipes, chosen with desk.design.active (ADR 0090). pack runs no code either: a pack block naming the plugins it brings (nested in its folder or on the desk), its own views and its contributed layout (ADR 0108). native is a program per OS (its native block, no entry) that the desk starts as a process of its own: it draws its surface over specs/surface and calls the bridge over the connection the desk gave it, as itself; it is not sandboxed, only its bridge calls are checked (ADR 0154).
+/// ui runs in a sandboxed iframe, logic in a Wasm instance, tool as an MCP server inside the VM. policy runs no code: it only contributes data (ADR 0017). library runs no code of its own either: it is files other plugins import, served at /<id>/... like any plugin's, never mounted and never turned off. connector brings an app's data in as items, as a Wasm component, an MCP server, an http block the core runs (no entry; ADR 0106) or an endue block over the endue account's connectors (no entry; ADR 0409); view runs no code either: it is one or more views (ADR 0032). theme runs no code: it is a theme block and its font and image files, chosen with desk.theme.active (ADR 0056). design-system runs no code either: it is a designSystem block of component recipes, chosen with desk.design.active (ADR 0090). pack runs no code either: a pack block naming the plugins it brings (nested in its folder or on the desk), its own views and its contributed layout (ADR 0108). native is a program per OS (its native block, no entry) that the desk starts as a process of its own: it draws its surface over specs/surface and calls the bridge over the connection the desk gave it, as itself; it is not sandboxed, only its bridge calls are checked (ADR 0154).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PluginKind {
     #[serde(rename = "ui")]
@@ -3062,6 +3062,8 @@ pub struct ConnectorManifest {
     pub binding: ConnectorBinding,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub http: Option<HttpBinding>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endue: Option<EndueBinding>,
     pub auth: ConnectorAuth,
     /// The kinds of item the connector brings in, one entry per kind.
     pub resources: Vec<ConnectorResource>,
@@ -3075,7 +3077,7 @@ pub struct ConnectorManifest {
     pub instance_settings: Option<BTreeMap<String, ConnectorSetting>>,
 }
 
-/// How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106).
+/// How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0409).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConnectorBinding {
     #[serde(rename = "wasm")]
@@ -3084,9 +3086,11 @@ pub enum ConnectorBinding {
     Mcp,
     #[serde(rename = "http")]
     Http,
+    #[serde(rename = "endue")]
+    Endue,
 }
 
-/// none (local files, the OS's own data), token (a key the person pastes) or oauth.
+/// none (local files, the OS's own data), token (a key the person pastes), oauth, or endue: the endue account the desk signed in to, with no connect step on the desk (binding endue).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConnectorAuthKind {
     #[serde(rename = "none")]
@@ -3095,6 +3099,8 @@ pub enum ConnectorAuthKind {
     Token,
     #[serde(rename = "oauth")]
     Oauth,
+    #[serde(rename = "endue")]
+    Endue,
 }
 
 /// How an instance signs in. Tokens are kept by the core and never handed to the connector's code; with binding http the core itself sends the token (http.auth). No v0 method starts an OAuth flow yet.
@@ -3210,13 +3216,23 @@ pub struct HttpItemMap {
     pub fields: BTreeMap<String, HttpValue>,
 }
 
-/// One item field's value: a JSON pointer into the record (empty is the whole record), or an object that reads one and shapes it. A null or missing value leaves the field out, unless default gives one.
+/// One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, a value of the instance, or the first of several that reads something. A null or missing value leaves the field out, unless default gives one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum HttpValue {
     JsonPointer(JsonPointer),
     HttpRead(HttpRead),
     HttpConst(HttpConst),
+    HttpObject(HttpObject),
+    HttpInstance(HttpInstanceValue),
+    HttpFirst(HttpFirst),
+}
+
+/// The first of these values that reads something other than null or the empty text.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HttpFirst {
+    pub first: Vec<HttpValue>,
 }
 
 /// Read the value at pointer and shape it.
@@ -3227,6 +3243,9 @@ pub struct HttpRead {
     /// Keep the text after the last occurrence of this text; a value without it is missing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// Keep the text before the first occurrence of this text (\n keeps the first line); a value without it is kept whole.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
     /// Replace the value, as text, by the one it names; one it does not name is missing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub values: Option<serde_json::Map<String, serde_json::Value>>,
@@ -3235,12 +3254,155 @@ pub struct HttpRead {
     pub default: Option<serde_json::Value>,
 }
 
+/// An object of values, by name, each one as a field's value is read; one that reads nothing is left out, and an object that keeps none is missing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HttpObject {
+    pub object: BTreeMap<String, HttpValue>,
+}
+
+/// A value of the instance the record came from, or of the sync that reads it (HttpInstanceField).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HttpInstanceValue {
+    pub instance: HttpInstanceField,
+}
+
+/// Which value: the instance's id or title, type (the endue account connector's type; missing for the other bindings), or syncedAt (when this sync began).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HttpInstanceField {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "title")]
+    Title,
+    #[serde(rename = "type")]
+    Type,
+    #[serde(rename = "syncedAt")]
+    SyncedAt,
+}
+
 /// The same value for every record.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HttpConst {
     /// This value for every record.
     pub r#const: serde_json::Value,
+}
+
+/// A connector as data over the endue account's connectors (binding endue, ADR 0409): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueBinding {
+    /// The tool endings an account connector must offer, all of them, to be an instance: social_read matches <type>__social_read. The core never reads the type.
+    pub tools: Vec<EndueToolName>,
+    /// What one sync asks for, in order. The same item from two requests is one item, the last one read.
+    pub requests: Vec<EndueRequest>,
+    /// How a record becomes an item, by name, as the http binding's maps; each request names one.
+    pub maps: BTreeMap<String, HttpItemMap>,
+    /// By id of a command the plugin declares in contributes.commands: the tool that command calls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actions: Option<BTreeMap<String, EndueAction>>,
+    /// Tool calls one sync of one instance makes at most; 30 when absent. A sync that spends it writes what it read and removes nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<u64>,
+}
+
+/// A tool's name after its connector's type and two underscores: social_read.
+pub type EndueToolName = String;
+
+/// The name of one argument a tool takes: operation, cursor, since.
+pub type EndueArgumentName = String;
+
+/// One tool call of a sync and the pages after it: the records at items in the answer's data, the next page's cursor at next.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueRequest {
+    pub tool: EndueToolName,
+    /// The tool's arguments, by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<BTreeMap<String, EndueRequestArgument>>,
+    /// Where the records are in the answer's data: a JSON pointer to an array, or to one object, which is one record; empty for the data itself.
+    pub items: JsonPointer,
+    /// Where the next page's cursor is in the answer's data. Absent, or nothing there: the last page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<JsonPointer>,
+    /// Pages read at most; 10 when absent.
+    #[serde(rename = "maxPages", default, skip_serializing_if = "Option::is_none")]
+    pub max_pages: Option<u64>,
+    pub map: HttpMapName,
+    /// A refusal whose reason is unsupported skips this request instead of failing the sync.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optional: Option<bool>,
+}
+
+/// One argument of a request: the same value every time; page, the cursor the previous page's next pointed to (absent on the first page); or since, the time of the instance's last good sync (RFC 3339, absent before the first). A request with since only adds and changes items.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EndueRequestArgument {
+    HttpConst(HttpConst),
+    EnduePage(EnduePage),
+    EndueSince(EndueSince),
+}
+
+/// The next page's cursor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EnduePage {
+    pub page: True,
+}
+
+/// The time of the last good sync.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueSince {
+    pub since: True,
+}
+
+/// What a tool's call does: read; write; send (others see it); destructive (cannot be taken back). An action on a send or destructive tool is an irreversible command, and a tool whose risk is higher than its action says is refused before it is called.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EndueRisk {
+    #[serde(rename = "read")]
+    Read,
+    #[serde(rename = "write")]
+    Write,
+    #[serde(rename = "send")]
+    Send,
+    #[serde(rename = "destructive")]
+    Destructive,
+}
+
+/// The tool a command calls and its arguments. Every call carries one Idempotency-Key per invocation, the same on a retry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueAction {
+    pub tool: EndueToolName,
+    pub risk: EndueRisk,
+    /// The tool's arguments, by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<BTreeMap<String, EndueActionArgument>>,
+}
+
+/// One argument of an action: the same value every time; arg, the command's argument of that name (left out when the command has none); or file, the path a command argument names, uploaded first and sent as what the upload answered.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EndueActionArgument {
+    HttpConst(HttpConst),
+    EndueArg(EndueArg),
+    EndueFile(EndueFile),
+}
+
+/// The command's argument of this name.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueArg {
+    pub arg: EndueArgumentName,
+}
+
+/// The file at the path the command's argument of this name holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndueFile {
+    pub file: EndueArgumentName,
 }
 
 /// One kind of item the connector brings in, and the commands that act on it.
@@ -3796,7 +3958,7 @@ pub enum AccountScreen {
     SignUp,
 }
 
-/// Which kind of problem the last step ran into, for the runtime to word: offline (endue could not be reached), denied (turned down in the browser), expired (the code ran out), slow-down (too many attempts; endue asked the desk to wait), unavailable (endue answered with a server error), suspended (the account is suspended), rejected (endue refused to renew the session, which the desk keeps), session-expired (the session ended, so the desk signed out), failed (anything else).
+/// Which kind of problem the last step ran into, for the runtime to word: offline (endue could not be reached), denied (turned down in the browser), expired (the code ran out), slow-down (too many attempts; endue asked the desk to wait), unavailable (endue answered with a server error), suspended (the account is suspended), pending-approval (the account waits for endue to approve its sign-up, as sign-ups from some email domains do), region-unavailable (endue is not offered where the person signs in from), rejected (endue refused to renew the session, which the desk keeps), session-expired (the session ended, so the desk signed out), failed (anything else).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AccountProblem {
     #[serde(rename = "offline")]
@@ -3811,6 +3973,10 @@ pub enum AccountProblem {
     Unavailable,
     #[serde(rename = "suspended")]
     Suspended,
+    #[serde(rename = "pending-approval")]
+    PendingApproval,
+    #[serde(rename = "region-unavailable")]
+    RegionUnavailable,
     #[serde(rename = "rejected")]
     Rejected,
     #[serde(rename = "session-expired")]
@@ -4061,6 +4227,115 @@ pub type AccountSettingsGetResult = AccountSettings;
 
 /// Result of account.settings.update: the settings now.
 pub type AccountSettingsUpdateResult = AccountSettings;
+
+/// What the desk's own key may do with the account's connectors: read (always), publish (send) and delete. publish and delete are asked for the first time the person does such a thing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AccountConnectorPower {
+    #[serde(rename = "read")]
+    Read,
+    #[serde(rename = "publish")]
+    Publish,
+    #[serde(rename = "delete")]
+    Delete,
+}
+
+/// active: the connector works. expired: it must be reconnected on endue.ai; the desk cannot reconnect it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AccountConnectorState {
+    #[serde(rename = "active")]
+    Active,
+    #[serde(rename = "expired")]
+    Expired,
+}
+
+/// What account.connectors.enable may add to the desk's key: publish (send) or delete.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AccountConnectorGrant {
+    #[serde(rename = "publish")]
+    Publish,
+    #[serde(rename = "delete")]
+    Delete,
+}
+
+/// One of the account's connectors as the desk's key sees it. expired ones must be reconnected on endue.ai: reconnectUrl is that page.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnector {
+    pub id: String,
+    pub r#type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub state: AccountConnectorState,
+    pub tools: u64,
+    #[serde(
+        rename = "reconnectUrl",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub reconnect_url: Option<String>,
+}
+
+/// Whether the desk uses the endue account's connectors, with what it may do, when its key was made (ms since the epoch), the connectors it can see and, for people, why the last step did not go through. No key is ever in it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectors {
+    pub enabled: bool,
+    pub may: Vec<AccountConnectorPower>,
+    #[serde(rename = "keyName", default, skip_serializing_if = "Option::is_none")]
+    pub key_name: Option<String>,
+    #[serde(rename = "createdAt", default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<u64>,
+    pub connectors: Vec<AccountConnector>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub problem: Option<String>,
+}
+
+/// Parameters of account.connectors.enable: the scope and, optionally, what else the key may do. The desk makes a key for itself with the session when there is none, and replaces it with a wider one when allow asks for more.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsEnableParams {
+    pub scope: AccountManagePermission,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow: Option<Vec<AccountConnectorGrant>>,
+}
+
+/// Whether the desk uses the endue account's connectors, and the connectors it can see. Nothing is sent without the desk's own key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsStatusRequest {
+    pub id: RequestId,
+    pub method: AccountConnectorsStatusRequestMethod,
+    pub params: AccountParams,
+}
+
+/// Turn on "Use my endue connectors on this desk", or let its key publish or delete too. The key is kept in the OS keychain only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsEnableRequest {
+    pub id: RequestId,
+    pub method: AccountConnectorsEnableRequestMethod,
+    pub params: AccountConnectorsEnableParams,
+}
+
+/// Turn it off: the desk revokes its key at endue AI and deletes it from the keychain. A revoke that cannot reach endue AI is said in problem and tried again at the next start.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AccountConnectorsDisableRequest {
+    pub id: RequestId,
+    pub method: AccountConnectorsDisableRequestMethod,
+    pub params: AccountParams,
+}
+
+/// Result of account.connectors.status.
+pub type AccountConnectorsStatusResult = AccountConnectors;
+
+/// Result of account.connectors.enable.
+pub type AccountConnectorsEnableResult = AccountConnectors;
+
+/// Result of account.connectors.disable.
+pub type AccountConnectorsDisableResult = AccountConnectors;
 
 /// The account changed: a sign-in began, finished or failed, the session was renewed with a problem or ended, the profile arrived or changed, or the desk signed out. Sent to holders of account:manage.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -4608,7 +4883,7 @@ pub struct AgentsChangedEvent {
     pub data: AgentsChangedData,
 }
 
-/// Start capturing the microphone. With wakeWord, audio.wake events arrive when the wake word is heard.
+/// Start capturing the microphone. With transcribe, audio.heard events carry the words heard on this computer: unsupported when no on-device recogniser serves the language, forbidden when the OS refuses speech recognition; nothing opens for either. With wakeWord, audio.wake events arrive when the wake word is heard.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AudioCaptureStartRequest {
@@ -4631,7 +4906,25 @@ pub struct AudioCaptureStartParams {
         skip_serializing_if = "Option::is_none"
     )]
     pub sample_rate: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcribe: Option<AudioTranscribe>,
     pub scope: AudioCapturePermission,
+}
+
+/// Turn the capture into words on this computer, in the desk's language. No audio leaves the computer for recognition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioTranscribe {
+    pub lang: AudioLang,
+}
+
+/// A language a capture is transcribed in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AudioLang {
+    #[serde(rename = "ko")]
+    Ko,
+    #[serde(rename = "en")]
+    En,
 }
 
 /// Result of audio.capture.start.
@@ -4690,6 +4983,26 @@ pub struct AudioFrameData {
     pub rms_db: f64,
     #[serde(rename = "peakDb")]
     pub peak_db: f64,
+}
+
+/// The words heard so far in a capture that transcribes, for the caller that started it, then the final words once, before audio.ended.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioHeardEvent {
+    pub event: AudioHeardEventEvent,
+    pub data: AudioHeardData,
+}
+
+/// Payload of audio.heard.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioHeardData {
+    #[serde(rename = "captureId")]
+    pub capture_id: String,
+    /// Every word heard since the capture started; empty when none were.
+    pub text: String,
+    /// True once, for the final words, after the capture stopped.
+    pub r#final: bool,
 }
 
 /// A capture ended; no audio.frame for it follows. Comes once per capture.
@@ -4809,6 +5122,15 @@ pub struct BrainDesk {
     pub closed: Option<Vec<BrainDeskClosed>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<BrainDeskCapabilities>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<BrainDeskAbout>,
+}
+
+/// What the line is about (FT-04, ADR 0407): the windows the talk line names, by id, each one of this snapshot's windows. "This" in the line means them, and their plugins' tools come first. It grants nothing: a line about a window still asks every question it would ask without. Absent: the line is about nothing in particular.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BrainDeskAbout {
+    pub windows: Vec<String>,
 }
 
 /// One desktop (window view): its id, which windows name in `desktop`, its name for people, whether it is the one in front, and how far its canvas is panned.
@@ -5177,7 +5499,7 @@ pub enum BrainStatusResult {
     BrainStatusOffline(BrainStatusOffline),
 }
 
-/// A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo) or claude (the person's own Claude Code, asked without its tools, ADR 0109).
+/// A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo), claude (the person's own Claude Code, asked without its tools, ADR 0109) or codex (the person's own Codex CLI, asked the same way). A chosen brain that cannot answer hands the turn to the next of endue, codex, claude and local that can.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BrainName {
     #[serde(rename = "endue")]
@@ -5188,6 +5510,8 @@ pub enum BrainName {
     Echo,
     #[serde(rename = "claude")]
     Claude,
+    #[serde(rename = "codex")]
+    Codex,
 }
 
 /// A brain on this machine, named by the model it runs. fallback is true when it answers in place of the chosen brain, which cannot be reached now (ADR 0094).
@@ -5214,6 +5538,9 @@ pub struct BrainStatusCloud {
     /// The brain the desk chose. Absent from desks that cannot choose.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brain: Option<BrainName>,
+    /// The brain that answers in place of the chosen one, which cannot answer now. Absent while the chosen brain answers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answering: Option<BrainName>,
 }
 
 /// The brain cannot be reached now, or the desk has none.
@@ -5248,6 +5575,23 @@ pub struct BrainTurnData {
     pub structured: Option<serde_json::Map<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool: Option<BrainTurnTool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<BrainTurnReason>,
+}
+
+/// error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BrainTurnReason {
+    #[serde(rename = "no_brain")]
+    NoBrain,
+    #[serde(rename = "signed_out")]
+    SignedOut,
+    #[serde(rename = "read_only")]
+    ReadOnly,
+    #[serde(rename = "too_many_steps")]
+    TooManySteps,
+    #[serde(rename = "failed")]
+    Failed,
 }
 
 /// started, delta (more text), completed; error (the turn failed, for example read-only after a takeover); offline (the brain is unreachable, the turn waits) and online (it resumed); tool (Eris hands work to a plugin command: the core runs the brain's call) and tool-result (the command answered and its answer went back to the brain).
@@ -5419,6 +5763,9 @@ pub enum BridgeRequest {
     AccountSignOut(AccountSignOutRequest),
     AccountSettingsGet(AccountSettingsGetRequest),
     AccountSettingsUpdate(AccountSettingsUpdateRequest),
+    AccountConnectorsStatus(AccountConnectorsStatusRequest),
+    AccountConnectorsEnable(AccountConnectorsEnableRequest),
+    AccountConnectorsDisable(AccountConnectorsDisableRequest),
     AgentsList(AgentsListRequest),
     AgentsSessions(AgentsSessionsRequest),
     AgentsTranscript(AgentsTranscriptRequest),
@@ -5572,6 +5919,7 @@ pub enum BridgeEvent {
     DbParameter(DbParameterEvent),
     DbClosed(DbClosedEvent),
     AudioFrame(AudioFrameEvent),
+    AudioHeard(AudioHeardEvent),
     AudioEnded(AudioEndedEvent),
     AudioCapturing(AudioCapturingEvent),
     AudioWake(AudioWakeEvent),
@@ -13760,6 +14108,30 @@ pub enum AccountSettingsUpdateRequestMethod {
     AccountSettingsUpdate,
 }
 
+/// The `method` of [`AccountConnectorsStatusRequest`]: always `"account.connectors.status"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AccountConnectorsStatusRequestMethod {
+    #[default]
+    #[serde(rename = "account.connectors.status")]
+    AccountConnectorsStatus,
+}
+
+/// The `method` of [`AccountConnectorsEnableRequest`]: always `"account.connectors.enable"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AccountConnectorsEnableRequestMethod {
+    #[default]
+    #[serde(rename = "account.connectors.enable")]
+    AccountConnectorsEnable,
+}
+
+/// The `method` of [`AccountConnectorsDisableRequest`]: always `"account.connectors.disable"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AccountConnectorsDisableRequestMethod {
+    #[default]
+    #[serde(rename = "account.connectors.disable")]
+    AccountConnectorsDisable,
+}
+
 /// The `event` of [`AccountChangedEvent`]: always `"account.changed"`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum AccountChangedEventEvent {
@@ -13902,6 +14274,14 @@ pub enum AudioFrameEventEvent {
     #[default]
     #[serde(rename = "audio.frame")]
     AudioFrame,
+}
+
+/// The `event` of [`AudioHeardEvent`]: always `"audio.heard"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum AudioHeardEventEvent {
+    #[default]
+    #[serde(rename = "audio.heard")]
+    AudioHeard,
 }
 
 /// The `event` of [`AudioEndedEvent`]: always `"audio.ended"`.

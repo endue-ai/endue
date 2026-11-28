@@ -1,0 +1,14 @@
+{
+  "target": "BridgeRequest",
+  "description": "let the desk's key publish too",
+  "instance": {
+    "id": 52,
+    "method": "account.connectors.enable",
+    "params": {
+      "scope": {
+        "permission": "account:manage"
+      },
+      "allow": ["publish"]
+    }
+  }
+}

@@ -19,7 +19,7 @@ import { windowsOf } from "../shell/actions";
 import type { ShellCtx } from "../shell/context";
 import { h } from "../shell/dom";
 import { cloudTurns } from "./cloud-turns";
-import { lay, place, render, type Spark } from "./errand-spark";
+import { followersOf, lay, place, render, type Spark } from "./errand-spark";
 import { edgeOf, erisAt, labelOf, type Target, targetsOf } from "./errand-targets";
 import type { Point } from "./errand-thread";
 import { setMind, takeIn } from "./mind";
@@ -154,6 +154,7 @@ export function mountErrands(shell: () => HTMLElement, ctx: ShellCtx): Errands {
       el,
       host,
       thread: null,
+      followers: followersOf(host),
       at: her(),
       aim: her,
       from: her,
@@ -190,6 +191,7 @@ export function mountErrands(shell: () => HTMLElement, ctx: ShellCtx): Errands {
     spark.unfollow();
     spark.thread?.remove();
     spark.el.remove();
+    for (const dot of spark.followers) dot.remove();
     sparks.delete(spark);
     if (!spark.away) return;
     spark.away = false;

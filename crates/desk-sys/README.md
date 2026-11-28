@@ -27,13 +27,13 @@ Primitives behind cargo features (Linux `audio` needs `libasound2-dev`), no perm
 - `login`: `apply(items, wanted, &desk(program)) -> Change` writes only on a difference; `check(..)` is
   `Status { registered, wanted, matches }`. `os(ID)`: a LaunchAgent (macOS), the Run key, XDG autostart;
   `fake::FakeLoginItems`. `launched_at_login` reads `BACKGROUND`; `program()`: the exe or `$APPIMAGE`.
-- `clipboard`: `Clipboard` (`state` reads no text: `State { count, has_text, marks }`; `read_text`;
-  `write_text(.., Marks { concealed, transient })`); `Changes`, `watch`; `os()`; `fake::FakeClipboard`.
+- `clipboard`: `Clipboard` (`state`, `read_text`, `write_text(.., Marks)`), `watch`; `os()`; `fake::FakeClipboard`.
 - `audio`: `AudioInput` (`authorization`, `request_access`, `devices`, `capture(&CaptureOptions,
   on_event) -> Capture`): mono `i16` `Frame { samples, level, at_ms }`s of 20 ms at 8 to 48 kHz, `End`
   last, `stop` or drop; `permission_denied` until `Authorized`. `os()`: cpal; `fake::FakeInput`.
-- `keychain` (ADR 0239): `Keychain` (`get` (`None` if missing), `set`, `delete` per account); `os(SERVICE)`
-  over keyring-core, `unsupported` when no keychain answers; `fake::FakeKeychain` (`unavailable()`).
+- `speech` (ADR 0406): `Recogniser` (`supports`, `authorization`, `start -> Recognition { feed, finish }`);
+  `os()`: Speech on macOS, on-device only, else `None`; `fake::FakeRecogniser` (scripted, with `audio-api`).
+- `keychain` (ADR 0239): `Keychain` (`get`, `set`, `delete` per account); `os(SERVICE)`; `fake::FakeKeychain`.
 
 ## Testing
 `cargo test -p desk-sys --all-features` (`docs/qa/TESTING.md`): fakes, local servers, temp dirs, the test

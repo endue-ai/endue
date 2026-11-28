@@ -2,6 +2,8 @@
 //! into text, tool calls and a stop reason.
 
 use std::io;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use desk_brain::{BrainError, BrainErrorCode, BrainFailure, StopReason};
 use serde::Deserialize;
@@ -10,10 +12,49 @@ use serde_json::{Map, Value, json};
 use crate::http::{Endpoint, get, post};
 use crate::model::{Answer, Call, Model, Piece};
 
-/// Ollama at `endpoint`, running `model`.
+/// The model name that asks for any model the server holds (`brain.model` unset).
+pub const ANY_MODEL: &str = "any";
+/// How long the server's model list is kept.
+const LIST_KEPT: Duration = Duration::from_secs(60);
+
+/// Ollama at `endpoint`, running `model`, or the first chat model it holds for `ANY_MODEL`.
 pub struct Ollama {
     pub endpoint: Endpoint,
     pub model: String,
+    listed: Mutex<Option<(Instant, Vec<String>)>>,
+}
+
+impl Ollama {
+    pub fn new(endpoint: Endpoint, model: String) -> Self {
+        Self {
+            endpoint,
+            model,
+            listed: Mutex::new(None),
+        }
+    }
+
+    /// The model that answers: the one named, or for `ANY_MODEL` the first chat model the server
+    /// holds. A server without one cannot answer (`Unreachable`), so the turn goes on to the next
+    /// brain instead of asking for a model that is not there.
+    fn resolve(&self) -> Result<String, BrainFailure> {
+        if self.model != ANY_MODEL {
+            return Ok(self.model.clone());
+        }
+        let mut listed = self.listed.lock().unwrap_or_else(|p| p.into_inner());
+        let names = match listed.as_ref().filter(|(at, _)| at.elapsed() < LIST_KEPT) {
+            Some((_, names)) => names.clone(),
+            None => {
+                let names = models(&self.endpoint)?;
+                *listed = Some((Instant::now(), names.clone()));
+                names
+            }
+        };
+        pick(&self.model, &names).ok_or_else(|| {
+            BrainFailure::Unreachable(
+                "Ollama holds no model that can chat; pull one with ollama pull".to_owned(),
+            )
+        })
+    }
 }
 
 impl Model for Ollama {
@@ -23,16 +64,62 @@ impl Model for Ollama {
         messages: &[Value],
         on: &mut dyn FnMut(Piece<'_>),
     ) -> Result<Answer, BrainFailure> {
-        chat(&self.endpoint, &self.model, tools, messages, on)
+        let model = self.resolve()?;
+        chat(&self.endpoint, &model, tools, messages, on)
     }
 
     fn reachable(&self) -> Result<(), BrainFailure> {
-        version(&self.endpoint)
+        version(&self.endpoint)?;
+        self.resolve().map(drop)
     }
 
     fn address(&self) -> String {
         self.endpoint.url()
     }
+}
+
+/// A 404 for the model is a model the server does not hold: the server cannot answer it, which is
+/// not a session the brain lost (the conversation would start a new one and try again).
+fn missing_model(status: u16, text: &str, model: &str) -> Option<BrainFailure> {
+    (status == 404 && text.contains("not found")).then(|| {
+        BrainFailure::Unreachable(format!(
+            "Ollama does not hold {model}; pull it with ollama pull {model}"
+        ))
+    })
+}
+
+/// The model of `names` that answers for `wanted`: itself (with or without `:latest`), or for
+/// `ANY_MODEL` the first that is not only for embeddings.
+pub fn pick(wanted: &str, names: &[String]) -> Option<String> {
+    if wanted == ANY_MODEL {
+        return names
+            .iter()
+            .find(|name| !name.to_ascii_lowercase().contains("embed"))
+            .cloned();
+    }
+    names
+        .iter()
+        .find(|name| *name == wanted || name.strip_suffix(":latest") == Some(wanted))
+        .cloned()
+}
+
+/// The models the server holds (`/api/tags`), in its order.
+pub fn models(endpoint: &Endpoint) -> Result<Vec<String>, BrainFailure> {
+    let response = get(endpoint, "/api/tags").map_err(unreachable)?;
+    let status = response.status;
+    let text = response.text().map_err(unreachable)?;
+    if status >= 300 {
+        return Err(refused(status, error_message(status, &text)));
+    }
+    let listed: Value = serde_json::from_str(&text)
+        .map_err(|e| BrainFailure::Protocol(format!("Ollama's model list: {e}")))?;
+    Ok(listed["models"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|m| m["name"].as_str().or(m["model"].as_str()))
+        .map(str::to_owned)
+        .collect())
 }
 
 /// Send the conversation and read the streamed answer. Nothing reaches `on` before Ollama has
@@ -52,6 +139,9 @@ pub fn chat(
     if response.status >= 300 {
         let status = response.status;
         let text = response.text().map_err(unreachable)?;
+        if let Some(missing) = missing_model(status, &text, model) {
+            return Err(missing);
+        }
         return Err(refused(status, error_message(status, &text)));
     }
     on(Piece::Opened);
@@ -233,6 +323,35 @@ fn unreachable(error: io::Error) -> BrainFailure {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn any_model_is_the_first_chat_model_the_server_holds() {
+        let names = ["qwen3-embedding:8b".to_owned(), "qwen3:27b".to_owned()];
+        assert_eq!(
+            super::pick(super::ANY_MODEL, &names).as_deref(),
+            Some("qwen3:27b")
+        );
+        assert_eq!(
+            super::pick(super::ANY_MODEL, &names[..1]),
+            None,
+            "embeddings only"
+        );
+        let latest = ["llama3.2:latest".to_owned()];
+        assert_eq!(
+            super::pick("llama3.2", &latest).as_deref(),
+            Some("llama3.2:latest")
+        );
+    }
+
+    #[test]
+    fn a_model_the_server_does_not_hold_is_not_a_lost_session() {
+        let text = r#"{"error":"model \"llama3.2\" not found, try pulling it first"}"#;
+        assert!(matches!(
+            super::missing_model(404, text, "llama3.2"),
+            Some(desk_brain::BrainFailure::Unreachable(_))
+        ));
+        assert!(super::missing_model(404, "{\"error\":\"session\"}", "x").is_none());
+    }
+
     use super::*;
 
     #[test]

@@ -5,7 +5,8 @@ use std::mem;
 
 use desk_brain::{StopReason, ToolCall, TurnEvent};
 use desk_bridge::{
-    BrainTurnData, BrainTurnEvent, BrainTurnKind, BrainTurnTool, BridgeEvent, MemoryStep,
+    BrainTurnData, BrainTurnEvent, BrainTurnKind, BrainTurnReason, BrainTurnTool, BridgeEvent,
+    MemoryStep,
 };
 
 use crate::events::EventBus;
@@ -41,6 +42,16 @@ impl<'a> Sink<'a> {
     }
 
     pub(crate) fn publish(&self, kind: BrainTurnKind, text: Option<&str>) {
+        self.publish_why(kind, text, None);
+    }
+
+    /// An error or offline, with why (FT-01): the desk offers what fixes it.
+    pub(crate) fn publish_why(
+        &self,
+        kind: BrainTurnKind,
+        text: Option<&str>,
+        reason: Option<BrainTurnReason>,
+    ) {
         self.events.publish(BridgeEvent::BrainTurn(BrainTurnEvent {
             event: Default::default(),
             data: BrainTurnData {
@@ -49,6 +60,7 @@ impl<'a> Sink<'a> {
                 text: text.map(str::to_owned),
                 structured: None,
                 tool: None,
+                reason,
             },
         }));
     }
@@ -70,6 +82,7 @@ impl<'a> Sink<'a> {
                 text: None,
                 structured: None,
                 tool: Some(tool),
+                reason: None,
             },
         }));
     }

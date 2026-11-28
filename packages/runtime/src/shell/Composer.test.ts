@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { borderPoint, windowBox } from "../eris/errand-targets";
 import { SAY_TO_ERIS } from "../eris/look";
 import type { LocalWindowManager } from "../wm/local";
 import { testWindowManager } from "../wm/testing";
 import { takeDesk } from "../wm/view";
-import { mountComposer } from "./Composer";
+import { mountComposer, wayOf } from "./Composer";
 import type { ShellCtx } from "./context";
 import { Store, sampleState } from "./state";
+import { AGENT_LINE, addressBook } from "./talk-address";
 
 /** Any desk snapshot: what the composer sends with every line. */
 const DESK = expect.objectContaining({ screen: expect.any(Object), windows: expect.any(Array) });
@@ -17,6 +19,7 @@ describe("the talk line", () => {
   let dispose: () => void;
   let store: Store;
   let wm: LocalWindowManager;
+  let ctx: ShellCtx;
   const brainSay = vi.fn();
   const notify = vi.fn();
   const erisSay = vi.fn();
@@ -32,7 +35,7 @@ describe("the talk line", () => {
     root = document.createElement("div");
     root.className = "shell";
     document.body.append(root);
-    const ctx = {
+    ctx = {
       store,
       wm,
       runtime: { commands: { list: commands, has: () => false }, notify },
@@ -158,5 +161,73 @@ describe("the talk line", () => {
     expect(key("Escape").defaultPrevented).toBe(true);
     expect(store.get().composer.open).toBe(false);
     expect(input.value).toBe("");
+  });
+
+  it("a_line_about_a_window_sends_about", async () => {
+    await wm.edit([{ op: "adopt", id: "endue.notes", title: "Notes" }]);
+    store.set({ focused: "endue.notes" });
+    type("summarise this");
+    key("Enter");
+    await vi.waitFor(() => expect(brainSay).toHaveBeenCalledOnce());
+    // An address grants nothing: the line and its permission are as before, with `about`.
+    expect(brainSay.mock.calls[0]?.[0]).toBe("summarise this");
+    expect(brainSay.mock.calls[0]?.[2].about).toEqual({ windows: ["endue.notes"] });
+  });
+
+  it("a_line_to_an_agent_does_not_reach_brain_say", async () => {
+    await wm.edit([{ op: "adopt", id: "agent:mira", title: "Mira" }]);
+    addressBook(store).pin(store.get(), {
+      kind: "agent",
+      agent: "mira",
+      local: false,
+      window: "agent:mira",
+      view: "agent:mira",
+    });
+    const heard = vi.fn((e: Event) => e.preventDefault());
+    document.addEventListener(AGENT_LINE, heard);
+    try {
+      type("are you there?");
+      key("Enter");
+      await vi.waitFor(() => expect(heard).toHaveBeenCalledOnce());
+      const line = heard.mock.calls[0]?.[0] as CustomEvent | undefined;
+      expect(line?.detail).toEqual({
+        agent: "mira",
+        view: "agent:mira",
+        text: "are you there?",
+      });
+      expect(brainSay).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener(AGENT_LINE, heard);
+    }
+  });
+
+  it("a_sent_line_flies_to_its_address", async () => {
+    await wm.edit([{ op: "adopt", id: "endue.notes", title: "Notes" }]);
+    store.set({ focused: "endue.notes" });
+    type("summarise this");
+    key("Enter");
+    // The line fades where it stands; a trail in the star's colour leaves for the window.
+    expect(root.querySelector(".absorb")).not.toBeNull();
+    expect(root.querySelectorAll('.trail[data-tone="star"]')).toHaveLength(1);
+    const from = { x: 0, y: 0 };
+    const box = windowBox(root, "endue.notes", ctx);
+    expect(box).toBeDefined();
+    // It ends on the window's border facing the line, where the link's ring is.
+    expect(wayOf(root, "endue.notes", from, ctx)(1)).toEqual(borderPoint(box as never, from));
+    await vi.waitFor(() => expect(brainSay).toHaveBeenCalledOnce());
+  });
+
+  it("with_no_address_it_flies_to_eris", async () => {
+    const body = document.createElement("div");
+    body.className = "eris-body";
+    const rect = { left: 600, top: 80, width: 40, height: 40, right: 640, bottom: 120 };
+    body.getBoundingClientRect = () => ({ ...rect, x: 600, y: 80, toJSON: () => rect });
+    root.append(body);
+    type("hello");
+    key("Enter");
+    expect(root.querySelectorAll(".trail")).toHaveLength(1);
+    expect(wayOf(root, undefined, { x: 0, y: 0 }, ctx)(1)).toEqual({ x: 620, y: 100 });
+    await vi.waitFor(() => expect(brainSay).toHaveBeenCalledOnce());
   });
 });

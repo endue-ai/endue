@@ -6,8 +6,7 @@
  * sleep once quiet (ADR 0164). Delegated work brings her out of the talk line while its moons
  * are present and she docks again once the last one leaves (rest.ts, ADR 0254).
  */
-import userHello from "../bridge/envelopes/user-hello.json";
-import type { Bands, WordTime } from "../bridge/types";
+import type { Bands, BrainTurnReason, WordTime } from "../bridge/types";
 import { moveEris } from "../shell/actions";
 import type { ShellCtx } from "../shell/context";
 import { h, listen } from "../shell/dom";
@@ -15,11 +14,11 @@ import { draggable } from "../shell/drag";
 import { IDLE } from "../shell/ticker";
 import { erisText } from "./copy";
 import { BODY } from "./draw";
-import { audioContext, openMic, sampleEar } from "./ear";
+import { audioContext, openMic } from "./ear";
 import { mountErrands } from "./errand";
 import { mindOf } from "./mind";
 import { defineModelCommands } from "./model";
-import { speakAloud } from "./mouth";
+import { voiceIf } from "./mouth";
 import { atWork, homeOf, pillOf, Rest, showRest, watchCard } from "./rest";
 import { SoulText } from "./SoulText";
 import { mountSaid } from "./said";
@@ -41,6 +40,8 @@ function louder(host: Bands, heard: Bands): number[] {
 
 export interface ErisHandle {
   say(text: string, words?: WordTime[]): void;
+  /** A failed turn (FT-01): her sentence, kept with what fixes it, and her oops. */
+  fail(text: string, reason: BrainTurnReason): void;
   setState(state: ErisState): void;
   /** Start a spoken turn (or, while she listens, stop listening and answer). */
   talk(): void;
@@ -110,6 +111,13 @@ export function mountEris(
   const setState = (state: ErisState) => {
     ctx.store.set((s) => ({ eris: { ...s.eris, state } }));
   };
+  /** A failed turn (FT-01): her sentence, kept with what fixes it, and her oops. */
+  const fail = (text: string, reason: BrainTurnReason) => {
+    said.fail(text, reason);
+    soul.stop(ctx.ticker.now());
+    soul.live.textContent = text;
+    setState("oops");
+  };
   const errands = mountErrands(
     () => (root.closest(".shell") as HTMLElement | null) ?? document.body,
     ctx,
@@ -126,7 +134,6 @@ export function mountEris(
       }
       return (await openMic(ctx.store.get().lang, audio, ctx.bridge.audio)) ?? "none";
     },
-    sampleEar: (at) => sampleEar(userHello, at),
     // A spoken line runs the same agentic loop as a typed one, so its hand-offs are drawn too
     // (ADR 0089), and she speaks once every errand is back.
     answer: async (text) => {
@@ -136,8 +143,19 @@ export function mountEris(
         await errands.finish();
       }
     },
+    hearing: (words) => said.hearing(words),
+    typeInstead: (line) => {
+      if (line) speakLine(line, undefined);
+      // The talk line, with the caret in it.
+      (root.ownerDocument.getElementById("composer-input") as HTMLInputElement | null)?.focus();
+    },
+    failed: (text, reason) => fail(text, reason),
     line: (text, words, pulses) => speakLine(text, words, pulses),
-    voice: speakAloud,
+    voice: voiceIf(() => {
+      const s = ctx.store.get();
+      const mode = s.modes.find((m) => m.manifest.id === s.modeId) ?? s.modes[0];
+      return mode?.eris.manner.voice ?? false;
+    }),
     setState,
     hush: () => {
       const now = ctx.ticker.now();
@@ -325,6 +343,7 @@ export function mountEris(
     say(text, words) {
       speakLine(text, words);
     },
+    fail,
     setState,
     talk() {
       wake();

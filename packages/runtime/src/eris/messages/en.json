@@ -3,11 +3,13 @@
   "eris.said.close": "Close",
   "eris.said.title": "Show what Eris said",
   "eris.said.none": "Eris has said nothing yet.",
+  "eris.said.chooseBrain": "Choose a brain",
+  "eris.said.signIn": "Sign in",
   "eris.talk.summon": "Talk to Eris",
   "eris.status.warning": "Warning",
   "eris.status.critical": "Critical",
-  "eris.talk.heard": "I heard you. This is a sample answer.",
   "eris.talk.nothing": "I didn't catch that. Tap and try again.",
-  "eris.talk.sample": "I heard a sample voice. This is how I talk.",
-  "eris.talk.refused": "I need the microphone to hear you. You can type instead."
+  "eris.talk.refused": "I need the microphone to hear you. You can type instead.",
+  "eris.talk.unheard": "I can't turn speech into words on this computer yet. Type to me instead.",
+  "eris.talk.failed": "I couldn't get an answer to that. Try again in a moment."
 }

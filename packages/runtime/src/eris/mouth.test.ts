@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { syllablePulses, syllables } from "./mouth";
+import { syllablePulses, syllables, voiceIf } from "./mouth";
+import type { Speech } from "./talk";
 
 describe("one pulse per syllable", () => {
   test("Hangul counts its blocks, Latin its vowel groups, and every word has one", () => {
@@ -19,5 +20,23 @@ describe("one pulse per syllable", () => {
       140,
     );
     expect(pulses).toEqual([0, 180, 400, 526]);
+  });
+});
+
+describe("her voice as the profile allows it", () => {
+  test("a_profile_with_voice_off_is_not_spoken_aloud", () => {
+    const spoken: string[] = [];
+    const speech: Speech = { done: Promise.resolve(), stop: () => {} };
+    const speak = (text: string) => {
+      spoken.push(text);
+      return speech;
+    };
+    let voice = false;
+    const say = voiceIf(() => voice, speak);
+    expect(say("Good morning", "en")).toBeNull();
+    expect(spoken).toEqual([]);
+    voice = true;
+    expect(say("Good morning", "en")).toBe(speech);
+    expect(spoken).toEqual(["Good morning"]);
   });
 });

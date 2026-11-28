@@ -1,15 +1,17 @@
 /**
  * A spoken turn with Eris, started by clicking her. She asks for the microphone, listens once the
- * person allows it (the microphone, or a recorded sample voice when it is allowed but there is
- * none), thinks (the brain answers what the platform recognised, or a sample line answers), and
- * speaks (soul text, one pulse per syllable, the platform's voice). Nothing says she listens while
- * the question is open or after a no: a refusal ends the turn with a line saying she can be typed
- * to (issue 161). Each phase from listening on is one of her states, so the mesh flows from
- * listening to thinking to speaking. Time comes in through `toggle(now)` and `update(now)`, so
- * tests drive it frame by frame.
+ * person allows it, showing the words so far, thinks (the brain answers the words she heard, as a
+ * typed line), and speaks (soul text, one pulse per syllable, the platform's voice when the profile
+ * allows it). She never answers with a placeholder (FT-02, ADR 0406): a voice without words is "I
+ * didn't catch that", a computer that cannot turn speech into words opens the talk line instead,
+ * and a failed answer is the turn's own line (ADR 0405). Nothing says she listens while the
+ * question is open or after a no: a refusal ends the turn with a line saying she can be typed to
+ * (issue 161). Each phase from listening on is one of her states, so the mesh flows from listening
+ * to thinking to speaking. Time comes in through `toggle(now)` and `update(now)`, so tests drive it
+ * frame by frame.
  */
 import { wordTimes } from "../bridge/browser";
-import type { Bands, WordTime } from "../bridge/types";
+import type { Bands, BrainTurnReason, WordTime } from "../bridge/types";
 import { erisText } from "./copy";
 import { syllablePulses } from "./mouth";
 import type { ErisState } from "./states";
@@ -22,10 +24,14 @@ export type TalkLang = "ko" | "en";
 export interface Ear {
   /** Nine band energies (0..1) at `now`. */
   bands(now: number): Bands;
-  /** Stop listening; resolves with what the platform recognised ("" when it cannot). */
+  /** Stop listening; resolves with the final words ("" when none were heard). */
   close(): Promise<string>;
   /** False for the recorded sample voice. */
   readonly live: boolean;
+  /** Whether it turns speech into words. */
+  readonly words: boolean;
+  /** The words heard so far. */
+  interim(): string;
 }
 
 /** The platform's voice saying a line. */
@@ -37,21 +43,32 @@ export interface Speech {
 export interface Reply {
   text: string;
   words?: WordTime[];
+  /** Set when the turn failed: `text` is then its own sentence (ADR 0405). */
+  reason?: BrainTurnReason;
 }
 
 /**
  * What asking for the microphone gave: the microphone; `none`, allowed but with no microphone to
- * open (the sample voice stands in); `refused`, the person said no.
+ * open; `refused`, the person or the OS said no to the microphone; `unheard`, this computer cannot
+ * turn speech into words, so no microphone was opened; `speech-refused`, the OS refused speech
+ * recognition.
  */
-export type Opened = Ear | "none" | "refused";
+export type Opened = Ear | "none" | "refused" | "unheard" | "speech-refused";
 
 export interface TalkDeps {
   lang(): TalkLang;
   /** Ask for the microphone and open it once the person allows it. */
   openEar(): Promise<Opened>;
-  /** The recorded sample voice, starting at `at`. */
-  sampleEar(at: number): Ear;
   answer(heard: string): Promise<Reply>;
+  /** The words heard so far, shown under her; "" when there are none. */
+  hearing(words: string): void;
+  /**
+   * She cannot hear words here: say `line` (once a session; null after) and open the talk line
+   * with the caret in it.
+   */
+  typeInstead(line: string | null): void;
+  /** A failed turn: its own sentence, and the command that fixes it. */
+  failed(text: string, reason: BrainTurnReason): void;
   /** Show the line as soul text with these pulses (ms after it starts); returns when it starts. */
   line(text: string, words: WordTime[], pulses: number[]): number;
   /** Say the line aloud; null when the platform has no voice. */
@@ -70,8 +87,6 @@ export const NO_SPEECH_MS = 8000;
 export const MAX_LISTEN_MS = 15000;
 /** Thinking shows at least this long, so it reads even when the answer is instant. */
 export const MIN_THINK_MS = 1100;
-/** Without a microphone, the sample voice starts after this pause. */
-export const SAMPLE_DELAY_MS = 500;
 /** Speaking time per character when the answer has no timestamps (and to time syllables). */
 export const MS_PER_CHAR: Record<TalkLang, number> = { ko: 140, en: 62 };
 /** After the estimated last syllable, the line is still being said for this long. */
@@ -80,20 +95,19 @@ const TAIL_MS = 400;
 export const SPEECH_GRACE_MS = 6000;
 
 /** One of her lines in both languages, from Eris's catalogs (`eris.talk.*`). */
-const both = (key: "heard" | "nothing" | "sample" | "refused") => ({
+const both = (key: "nothing" | "refused" | "unheard" | "failed") => ({
   ko: erisText("ko", `talk.${key}`),
   en: erisText("en", `talk.${key}`),
 });
 
-/** What she says when no words were recognised; short enough for one line of soul text. */
-export const SAMPLE_LINES = {
-  heard: both("heard"),
-  nothing: both("nothing"),
-  sample: both("sample"),
-} as const;
-
-/** What she says when the person did not allow the microphone. */
+/** What she says when she heard a voice and no words; short enough for one line of soul text. */
+export const NOTHING_LINES: Record<TalkLang, string> = both("nothing");
+/** What she says when the person did not allow the microphone, or there is none. */
 export const REFUSED_LINES: Record<TalkLang, string> = both("refused");
+/** What she says, once a session, when this computer cannot turn speech into words. */
+export const UNHEARD_LINES: Record<TalkLang, string> = both("unheard");
+/** What she says when the answer itself could not be had (the bridge failed). */
+export const FAILED_LINES: Record<TalkLang, string> = both("failed");
 
 const SILENT: Bands = Object.freeze([0, 0, 0, 0, 0, 0, 0, 0, 0]);
 const mean = (b: Bands) => b.reduce((a, v) => a + v, 0) / Math.max(1, b.length);
@@ -105,7 +119,8 @@ export class Talk {
   #turn = 0;
   #now = 0;
   #ear: Ear | undefined;
-  #sample = false;
+  /** Whether she said, this session, that she cannot hear words here. */
+  #toldUnheard = false;
   #since = 0;
   #heard = false;
   #lastLoud = 0;
@@ -170,22 +185,26 @@ export class Talk {
     const turn = ++this.#turn;
     this.#phase = "asking";
     this.#heard = false;
-    this.#sample = false;
+    this.#deps.hearing("");
     const arrive = (opened: Opened) => {
       if (turn !== this.#turn || this.#phase !== "asking") {
         if (typeof opened === "object") void opened.close();
         return;
       }
-      if (opened === "refused") {
+      if (opened === "refused" || opened === "none") {
         this.#speak({ text: REFUSED_LINES[this.#deps.lang()] });
+        return;
+      }
+      if (opened === "unheard" || opened === "speech-refused" || !opened.words) {
+        if (typeof opened === "object") void opened.close();
+        this.#typeInstead(opened === "speech-refused");
         return;
       }
       // The clock starts once she can hear: a permission prompt is not silence.
       this.#phase = "listening";
       this.#since = this.#now;
       this.#lastLoud = this.#now;
-      this.#sample = opened === "none";
-      this.#ear = opened === "none" ? this.#deps.sampleEar(this.#now + SAMPLE_DELAY_MS) : opened;
+      this.#ear = opened;
       this.#deps.setState("listening");
     };
     this.#deps.openEar().then(arrive, () => arrive("refused"));
@@ -194,6 +213,7 @@ export class Talk {
   #listening(now: number): Bands {
     if (!this.#ear) return SILENT;
     const bands = this.#ear.bands(now);
+    this.#deps.hearing(this.#ear.interim());
     if (mean(bands) > SPEECH_LEVEL) {
       this.#heard = true;
       this.#lastLoud = now;
@@ -209,28 +229,42 @@ export class Talk {
   #think(now: number): void {
     const turn = this.#turn;
     const ear = this.#ear;
-    const heard = this.#heard;
-    const sample = this.#sample;
     this.#ear = undefined;
     this.#phase = "thinking";
     this.#since = now;
     this.#reply = undefined;
     this.#deps.setState("thinking");
     const lang = this.#deps.lang();
-    const fallback = (key: keyof typeof SAMPLE_LINES): Reply => ({ text: SAMPLE_LINES[key][lang] });
     void (async () => {
       const text = ((await ear?.close().catch(() => "")) ?? "").trim();
-      let reply: Reply;
-      if (text) {
-        reply = await this.#deps.answer(text).catch(() => fallback("heard"));
-      } else {
-        reply = fallback(sample ? "sample" : heard ? "heard" : "nothing");
-      }
+      if (turn !== this.#turn) return;
+      // The final words stay under her as the turn's first line.
+      this.#deps.hearing(text);
+      const reply: Reply = text
+        ? await this.#deps
+            .answer(text)
+            .catch((): Reply => ({ text: FAILED_LINES[lang], reason: "failed" }))
+        : { text: NOTHING_LINES[lang] };
       if (turn === this.#turn && this.#phase === "thinking") this.#reply = reply;
     })();
   }
 
+  /** She cannot hear words here: once a session she says so; the talk line opens every time. */
+  #typeInstead(refused: boolean): void {
+    const told = this.#toldUnheard && !refused;
+    this.#toldUnheard = true;
+    this.#phase = "off";
+    this.#deps.setState("idle");
+    this.#deps.typeInstead(told ? null : UNHEARD_LINES[this.#deps.lang()]);
+  }
+
   #speak(reply: Reply): void {
+    if (reply.reason) {
+      this.#phase = "off";
+      this.#reply = undefined;
+      this.#deps.failed(reply.text, reply.reason);
+      return;
+    }
     const ms = MS_PER_CHAR[this.#deps.lang()];
     const words = reply.words?.length ? reply.words : wordTimes(reply.text, ms);
     const start = this.#deps.line(reply.text, words, syllablePulses(words, ms));

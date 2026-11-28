@@ -49,9 +49,10 @@ describe("the brain popover (ADR 0094)", () => {
       b.getAttribute("aria-checked"),
     ]);
 
-  it("offers endue AI, Claude Code, local and echo and marks the brain the desk chose", () => {
+  it("offers endue AI, Codex, Claude Code, local and echo and marks the brain the desk chose", () => {
     expect(segments()).toEqual([
       ["brain-endue", "true"],
+      ["brain-codex", "false"],
       ["brain-claude", "false"],
       ["brain-local", "false"],
       ["brain-echo", "false"],
@@ -64,9 +65,16 @@ describe("the brain popover (ADR 0094)", () => {
     root.querySelector<HTMLButtonElement>("[data-key=brain-claude]")?.click();
     await vi.waitFor(() => expect(store.get().brain).toEqual(claude));
     expect(use).toHaveBeenCalledWith("claude");
-    expect(segments()[1]).toEqual(["brain-claude", "true"]);
+    expect(segments()[2]).toEqual(["brain-claude", "true"]);
     const item = root.querySelector('[data-rail="brain"]');
     await vi.waitFor(() => expect(item?.getAttribute("aria-label")).toBe("brainClaude"));
+  });
+
+  it("names the brain that stands in for the chosen one", async () => {
+    store.set({ brain: { mode: "cloud", credits: 0, brain: "endue", answering: "codex" } });
+    const item = root.querySelector('[data-rail="brain"]');
+    await vi.waitFor(() => expect(item?.getAttribute("aria-label")).toBe("brainCodex"));
+    expect(segments()[0]).toEqual(["brain-endue", "true"]);
   });
 
   it("switches through bridge.brain.use and shows what the desk answers", async () => {
@@ -75,12 +83,12 @@ describe("the brain popover (ADR 0094)", () => {
     root.querySelector<HTMLButtonElement>("[data-key=brain-local]")?.click();
     await vi.waitFor(() => expect(store.get().brain).toEqual(local));
     expect(use).toHaveBeenCalledWith("local");
-    expect(segments()[2]).toEqual(["brain-local", "true"]);
+    expect(segments()[3]).toEqual(["brain-local", "true"]);
   });
 
   it("keeps the chosen brain marked while the local brain stands in for it", () => {
     store.set({ brain: { mode: "local", model: "llama3.2", brain: "echo", fallback: true } });
-    expect(segments()[3]).toEqual(["brain-echo", "true"]);
+    expect(segments()[4]).toEqual(["brain-echo", "true"]);
     const note = root.querySelector("[data-popover=brain] .brain-fallback");
     expect(note?.textContent).toBe("brainFallback");
   });

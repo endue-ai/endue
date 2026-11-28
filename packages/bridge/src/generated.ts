@@ -845,7 +845,7 @@ export type Role = string;
 /** Semantic version, for example 0.1.0 or 1.2.3-beta.1. */
 export type Version = string;
 
-/** ui runs in a sandboxed iframe, logic in a Wasm instance, tool as an MCP server inside the VM. policy runs no code: it only contributes data (ADR 0017). library runs no code of its own either: it is files other plugins import, served at /<id>/... like any plugin's, never mounted and never turned off. connector brings an app's data in as items, as a Wasm component, an MCP server or an http block the core runs (no entry; ADR 0106); view runs no code either: it is one or more views (ADR 0032). theme runs no code: it is a theme block and its font and image files, chosen with desk.theme.active (ADR 0056). design-system runs no code either: it is a designSystem block of component recipes, chosen with desk.design.active (ADR 0090). pack runs no code either: a pack block naming the plugins it brings (nested in its folder or on the desk), its own views and its contributed layout (ADR 0108). native is a program per OS (its native block, no entry) that the desk starts as a process of its own: it draws its surface over specs/surface and calls the bridge over the connection the desk gave it, as itself; it is not sandboxed, only its bridge calls are checked (ADR 0154). */
+/** ui runs in a sandboxed iframe, logic in a Wasm instance, tool as an MCP server inside the VM. policy runs no code: it only contributes data (ADR 0017). library runs no code of its own either: it is files other plugins import, served at /<id>/... like any plugin's, never mounted and never turned off. connector brings an app's data in as items, as a Wasm component, an MCP server, an http block the core runs (no entry; ADR 0106) or an endue block over the endue account's connectors (no entry; ADR 0409); view runs no code either: it is one or more views (ADR 0032). theme runs no code: it is a theme block and its font and image files, chosen with desk.theme.active (ADR 0056). design-system runs no code either: it is a designSystem block of component recipes, chosen with desk.design.active (ADR 0090). pack runs no code either: a pack block naming the plugins it brings (nested in its folder or on the desk), its own views and its contributed layout (ADR 0108). native is a program per OS (its native block, no entry) that the desk starts as a process of its own: it draws its surface over specs/surface and calls the bridge over the connection the desk gave it, as itself; it is not sandboxed, only its bridge calls are checked (ADR 0154). */
 export type PluginKind =
   | "ui"
   | "logic"
@@ -1828,6 +1828,7 @@ export interface ViewProvenance {
 export interface ConnectorManifest {
   binding: ConnectorBinding;
   http?: HttpBinding;
+  endue?: EndueBinding;
   auth: ConnectorAuth;
   /** The kinds of item the connector brings in, one entry per kind. */
   resources: ConnectorResource[];
@@ -1836,11 +1837,11 @@ export interface ConnectorManifest {
   instanceSettings?: Record<string, ConnectorSetting>;
 }
 
-/** How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106). */
-export type ConnectorBinding = "wasm" | "mcp" | "http";
+/** How the connector runs: wasm, a component the plugin's entry names (no VM to boot); mcp, an MCP server inside the VM that follows the endue profile in the README; http, requests and a mapping the core runs from the http block, with no code of the plugin's own (ADR 0106); endue, the endue account's connectors, whose tools the core calls with the desk's own key from the endue block (ADR 0409). */
+export type ConnectorBinding = "wasm" | "mcp" | "http" | "endue";
 
-/** none (local files, the OS's own data), token (a key the person pastes) or oauth. */
-export type ConnectorAuthKind = "none" | "token" | "oauth";
+/** none (local files, the OS's own data), token (a key the person pastes), oauth, or endue: the endue account the desk signed in to, with no connect step on the desk (binding endue). */
+export type ConnectorAuthKind = "none" | "token" | "oauth" | "endue";
 
 /** How an instance signs in. Tokens are kept by the core and never handed to the connector's code; with binding http the core itself sends the token (http.auth). No v0 method starts an OAuth flow yet. */
 export interface ConnectorAuth {
@@ -1920,24 +1921,123 @@ export interface HttpItemMap {
   fields: Record<string, HttpValue>;
 }
 
-/** One item field's value: a JSON pointer into the record (empty is the whole record), or an object that reads one and shapes it. A null or missing value leaves the field out, unless default gives one. */
-export type HttpValue = JsonPointer | HttpRead | HttpConst;
+/** One item field's value: a JSON pointer into the record (empty is the whole record), an object that reads one and shapes it, a constant, an object of values, a value of the instance, or the first of several that reads something. A null or missing value leaves the field out, unless default gives one. */
+export type HttpValue =
+  | JsonPointer
+  | HttpRead
+  | HttpConst
+  | HttpObject
+  | HttpInstanceValue
+  | HttpFirst;
+
+/** The first of these values that reads something other than null or the empty text. */
+export interface HttpFirst {
+  first: HttpValue[];
+}
 
 /** Read the value at pointer and shape it. */
 export interface HttpRead {
   pointer: JsonPointer;
   /** Keep the text after the last occurrence of this text; a value without it is missing. */
   after?: string;
+  /** Keep the text before the first occurrence of this text (\n keeps the first line); a value without it is kept whole. */
+  before?: string;
   /** Replace the value, as text, by the one it names; one it does not name is missing. */
   values?: Record<string, unknown>;
   /** The value when the pointer reads nothing, or nothing that values or after keep. */
   default?: unknown;
 }
 
+/** An object of values, by name, each one as a field's value is read; one that reads nothing is left out, and an object that keeps none is missing. */
+export interface HttpObject {
+  object: Record<string, HttpValue>;
+}
+
+/** A value of the instance the record came from, or of the sync that reads it (HttpInstanceField). */
+export interface HttpInstanceValue {
+  instance: HttpInstanceField;
+}
+
+/** Which value: the instance's id or title, type (the endue account connector's type; missing for the other bindings), or syncedAt (when this sync began). */
+export type HttpInstanceField = "id" | "title" | "type" | "syncedAt";
+
 /** The same value for every record. */
 export interface HttpConst {
   /** This value for every record. */
   const: unknown;
+}
+
+/** A connector as data over the endue account's connectors (binding endue, ADR 0409): every account connector that offers all of tools is an instance, named by its display name. The core calls their tools with the desk's own key (ADR 0407), maps what the requests answer into items, and runs the actions as commands. Nothing of the plugin runs, and it needs no net:fetch. */
+export interface EndueBinding {
+  /** The tool endings an account connector must offer, all of them, to be an instance: social_read matches <type>__social_read. The core never reads the type. */
+  tools: EndueToolName[];
+  /** What one sync asks for, in order. The same item from two requests is one item, the last one read. */
+  requests: EndueRequest[];
+  /** How a record becomes an item, by name, as the http binding's maps; each request names one. */
+  maps: Record<string, HttpItemMap>;
+  /** By id of a command the plugin declares in contributes.commands: the tool that command calls. */
+  actions?: Record<string, EndueAction>;
+  /** Tool calls one sync of one instance makes at most; 30 when absent. A sync that spends it writes what it read and removes nothing. */
+  budget?: number;
+}
+
+/** A tool's name after its connector's type and two underscores: social_read. */
+export type EndueToolName = string;
+
+/** The name of one argument a tool takes: operation, cursor, since. */
+export type EndueArgumentName = string;
+
+/** One tool call of a sync and the pages after it: the records at items in the answer's data, the next page's cursor at next. */
+export interface EndueRequest {
+  tool: EndueToolName;
+  /** The tool's arguments, by name. */
+  arguments?: Record<string, EndueRequestArgument>;
+  /** Where the records are in the answer's data: a JSON pointer to an array, or to one object, which is one record; empty for the data itself. */
+  items: JsonPointer;
+  /** Where the next page's cursor is in the answer's data. Absent, or nothing there: the last page. */
+  next?: JsonPointer;
+  /** Pages read at most; 10 when absent. */
+  maxPages?: number;
+  map: HttpMapName;
+  /** A refusal whose reason is unsupported skips this request instead of failing the sync. */
+  optional?: boolean;
+}
+
+/** One argument of a request: the same value every time; page, the cursor the previous page's next pointed to (absent on the first page); or since, the time of the instance's last good sync (RFC 3339, absent before the first). A request with since only adds and changes items. */
+export type EndueRequestArgument = HttpConst | EnduePage | EndueSince;
+
+/** The next page's cursor. */
+export interface EnduePage {
+  page: true;
+}
+
+/** The time of the last good sync. */
+export interface EndueSince {
+  since: true;
+}
+
+/** What a tool's call does: read; write; send (others see it); destructive (cannot be taken back). An action on a send or destructive tool is an irreversible command, and a tool whose risk is higher than its action says is refused before it is called. */
+export type EndueRisk = "read" | "write" | "send" | "destructive";
+
+/** The tool a command calls and its arguments. Every call carries one Idempotency-Key per invocation, the same on a retry. */
+export interface EndueAction {
+  tool: EndueToolName;
+  risk: EndueRisk;
+  /** The tool's arguments, by name. */
+  arguments?: Record<string, EndueActionArgument>;
+}
+
+/** One argument of an action: the same value every time; arg, the command's argument of that name (left out when the command has none); or file, the path a command argument names, uploaded first and sent as what the upload answered. */
+export type EndueActionArgument = HttpConst | EndueArg | EndueFile;
+
+/** The command's argument of this name. */
+export interface EndueArg {
+  arg: EndueArgumentName;
+}
+
+/** The file at the path the command's argument of this name holds. */
+export interface EndueFile {
+  file: EndueArgumentName;
 }
 
 /** One kind of item the connector brings in, and the commands that act on it. */
@@ -2289,7 +2389,7 @@ export type AccountState = "signed-out" | "signing-in" | "signed-in";
 /** Which endue ID page the person starts on: sign-in, or sign-up to create an account. Either way they end signed in. */
 export type AccountScreen = "sign-in" | "sign-up";
 
-/** Which kind of problem the last step ran into, for the runtime to word: offline (endue could not be reached), denied (turned down in the browser), expired (the code ran out), slow-down (too many attempts; endue asked the desk to wait), unavailable (endue answered with a server error), suspended (the account is suspended), rejected (endue refused to renew the session, which the desk keeps), session-expired (the session ended, so the desk signed out), failed (anything else). */
+/** Which kind of problem the last step ran into, for the runtime to word: offline (endue could not be reached), denied (turned down in the browser), expired (the code ran out), slow-down (too many attempts; endue asked the desk to wait), unavailable (endue answered with a server error), suspended (the account is suspended), pending-approval (the account waits for endue to approve its sign-up, as sign-ups from some email domains do), region-unavailable (endue is not offered where the person signs in from), rejected (endue refused to renew the session, which the desk keeps), session-expired (the session ended, so the desk signed out), failed (anything else). */
 export type AccountProblem =
   | "offline"
   | "denied"
@@ -2297,6 +2397,8 @@ export type AccountProblem =
   | "slow-down"
   | "unavailable"
   | "suspended"
+  | "pending-approval"
+  | "region-unavailable"
   | "rejected"
   | "session-expired"
   | "failed";
@@ -2456,6 +2558,72 @@ export type AccountSettingsGetResult = AccountSettings;
 
 /** Result of account.settings.update: the settings now. */
 export type AccountSettingsUpdateResult = AccountSettings;
+
+/** What the desk's own key may do with the account's connectors: read (always), publish (send) and delete. publish and delete are asked for the first time the person does such a thing. */
+export type AccountConnectorPower = "read" | "publish" | "delete";
+
+/** active: the connector works. expired: it must be reconnected on endue.ai; the desk cannot reconnect it. */
+export type AccountConnectorState = "active" | "expired";
+
+/** What account.connectors.enable may add to the desk's key: publish (send) or delete. */
+export type AccountConnectorGrant = "publish" | "delete";
+
+/** One of the account's connectors as the desk's key sees it. expired ones must be reconnected on endue.ai: reconnectUrl is that page. */
+export interface AccountConnector {
+  id: string;
+  type: string;
+  name?: string;
+  title?: string;
+  state: AccountConnectorState;
+  tools: number;
+  reconnectUrl?: string;
+}
+
+/** Whether the desk uses the endue account's connectors, with what it may do, when its key was made (ms since the epoch), the connectors it can see and, for people, why the last step did not go through. No key is ever in it. */
+export interface AccountConnectors {
+  enabled: boolean;
+  may: AccountConnectorPower[];
+  keyName?: string;
+  createdAt?: number;
+  connectors: AccountConnector[];
+  problem?: string;
+}
+
+/** Parameters of account.connectors.enable: the scope and, optionally, what else the key may do. The desk makes a key for itself with the session when there is none, and replaces it with a wider one when allow asks for more. */
+export interface AccountConnectorsEnableParams {
+  scope: AccountManagePermission;
+  allow?: AccountConnectorGrant[];
+}
+
+/** Whether the desk uses the endue account's connectors, and the connectors it can see. Nothing is sent without the desk's own key. */
+export interface AccountConnectorsStatusRequest {
+  id: RequestId;
+  method: "account.connectors.status";
+  params: AccountParams;
+}
+
+/** Turn on "Use my endue connectors on this desk", or let its key publish or delete too. The key is kept in the OS keychain only. */
+export interface AccountConnectorsEnableRequest {
+  id: RequestId;
+  method: "account.connectors.enable";
+  params: AccountConnectorsEnableParams;
+}
+
+/** Turn it off: the desk revokes its key at endue AI and deletes it from the keychain. A revoke that cannot reach endue AI is said in problem and tried again at the next start. */
+export interface AccountConnectorsDisableRequest {
+  id: RequestId;
+  method: "account.connectors.disable";
+  params: AccountParams;
+}
+
+/** Result of account.connectors.status. */
+export type AccountConnectorsStatusResult = AccountConnectors;
+
+/** Result of account.connectors.enable. */
+export type AccountConnectorsEnableResult = AccountConnectors;
+
+/** Result of account.connectors.disable. */
+export type AccountConnectorsDisableResult = AccountConnectors;
 
 /** The account changed: a sign-in began, finished or failed, the session was renewed with a problem or ended, the profile arrived or changed, or the desk signed out. Sent to holders of account:manage. */
 export interface AccountChangedEvent {
@@ -2811,7 +2979,7 @@ export interface AgentsChangedEvent {
   data: AgentsChangedData;
 }
 
-/** Start capturing the microphone. With wakeWord, audio.wake events arrive when the wake word is heard. */
+/** Start capturing the microphone. With transcribe, audio.heard events carry the words heard on this computer: unsupported when no on-device recogniser serves the language, forbidden when the OS refuses speech recognition; nothing opens for either. With wakeWord, audio.wake events arrive when the wake word is heard. */
 export interface AudioCaptureStartRequest {
   id: RequestId;
   method: "audio.capture.start";
@@ -2824,8 +2992,17 @@ export interface AudioCaptureStartParams {
   wakeWord?: boolean;
   /** Samples per second. */
   sampleRate?: number;
+  transcribe?: AudioTranscribe;
   scope: AudioCapturePermission;
 }
+
+/** Turn the capture into words on this computer, in the desk's language. No audio leaves the computer for recognition. */
+export interface AudioTranscribe {
+  lang: AudioLang;
+}
+
+/** A language a capture is transcribed in. */
+export type AudioLang = "ko" | "en";
 
 /** Result of audio.capture.start. */
 export interface AudioCaptureStartResult {
@@ -2864,6 +3041,21 @@ export interface AudioFrameData {
   pcm: string;
   rmsDb: number;
   peakDb: number;
+}
+
+/** The words heard so far in a capture that transcribes, for the caller that started it, then the final words once, before audio.ended. */
+export interface AudioHeardEvent {
+  event: "audio.heard";
+  data: AudioHeardData;
+}
+
+/** Payload of audio.heard. */
+export interface AudioHeardData {
+  captureId: string;
+  /** Every word heard since the capture started; empty when none were. */
+  text: string;
+  /** True once, for the final words, after the capture stopped. */
+  final: boolean;
 }
 
 /** A capture ended; no audio.frame for it follows. Comes once per capture. */
@@ -2946,6 +3138,12 @@ export interface BrainDesk {
   /** The windows closed recently, the last one closed first; desk.windows.reopen brings one back where it was. */
   closed?: BrainDeskClosed[];
   capabilities?: BrainDeskCapabilities;
+  about?: BrainDeskAbout;
+}
+
+/** What the line is about (FT-04, ADR 0407): the windows the talk line names, by id, each one of this snapshot's windows. "This" in the line means them, and their plugins' tools come first. It grants nothing: a line about a window still asks every question it would ask without. Absent: the line is about nothing in particular. */
+export interface BrainDeskAbout {
+  windows: string[];
 }
 
 /** One desktop (window view): its id, which windows name in `desktop`, its name for people, whether it is the one in front, and how far its canvas is panned. */
@@ -3192,8 +3390,8 @@ export interface BrainStatusParams {
 /** Result of brain.status: a brain on this machine with its model, a brain in the cloud, or offline. */
 export type BrainStatusResult = BrainStatusLocal | BrainStatusCloud | BrainStatusOffline;
 
-/** A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo) or claude (the person's own Claude Code, asked without its tools, ADR 0109). */
-export type BrainName = "endue" | "local" | "echo" | "claude";
+/** A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo), claude (the person's own Claude Code, asked without its tools, ADR 0109) or codex (the person's own Codex CLI, asked the same way). A chosen brain that cannot answer hands the turn to the next of endue, codex, claude and local that can. */
+export type BrainName = "endue" | "local" | "echo" | "claude" | "codex";
 
 /** A brain on this machine, named by the model it runs. fallback is true when it answers in place of the chosen brain, which cannot be reached now (ADR 0094). */
 export interface BrainStatusLocal {
@@ -3211,6 +3409,8 @@ export interface BrainStatusCloud {
   credits?: number;
   /** The brain the desk chose. Absent from desks that cannot choose. */
   brain?: BrainName;
+  /** The brain that answers in place of the chosen one, which cannot answer now. Absent while the chosen brain answers. */
+  answering?: BrainName;
 }
 
 /** The brain cannot be reached now, or the desk has none. */
@@ -3234,7 +3434,11 @@ export interface BrainTurnData {
   /** brain.ask only, on completed: the arguments the brain called the tool with, checked against its schema. Absent when the brain answered in text instead. */
   structured?: Record<string, unknown>;
   tool?: BrainTurnTool;
+  reason?: BrainTurnReason;
 }
+
+/** error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people. */
+export type BrainTurnReason = "no_brain" | "signed_out" | "read_only" | "too_many_steps" | "failed";
 
 /** started, delta (more text), completed; error (the turn failed, for example read-only after a takeover); offline (the brain is unreachable, the turn waits) and online (it resumed); tool (Eris hands work to a plugin command: the core runs the brain's call) and tool-result (the command answered and its answer went back to the brain). */
 export type BrainTurnKind =
@@ -3382,6 +3586,9 @@ export type BridgeRequest =
   | AccountSignOutRequest
   | AccountSettingsGetRequest
   | AccountSettingsUpdateRequest
+  | AccountConnectorsStatusRequest
+  | AccountConnectorsEnableRequest
+  | AccountConnectorsDisableRequest
   | AgentsListRequest
   | AgentsSessionsRequest
   | AgentsTranscriptRequest
@@ -3505,6 +3712,7 @@ export type BridgeEvent =
   | DbParameterEvent
   | DbClosedEvent
   | AudioFrameEvent
+  | AudioHeardEvent
   | AudioEndedEvent
   | AudioCapturingEvent
   | AudioWakeEvent
@@ -8554,6 +8762,12 @@ export interface BridgeMethodMap {
     params: AccountSettingsUpdateParams;
     result: AccountSettingsUpdateResult;
   };
+  "account.connectors.status": { params: AccountParams; result: AccountConnectorsStatusResult };
+  "account.connectors.enable": {
+    params: AccountConnectorsEnableParams;
+    result: AccountConnectorsEnableResult;
+  };
+  "account.connectors.disable": { params: AccountParams; result: AccountConnectorsDisableResult };
   "agents.list": { params: AgentsParams; result: AgentsListResult };
   "agents.sessions": { params: AgentsSessionsParams; result: AgentsSessionsResult };
   "agents.transcript": { params: AgentsTranscriptParams; result: AgentsTranscriptResult };
@@ -8757,6 +8971,9 @@ export const BRIDGE_METHODS = [
   "account.signOut",
   "account.settings.get",
   "account.settings.update",
+  "account.connectors.status",
+  "account.connectors.enable",
+  "account.connectors.disable",
   "agents.list",
   "agents.sessions",
   "agents.transcript",

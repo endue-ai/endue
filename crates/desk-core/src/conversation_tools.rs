@@ -3,7 +3,7 @@
 //! 0096). Split from conversation.rs, which holds the turn loop.
 
 use desk_brain::{ToolCall, ToolDefinition, TurnContext};
-use desk_bridge::{BrainDesk, BrainTurnTool, MemoryStep};
+use desk_bridge::{BrainDesk, BrainTurnReason, BrainTurnTool, MemoryStep};
 use serde_json::Value;
 
 use crate::conversation::BrainMode;
@@ -33,6 +33,15 @@ pub(crate) trait Tools: Send + Sync {
     /// What the brain is told before a turn on `line` (ADR 0096).
     fn context(&self, _line: &str) -> Option<TurnContext> {
         None
+    }
+    /// The desk's turn `turn` failed for `reason`; `why` is what the brain said, if it said anything.
+    fn failed(
+        &self,
+        _turn: &str,
+        _mode: &BrainMode,
+        _reason: BrainTurnReason,
+        _why: Option<String>,
+    ) {
     }
     /// A turn ended in words: what was asked, the answer and the commands its errands ran.
     fn finished(&self, _asked: &str, _answered: &str, _steps: Vec<MemoryStep>) {}

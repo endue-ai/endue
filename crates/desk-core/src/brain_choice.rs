@@ -1,8 +1,9 @@
 //! The brains a desk chooses from (ADR 0094): endue AI, the local brain on Ollama,
-//! examples/brain-echo and the person's own Claude Code (ADR 0109). The runtime's own setting `brain.use` picks one for every turn (init.yaml:
+//! examples/brain-echo and the person's own Claude Code (ADR 0109) and Codex. The runtime's own setting `brain.use` picks one for every turn (init.yaml:
 //! `desk.brain.use`), `brain.model` names the local model and `brain.claude-model` Claude Code's
 //! (ADR 0296; empty: Claude Code's own). A remote brain that cannot be reached
-//! hands its turns to the local brain; a local choice never reaches out. Each brain keeps its
+//! hands its turns to the next of endue, Codex, Claude Code and the local brain that can answer
+//! (FALLBACK_ORDER); a local choice never reaches out. Each brain keeps its
 //! sessions in a file of its own, and they share turn numbers so turn ids never repeat.
 
 use std::collections::BTreeMap;
@@ -17,8 +18,18 @@ use crate::conversation::{BrainMode, BrainOptions, Conversation, Fallback, Tools
 use crate::events::EventBus;
 use crate::handler::Core;
 
-/// The local model when the runtime's `brain.model` names none.
-pub const DEFAULT_LOCAL_MODEL: &str = "llama3.2";
+/// The order a turn goes down when its brain cannot answer: the person's endue AI, then their own
+/// Codex, their own Claude Code, then a model on this computer.
+pub const FALLBACK_ORDER: [BrainName; 4] = [
+    BrainName::Endue,
+    BrainName::Codex,
+    BrainName::Claude,
+    BrainName::Local,
+];
+
+/// The local model when the runtime's `brain.model` names none: any chat model the server holds
+/// (desk-brain-local's `ANY_MODEL`), never one it does not.
+pub const DEFAULT_LOCAL_MODEL: &str = "any";
 /// The runtime's settings that choose the brain: the owner and the keys.
 const OWNER: &str = "desk";
 const USE: &str = "brain.use";
@@ -35,6 +46,7 @@ pub struct Brains {
     endue: Option<Arc<dyn Brain>>,
     echo: Option<Arc<dyn Brain>>,
     claude: Option<Arc<dyn Brain>>,
+    codex: Option<Arc<dyn Brain>>,
     claude_models: Option<LocalBrains>,
     local: Option<LocalBrains>,
     folder: Option<PathBuf>,
@@ -58,6 +70,13 @@ impl Brains {
     /// endue, a turn it cannot answer goes to the local brain.
     pub fn with_claude(mut self, brain: Arc<dyn Brain>) -> Self {
         self.claude = Some(brain);
+        self
+    }
+
+    /// The person's own Codex CLI, asked as Claude Code is. Like endue, a turn it cannot answer
+    /// goes down FALLBACK_ORDER.
+    pub fn with_codex(mut self, brain: Arc<dyn Brain>) -> Self {
+        self.codex = Some(brain);
         self
     }
 
@@ -98,6 +117,7 @@ impl Brains {
             BrainName::Endue => self.endue.is_some(),
             BrainName::Echo => self.echo.is_some(),
             BrainName::Claude => self.claude.is_some(),
+            BrainName::Codex => self.codex.is_some(),
             BrainName::Local => self.local.is_some(),
         }
     }
@@ -123,8 +143,9 @@ pub(crate) struct BrainChoice {
 
 impl BrainChoice {
     fn pick(&self, chosen: BrainName, model: &str, claude_model: &str) -> Option<Picked> {
-        let name = [chosen, BrainName::Endue, BrainName::Echo, BrainName::Local]
+        let name = [chosen, BrainName::Endue, BrainName::Echo]
             .into_iter()
+            .chain(FALLBACK_ORDER)
             .find(|name| self.brains.has(*name))?;
         let conversation = match name {
             BrainName::Claude
@@ -134,13 +155,17 @@ impl BrainChoice {
             }
             _ => self.conversation(name, model)?,
         };
-        let fallback = (name != BrainName::Local)
-            .then(|| self.conversation(BrainName::Local, model))
-            .flatten()
-            .map(|to| Fallback {
-                to,
-                said: Arc::clone(&self.said),
-            });
+        let chain: Vec<_> = FALLBACK_ORDER
+            .into_iter()
+            .filter(|_| name != BrainName::Local)
+            .filter(|next| *next != name && self.brains.has(*next))
+            .filter_map(|next| Some((next, self.conversation(next, model)?)))
+            .collect();
+        let fallback = (!chain.is_empty()).then(|| Fallback {
+            chain,
+            said: Arc::clone(&self.said),
+            standing_in: false,
+        });
         Some(Picked {
             conversation,
             fallback,
@@ -166,6 +191,11 @@ impl BrainChoice {
                 "brain-claude.json".to_owned(),
                 BrainMode::Cloud,
             ),
+            BrainName::Codex => (
+                "codex".to_owned(),
+                "brain-codex.json".to_owned(),
+                BrainMode::Cloud,
+            ),
             BrainName::Local => (
                 format!("local:{model}"),
                 format!("brain-local-{}.json", file_safe(model)),
@@ -181,6 +211,7 @@ impl BrainChoice {
             BrainName::Endue => self.brains.endue.clone()?,
             BrainName::Echo => self.brains.echo.clone()?,
             BrainName::Claude => self.brains.claude.clone()?,
+            BrainName::Codex => self.brains.codex.clone()?,
             BrainName::Local => (self.brains.local.as_ref()?)(model).ok()?,
         };
         Some(self.keep(key, file, mode, brain))
@@ -249,7 +280,12 @@ fn file_safe(model: &str) -> String {
 impl Core {
     /// Let the runtime's setting choose Eris's brain among `brains` for every turn (ADR 0094).
     pub fn with_brains(mut self, brains: Brains) -> Self {
-        for file in ["brain.json", "brain-echo.json", "brain-claude.json"] {
+        for file in [
+            "brain.json",
+            "brain-echo.json",
+            "brain-claude.json",
+            "brain-codex.json",
+        ] {
             if let Some(folder) = &brains.folder {
                 self.screen_state(&folder.join(file), crate::sessions::readable);
             }

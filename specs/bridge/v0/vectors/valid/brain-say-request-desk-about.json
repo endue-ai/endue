@@ -1,0 +1,35 @@
+{
+  "target": "BridgeRequest",
+  "description": "a line about one window (ADR 0407): the talk line names Notes while Git has the focus",
+  "instance": {
+    "id": 32,
+    "method": "brain.say",
+    "params": {
+      "text": "summarise this",
+      "desk": {
+        "screen": { "w": 1440, "h": 900 },
+        "windows": [
+          {
+            "id": "window-2",
+            "x": 720,
+            "y": 60,
+            "w": 680,
+            "h": 760,
+            "focused": true,
+            "panes": [{ "view": "plugin:endue.git", "plugin": "endue.git", "title": "Git" }]
+          },
+          {
+            "id": "notes",
+            "x": 40,
+            "y": 60,
+            "w": 640,
+            "h": 420,
+            "panes": [{ "view": "plugin:endue.notes", "plugin": "endue.notes", "title": "Notes" }]
+          }
+        ],
+        "about": { "windows": ["notes"] }
+      },
+      "scope": { "permission": "brain:converse" }
+    }
+  }
+}

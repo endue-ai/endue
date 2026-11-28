@@ -16,6 +16,8 @@ served as `account.settings.*` (`specs/bridge/v0/account.schema.json`) under `ac
 | Conversations | `listConversations` (the Home board), `createAgentConversation`, `runAgentConversation` |
 | Spaces | `listSpaces` (with summaries), `getSpace`, `getSpaceOverview`, `listSpaceRooms`, `ensureSpaceConversation` |
 | Account | `getMe`, `updateMe`, `getMyPreferences`, `updateMyPreferences` (language, time zone), `getNotificationPreferences`, `updateNotificationPreferences` |
+| The desk's own key | `createApiKey`, `revokeApiKey` (with the session) |
+| Connectors | `listConnectors`, `listConnectorTools`, `callConnectorTool` (with the desk's own key, never the session) |
 
 ## Base, token and envelopes
 

@@ -1,4 +1,6 @@
+import { SAMPLE_WORDS, type ScriptedWord, scriptedMic } from "./browser-mic";
 import { agentCard, type Directory, listAgents, listTasks, sampleDirectory } from "./directory";
+import userHello from "./envelopes/user-hello.json";
 import { type LocalStub, type LocalStubOptions, localAgentsStub } from "./local-agents";
 import type { StudioStub } from "./studio";
 import type {
@@ -45,6 +47,8 @@ export interface BrowserBridgeOptions {
    * agent directory.
    */
   studio?: StudioStub;
+  /** What the stub microphone's recogniser hears (`browser-mic.ts`); default `SAMPLE_WORDS`. */
+  heard?: readonly ScriptedWord[];
 }
 
 /** The stub plus the knobs tests and the dev page turn. */
@@ -64,6 +68,8 @@ export interface BrowserBridge extends ShellBridge {
     approveSignIn(): void;
     /** Put the account in any state, as account.changed would (a failure with its reason, say). */
     setAccount(status: AccountStatus): void;
+    /** What the stub microphone's recogniser hears from the next capture on; [] for nothing. */
+    hear(words: readonly ScriptedWord[]): void;
   };
 }
 
@@ -179,6 +185,14 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
     return p ? sampleEnvelope(p.envelope, options.now() - p.at) : SILENT;
   };
 
+  let heard = options.heard;
+  const mic = scriptedMic(
+    options.now,
+    () => userHello,
+    sampleEnvelope,
+    () => heard ?? SAMPLE_WORDS,
+  );
+
   const local = options.localAgents
     ? localAgentsStub({ epoch: options.epoch ?? Date.now(), ...options.localAgents })
     : undefined;
@@ -202,7 +216,11 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
       },
     },
     audio: {
-      levels: () => ({ user: level("user"), eris: level("eris") }),
+      levels: () => {
+        mic.pump();
+        return { user: level("user"), eris: level("eris") };
+      },
+      capture: mic.capture,
     },
     brain: {
       async status() {
@@ -261,6 +279,9 @@ export function browserBridge(options: BrowserBridgeOptions): BrowserBridge {
           changed({ state: "signed-in", profile: { ...SAMPLE_PROFILE } });
       },
       setAccount: (status) => changed(structuredClone(status)),
+      hear(words) {
+        heard = words;
+      },
       play(source, envelope, at) {
         playing[source] = { envelope, at: at ?? options.now() };
       },

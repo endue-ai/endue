@@ -137,6 +137,15 @@ impl Core {
             R::AccountSignOut(r) => (r.id, self.account_sign_out(caller, r.params)),
             R::AccountSettingsGet(r) => (r.id, self.account_settings_get(caller, r.params)),
             R::AccountSettingsUpdate(r) => (r.id, self.account_settings_update(caller, r.params)),
+            R::AccountConnectorsStatus(r) => {
+                (r.id, self.account_connectors_status(caller, r.params))
+            }
+            R::AccountConnectorsEnable(r) => {
+                (r.id, self.account_connectors_enable(caller, r.params))
+            }
+            R::AccountConnectorsDisable(r) => {
+                (r.id, self.account_connectors_disable(caller, r.params))
+            }
             R::AgentsList(r) => (r.id, self.agents_list(caller, r.params)),
             R::AgentsSessions(r) => (r.id, self.agents_sessions(caller, r.params)),
             R::AgentsTranscript(r) => (r.id, self.agents_transcript(caller, r.params)),

@@ -54,7 +54,7 @@ test("at rest Eris is in the talk line, and comes out above it while she speaks"
   await expect(eris).toHaveAttribute("aria-hidden", "true");
   await expect(eris).toHaveAttribute("tabindex", "-1");
   expect(await sizeOf(page.locator(".talk-pill"))).toEqual({ w: 440, h: 40 });
-  expect(await sizeOf(page.locator(".talk-pill .talk-orb"))).toEqual({ w: 18, h: 18 });
+  expect(await sizeOf(page.locator(".talk-launch .talk-orb"))).toEqual({ w: 24, h: 24 });
   await expect(page.locator(".talk-pill .talk-shortcut")).toBeVisible();
 
   await page.evaluate(() => window.__shell.desk.eris.say("Quiet morning."));
@@ -210,8 +210,11 @@ test("speaking: pulses leave the core and reach the rim with each word (0.3 s)",
   expect(await shellTree(page, ".eris")).toMatchSnapshot("speaking-300ms.json");
 });
 
-test("a click on Eris listens, thinks and speaks, the mesh moving with each", async ({ page }) => {
-  // No microphone and no platform voice here: she listens to the sample voice and answers the sample.
+test("a spoken line is answered: a click listens, thinks and speaks, the mesh moving with each", async ({
+  page,
+}) => {
+  // The stub's microphone plays the sample voice, and its scripted recogniser hears "Hello Eris"
+  // (ADR 0406): the words go to the brain as a typed line, and her answer is to them.
   await page.evaluate(() => {
     Object.defineProperty(navigator, "mediaDevices", { value: undefined, configurable: true });
     Object.defineProperty(window, "speechSynthesis", { value: undefined, configurable: true });
@@ -227,12 +230,13 @@ test("a click on Eris listens, thinks and speaks, the mesh moving with each", as
   await expect(eris).toHaveAttribute("data-talk", "listening");
   await expect(eris).toHaveAttribute("data-state", "listening");
   await expect(eris).toHaveAttribute("aria-label", "Eris: 듣는 중");
-  // The sample voice starts 500 ms in and pulls the rings in from the rim.
+  // The sample voice pulls the rings in from the rim, and the words so far stand under her.
   await step(page, 1200);
   await expect(page.locator(".eris-mesh")).toHaveAttribute("data-voice", "listening");
   expect(Math.min(...(await rings(page)))).toBeLessThan(0);
-  // 1.4 s of voice, then 1.1 s of quiet: she stops listening and thinks.
-  await step(page, 2000);
+  await expect(page.locator(".eris-said-heard")).toHaveText(/^Hello/);
+  // 1.4 s of voice from the start, then 1.1 s of quiet: she stops listening and thinks.
+  await step(page, 1500);
   await expect(eris).toHaveAttribute("data-talk", "thinking");
   await expect(eris).toHaveAttribute("data-state", "thinking");
   await step(page, 600);
@@ -241,7 +245,8 @@ test("a click on Eris listens, thinks and speaks, the mesh moving with each", as
   await step(page, 600);
   await step(page, 300);
   await expect(eris).toHaveAttribute("data-talk", "speaking");
-  await expect(page.locator(".soul-live")).toHaveText("샘플 목소리를 들었어요. 이렇게 말해요.");
+  await expect(page.locator(".eris-said-heard")).toHaveText("Hello Eris");
+  await expect(page.locator(".soul-live")).toHaveText('I\'ll look into "Hello Eris" and tell you.');
   await step(page, 300);
   await expect(page.locator(".eris-mesh")).toHaveAttribute("data-voice", "speaking");
   expect(Math.max(...(await rings(page)))).toBeGreaterThan(0);

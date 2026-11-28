@@ -1,25 +1,48 @@
 /**
  * Bottom centre: the line you talk on. A 2 px line with a hint until focused, then a 48 px input that
- * doubles as the command palette. A sent line flies into Eris wherever she floats and is absorbed;
- * she takes it in and reads it, and her hand-offs to plugins while she answers are drawn as errands
+ * doubles as the command palette. A sent line fades where it stands while a trail carries it to
+ * what it is about, or into Eris wherever she floats (eris/trail.ts, ADR 0408); she reads it, and her hand-offs to plugins while she answers are drawn as errands
  * once it is in her (eris/errand.ts, ADR 0089, ADR 0275). A request to change the look goes to the
  * theme studio's Describe tab instead (eris/look.ts, TS-07), and one to make something to
  * desk.propose (ADR 0073); propose/route.ts decides which.
  */
 
 import type { CommandInfo } from "../commands";
-import { clamp01, cubicBezier, easeOutExpo } from "../ease";
+import { clamp01, easeOutExpo } from "../ease";
 import { mountErrands } from "../eris/errand";
+import { borderPoint, centre, erisAt, windowBox } from "../eris/errand-targets";
+import type { Point } from "../eris/errand-thread";
 import { DESIGN_REPLY, LOOK_REPLY, SAY_TO_ERIS } from "../eris/look";
+import { trailsOf, type Way } from "../eris/trail";
 import { runGesture } from "../gesture";
 import { routeOf } from "../propose/route";
 import { match } from "./commands";
 import type { ShellCtx } from "./context";
 import { deskSnapshot } from "./desk-view";
 import { h, listen, render } from "./dom";
+import { AGENT_LINE, addressBook, type TalkAddress, windowsOf } from "./talk-address";
+import { addressName } from "./talk-chip";
+import { bend } from "./talk-link";
 
-const ABSORB_MS = 1400;
-const absorbEase = cubicBezier(0.55, 0, 0.85, 0.35);
+/** The sent line fades where it stands. */
+const GHOST_MS = 200;
+
+/**
+ * Where a sent line flies: along the talk line's link (ADR 0407) to the border of window `id`, which
+ * it is about, read again on every frame so a window dragged meanwhile keeps the trail on it; with no
+ * window on screen, into Eris where she floats.
+ */
+export function wayOf(
+  host: HTMLElement,
+  id: string | undefined,
+  from: Point,
+  ctx: Parameters<typeof windowBox>[2],
+): Way {
+  return (t) => {
+    const box = id ? windowBox(host, id, ctx) : undefined;
+    return bend(from, box ? borderPoint(box, from) : erisAt(host), t);
+  };
+}
 
 export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
   const input = h("input", {
@@ -61,6 +84,11 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
     const from = height;
     const to = open ? 48 : 2;
     el.classList.toggle("is-open", open);
+    // The talk pill lays its field out itself (bottom.css, ADR 0407).
+    if (el.classList.contains("talk-pill")) {
+      field.style.removeProperty("height");
+      return Promise.resolve();
+    }
     return ctx.ticker.animate(ctx.reduced() ? 0 : 220, easeOutExpo, (t) => {
       if (id !== animation) return;
       height = from + (to - from) * t;
@@ -134,30 +162,61 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
     close();
   };
 
-  /** The sent line floats from the input into Eris and dissolves there: soul text in reverse. */
+  /**
+   * A line to an agent goes to that agent and nowhere else (FT-04, ADR 0407): a local agent's run
+   * (`desk.agents.ask`, with ADR 0099's approval), or an endue agent's window, which takes it once it
+   * holds a conversation (FT-03); until then the desk says where to write.
+   */
+  const toAgent = async (address: Extract<TalkAddress, { kind: "agent" }>, text: string) => {
+    if (address.local) {
+      await runGesture(ctx.runtime, "desk.agents.ask", {
+        agent: address.agent,
+        prompt: text.trim(),
+      });
+      return;
+    }
+    const line = new CustomEvent(AGENT_LINE, {
+      detail: { agent: address.agent, view: address.view, text: text.trim() },
+      cancelable: true,
+    });
+    document.dispatchEvent(line);
+    if (!line.defaultPrevented) {
+      const x = addressName(ctx, address);
+      ctx.runtime.notify({ caller: "desk", title: ctx.tr("talkAgentLater", { x }), level: "info" });
+    }
+  };
+
+  /** The sent line leaves for what it is about: an agent, or Eris with the windows it names. */
   const send = async (text: string) => {
+    const address = addressBook(ctx.store).current(ctx.store.get());
     // The line crosses the whole desk, so it lives on the shell, not inside the bottom edge.
     const host = shell();
-    const frame = host.getBoundingClientRect();
-    const rect = field.getBoundingClientRect();
+    const from = centre(field, host);
     const ghost = h("div", { class: "absorb", "aria-hidden": "true" }, text);
-    const x = rect.left + rect.width / 2 - frame.left;
-    const y = rect.top + rect.height / 2 - frame.top;
-    ghost.style.left = `${x}px`;
-    ghost.style.top = `${y}px`;
+    ghost.style.left = `${from.x}px`;
+    ghost.style.top = `${from.y}px`;
     host.append(ghost);
-    // Into her body where she floats now; without her, into the middle of the screen.
-    const body = host.querySelector(".eris-body")?.getBoundingClientRect();
-    const dx = body ? body.left + body.width / 2 - frame.left - x : 0;
-    const dy = body ? body.top + body.height / 2 - frame.top - y : frame.height / 2 - y;
-    const arrived = ctx.ticker
-      .animate(ctx.reduced() ? 200 : ABSORB_MS, ctx.reduced() ? (t) => t : absorbEase, (t) => {
-        const move = ctx.reduced() ? 0 : t;
-        ghost.style.transform = `translate(calc(-50% + ${(dx * move).toFixed(1)}px), calc(-50% + ${(dy * move).toFixed(1)}px)) scale(${(1 - 0.6 * move).toFixed(3)})`;
-        ghost.style.filter = `blur(${(10 * move).toFixed(2)}px)`;
-        ghost.style.opacity = (1 - t).toFixed(3);
-      })
+    // The line fades where it stands while a trail carries it off (FT-05, ADR 0408).
+    void ctx.ticker
+      .animate(
+        GHOST_MS,
+        (t) => t,
+        (t) => {
+          ghost.style.opacity = (1 - t).toFixed(3);
+        },
+      )
       .then(() => ghost.remove());
+    // To every window it is about, staggered when there are several; else into Eris.
+    const ids = windowsOf(address);
+    const ways = (ids.length ? ids : [undefined]).map((id) => wayOf(host, id, from, ctx));
+    // In her (or with the window) once the heads are there; the rings fade after.
+    const arrived = new Promise<void>((there) => {
+      void trailsOf(host, ctx).several(ways, "star", there);
+    });
+    if (address.kind === "agent") {
+      await toAgent(address, text);
+      return;
+    }
     const to = route(text);
     if (to.to === "look" || to.to === "design") {
       const design = to.to === "design";
@@ -192,7 +251,12 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
     errands.ask(arrived);
     let reply: Awaited<ReturnType<typeof ctx.bridge.brain.say>>;
     try {
-      const desk = await deskSnapshot(ctx);
+      // What the line is about: "this" is that window, and its plugin's tools come first (ADR 0407).
+      const about = windowsOf(addressBook(ctx.store).current(ctx.store.get())).slice(0, 16);
+      const desk = {
+        ...(await deskSnapshot(ctx)),
+        ...(about.length ? { about: { windows: about } } : {}),
+      };
       // What a sweep handed her goes with this line, once (ADR 0296).
       const context = ctx.store.get().sweep.context;
       if (context) ctx.store.set((s) => ({ sweep: { ...s.sweep, context: null } }));
@@ -206,7 +270,8 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
       return;
     }
     await errands.finish();
-    ctx.eris.say(reply.text, reply.words);
+    if (reply.reason && ctx.eris.fail) ctx.eris.fail(reply.text, reply.reason);
+    else ctx.eris.say(reply.text, reply.words);
   };
 
   const offs = [

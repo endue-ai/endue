@@ -14,14 +14,14 @@ const MAX_STREAM: u64 = 2 * 1024 * 1024;
 const MAX_REPLY: usize = 12_000;
 const TURN_TIMEOUT: Duration = Duration::from_secs(90);
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ChatConversation {
     #[serde(alias = "conversation_id")]
     pub id: String,
     pub agent_id: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChatState {
     Done,
     NeedsInput,
@@ -59,7 +59,38 @@ impl ChatTurn {
     }
 }
 
+/// The person's Eris on endue AI, as `GET /api/v1/ai/secretary` answers.
+#[derive(Debug, Deserialize)]
+struct Eris {
+    #[serde(default)]
+    available: bool,
+    #[serde(default = "yes")]
+    enabled: bool,
+    agent_id: Option<String>,
+    conversation_id: Option<String>,
+}
+
+fn yes() -> bool {
+    true
+}
+
 impl Platform {
+    /// The person's own Eris on endue AI and her conversation, which the web talks in too; `None`
+    /// when the account has none, or she is turned off.
+    pub fn eris(&self) -> Result<Option<ChatConversation>> {
+        let eris: Eris = self.read(Method::Get, "/api/v1/ai/secretary", None, "Eris")?;
+        Ok(
+            match (
+                eris.available && eris.enabled,
+                eris.agent_id,
+                eris.conversation_id,
+            ) {
+                (true, Some(agent_id), Some(id)) => Some(ChatConversation { id, agent_id }),
+                _ => None,
+            },
+        )
+    }
+
     pub fn agent_conversation(&self, agent_id: &str) -> Result<ChatConversation> {
         self.read(
             Method::Post,

@@ -61,7 +61,10 @@ impl Core {
     }
 
     pub(crate) fn account_sign_out(&self, caller: &str, params: AccountParams) -> Answer {
-        let account = self.account_for(caller, params.scope)?;
+        let account = Arc::clone(self.account_for(caller, params.scope)?);
+        // The desk's key for the account's connectors goes with the session (ADR 0407); a revoke
+        // that cannot go through now is kept for the next start.
+        let _ = self.forget_endue_key(&account);
         json(bridge_status(&account.sign_out()))
     }
 
@@ -131,6 +134,8 @@ fn reason_of(problem: Problem) -> AccountProblem {
         Problem::SlowDown => AccountProblem::SlowDown,
         Problem::Unavailable => AccountProblem::Unavailable,
         Problem::Suspended => AccountProblem::Suspended,
+        Problem::PendingApproval => AccountProblem::PendingApproval,
+        Problem::RegionUnavailable => AccountProblem::RegionUnavailable,
         Problem::Rejected => AccountProblem::Rejected,
         Problem::SessionExpired => AccountProblem::SessionExpired,
         Problem::Failed => AccountProblem::Failed,

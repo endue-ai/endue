@@ -72,4 +72,14 @@ describe("the runtime's catalogs", () => {
       }
     }
   });
+
+  // FT-02 (ADR 0406): she never answers a spoken line with a line written for a demonstration.
+  it("no catalogue holds Eris's sample answers", () => {
+    for (const folder of found)
+      for (const file of readdirSync(folder).filter((f) => f.endsWith(".json"))) {
+        const catalog = read(join(folder, file));
+        for (const gone of ["eris.talk.heard", "eris.talk.sample"])
+          expect(Object.hasOwn(catalog, gone), `${folder}/${file}: ${gone}`).toBe(false);
+      }
+  });
 });

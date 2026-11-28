@@ -72,7 +72,7 @@ holds the call after the cap and the permission check and sends `perm.approval` 
 A caller that is not an agent is never held.
 
 An event about the caller's own work reaches it without asking: `fs.changed` for its watches, `proc.*` for
-its processes, `net.data` and `net.closed` for its sockets, `db.notice`, `db.call.notice`, `db.notification`, `db.parameter` and `db.closed` for its database sessions, `audio.frame`, `audio.ended` and `audio.wake` for its captures, `brain.turn` for its turns, `perm.changed` for its grants,
+its processes, `net.data` and `net.closed` for its sockets, `db.notice`, `db.call.notice`, `db.notification`, `db.parameter` and `db.closed` for its database sessions, `audio.frame`, `audio.heard`, `audio.ended` and `audio.wake` for its captures, `brain.turn` for its turns, `perm.changed` for its grants,
 `cmd.invoked` for the commands it provides, `cmd.answered` for the commands it invoked, `cmd.undone` for
 the undos and redos it ran, and
 `settings.changed` for its own keys and `data.changed` for its data subscriptions. `plugin.changed` goes to
@@ -309,6 +309,12 @@ by default), base64, with its level. `audio.ended` comes once, last, with its re
 the caller stopping, its last surface closing, a revoke, or the device. The runtime hears
 `audio.capturing`, every capture in force and its caller, on each change, so the chrome shows the
 microphone is on. `wakeWord` answers `unsupported` until the core has a wake-word engine (ADR 0245).
+With `transcribe: { lang }` (`ko`, `en`) the capture is also turned into words on this computer
+(ADR 0406): the caller alone hears `audio.heard`, the words so far, then the final words once,
+before `audio.ended`. Recognition runs on the device, never elsewhere: on macOS the Speech
+framework with on-device recognition required. Without a recogniser for the language the start is
+`unsupported`, and when the OS refuses speech recognition it is `forbidden`; nothing opens for
+either. Every end of the capture ends its recognition too.
 
 **audio.capture.stop** closes a capture. Stopping a capture that already ended is not an error. Another
 caller's capture is `not_found`, except for the runtime, which may stop any (the person's stop).
@@ -694,7 +700,8 @@ PKCE through the platform's `/api/v1/auth/device/*`, opens endue ID's page at au
 (`screen: sign-up` asks for the sign-up page) and answers `signing-in` with `signIn`; called again, it
 opens the page again. `account.changed` reports `signed-in` with the `profile` from `/api/v1/users/me`,
 or a `problem` with its `reason` (`offline`, `denied`, `expired`, `slow-down`, `unavailable`,
-`suspended`, `rejected`, `session-expired`, `failed`). `account.signOut` revokes the session
+`suspended`, `pending-approval`, `region-unavailable`, `rejected`, `session-expired`, `failed`).
+`account.signOut` revokes the session
 (`/api/v1/auth/logout`) and forgets it. The core renews the session before the access token expires
 and gives the token to the brain as its bearer token; no token crosses the bridge.
 

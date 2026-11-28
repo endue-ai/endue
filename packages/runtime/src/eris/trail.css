@@ -1,0 +1,33 @@
+/* What is handed over is seen going (eris/trail.ts, ADR 0408): a head and three followers along a
+   way, then one ring where it arrives. The star's colour when an agent takes up work; muted when the
+   person puts a window away, since nobody is at work (docs/design-system.md). Moved by transform
+   and opacity only. */
+.trail {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-float-top);
+  pointer-events: none;
+  --trail-colour: var(--desk-star);
+}
+.trail[data-tone="muted"] { --trail-colour: var(--desk-text-muted); }
+
+.trail-dot,
+.trail-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: var(--radius-full);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.trail-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--trail-colour);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--trail-colour) 60%, transparent);
+}
+.trail-ring {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--trail-colour);
+}

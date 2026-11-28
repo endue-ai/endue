@@ -1,0 +1,9 @@
+{
+  "target": "BridgeRequest",
+  "description": "a capture that turns speech into words on this computer, in Korean",
+  "instance": {
+    "id": 9,
+    "method": "audio.capture.start",
+    "params": { "transcribe": { "lang": "ko" }, "scope": { "permission": "audio:capture" } }
+  }
+}

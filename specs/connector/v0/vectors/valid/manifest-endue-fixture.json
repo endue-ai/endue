@@ -1,0 +1,67 @@
+{
+  "target": "ConnectorManifest",
+  "description": "the endue account's connectors as data: every account connector offering both tools is an instance; a sync reads pages through the cursor and since the last good sync, and a command sends through the send tool",
+  "instance": {
+    "binding": "endue",
+    "endue": {
+      "tools": ["thing_read", "thing_send"],
+      "requests": [
+        {
+          "tool": "thing_read",
+          "arguments": {
+            "operation": { "const": "things" },
+            "cursor": { "page": true },
+            "since": { "since": true }
+          },
+          "items": "/items",
+          "next": "/next_cursor",
+          "maxPages": 5,
+          "map": "thing"
+        },
+        {
+          "tool": "thing_read",
+          "arguments": { "operation": { "const": "insights" } },
+          "items": "/items",
+          "map": "count",
+          "optional": true
+        }
+      ],
+      "maps": {
+        "thing": {
+          "kind": "entry",
+          "fields": {
+            "id": "/id",
+            "title": { "pointer": "/text", "before": "\n" },
+            "body": "/text",
+            "publishedAt": "/at",
+            "raw": {
+              "object": { "network": { "instance": "type" }, "studio": { "instance": "title" } }
+            }
+          }
+        },
+        "count": {
+          "kind": "metric",
+          "fields": { "id": "/id", "title": "/name", "value": "/value", "at": "/at" }
+        }
+      },
+      "actions": {
+        "fixture.gadget.thing.send": {
+          "tool": "thing_send",
+          "risk": "send",
+          "arguments": {
+            "operation": { "const": "send" },
+            "text": { "arg": "text" },
+            "picture": { "file": "picture" }
+          }
+        }
+      },
+      "budget": 20
+    },
+    "auth": { "kind": "endue" },
+    "resources": [
+      { "kind": "entry", "actions": ["fixture.gadget.thing.send"] },
+      { "kind": "metric" }
+    ],
+    "sync": { "mode": "pull", "intervalSeconds": 900 }
+  }
+}

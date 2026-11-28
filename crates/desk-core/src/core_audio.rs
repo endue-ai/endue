@@ -5,20 +5,26 @@
 //! runtime hears `audio.capturing`, every capture in force, on each change, so the chrome shows that
 //! the microphone is on. A capture belongs to its caller, and ends when the caller stops it, the
 //! runtime stops it for the person, the caller unloads, its grant goes, or its last surface closes.
+//! A capture with `transcribe` also feeds its frames to the on-device recogniser
+//! (`Core::with_speech`, ADR 0406): its caller alone hears `audio.heard`, the words so far, then the
+//! final words before `audio.ended`; every end of the capture ends the recogniser with it.
 
-use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use base64::Engine as _;
 use desk_bridge::{
     AudioCaptureInForce, AudioCaptureStartParams, AudioCaptureStartResult, AudioCaptureStopParams,
     AudioCaptureStopResult, AudioCapturingData, AudioCapturingEvent, AudioEndReason,
-    AudioEndedData, AudioEndedEvent, AudioFrameData, AudioFrameEvent, BridgeEvent, ErrorCode,
-    Permission,
+    AudioEndedData, AudioEndedEvent, AudioFrameData, AudioFrameEvent, AudioLang, BridgeEvent,
+    ErrorCode, Permission,
 };
-use desk_sys::audio::{
-    AudioInput, Authorization, Capture, CaptureOptions, DEFAULT_SAMPLE_RATE, Event,
-};
+use desk_sys::audio::{AudioInput, Authorization, CaptureOptions, DEFAULT_SAMPLE_RATE, Event};
+use desk_sys::speech::{Recogniser, Recognition};
+
+mod captures;
+mod words;
+
+use captures::{Captures, Entry};
 
 use crate::events::EventBus;
 use crate::handler::{Answer, Core, error, json, sys_error};
@@ -29,70 +35,11 @@ const RUNTIME: &str = "desk";
 const REASON: &str = "listens to the microphone";
 /// The captures one caller may hold at once; another start is `forbidden` until one ends.
 pub(crate) const MAX_PER_CALLER: usize = 4;
-/// How many ended ids are remembered, so that stopping one again is not an error.
-const ENDED: usize = 256;
-
-struct Entry {
-    caller: String,
-    scope: Permission,
-    capture: Arc<Capture>,
-    /// Why it ends, set before it is stopped; its callback reads it for `audio.ended`.
-    reason: Arc<Mutex<AudioEndReason>>,
-}
-
-/// The captures callers started, by id, in the order they started, and the ids that ended (a stop of
-/// one of those is not an error). Shared with each capture's callback, which removes its entry when
-/// the capture ends.
-#[derive(Default)]
-pub(crate) struct Captures {
-    next: u64,
-    entries: BTreeMap<u64, (String, Entry)>,
-    ended: VecDeque<(String, String)>,
-}
-
-impl Captures {
-    fn find(&self, id: &str) -> Option<u64> {
-        self.entries
-            .iter()
-            .find(|(_, (capture_id, _))| capture_id == id)
-            .map(|(key, _)| *key)
-    }
-
-    fn has_ended(&self, caller: &str, id: &str) -> bool {
-        self.ended
-            .iter()
-            .any(|(c, e)| (caller == RUNTIME || c == caller) && e == id)
-    }
-
-    fn remember_ended(&mut self, caller: &str, id: &str) {
-        if self.ended.len() == ENDED {
-            self.ended.pop_front();
-        }
-        self.ended.push_back((caller.to_owned(), id.to_owned()));
-    }
-
-    fn held_by(&self, caller: &str) -> usize {
-        self.entries
-            .values()
-            .filter(|(_, e)| e.caller == caller)
-            .count()
-    }
-
-    fn in_force(&self) -> Vec<AudioCaptureInForce> {
-        self.entries
-            .values()
-            .map(|(capture_id, entry)| AudioCaptureInForce {
-                capture_id: capture_id.clone(),
-                caller: entry.caller.clone(),
-            })
-            .collect()
-    }
-}
-
 /// The input and the captures: what `Core` keeps for audio.*.
 #[derive(Default)]
 pub(crate) struct Audio {
     input: Option<Arc<dyn AudioInput>>,
+    speech: Option<Arc<dyn Recogniser>>,
     captures: Arc<Mutex<Captures>>,
 }
 
@@ -100,6 +47,12 @@ impl Core {
     /// The microphones audio.capture.* reads; without one both answer `unsupported`.
     pub fn with_audio(mut self, input: Arc<dyn AudioInput>) -> Self {
         self.audio.input = Some(input);
+        self
+    }
+
+    /// What turns a capture into words (`transcribe`); without one it answers `unsupported`.
+    pub fn with_speech(mut self, speech: Arc<dyn Recogniser>) -> Self {
+        self.audio.speech = Some(speech);
         self
     }
 
@@ -120,10 +73,21 @@ impl Core {
                 "this desk has no microphone input".to_owned(),
             )
         })?;
+        let lang = params.transcribe.map(|t| match t.lang {
+            AudioLang::Ko => "ko",
+            AudioLang::En => "en",
+        });
+        let speech = match lang {
+            Some(lang) => Some(words::recogniser(self.audio.speech.as_ref(), lang)?),
+            None => None,
+        };
         let scope = Permission::AudioCapture(params.scope);
         self.check_or_ask(caller, &scope, &Target::None, REASON)?;
         if input.authorization() == Authorization::NotDetermined {
             input.request_access().map_err(sys_error)?;
+        }
+        if let Some(speech) = &speech {
+            words::allowed(speech.as_ref())?;
         }
         let sample_rate = match params.sample_rate {
             Some(rate) => u32::try_from(rate).unwrap_or(u32::MAX),
@@ -146,6 +110,15 @@ impl Core {
         let key = captures.next;
         let capture_id = format!("a-{key}");
         let reason = Arc::new(Mutex::new(AudioEndReason::Stopped));
+        let heard = words::Heard {
+            capture_id: capture_id.clone(),
+            caller: caller.to_owned(),
+            events: self.events().clone(),
+        };
+        let words = match (&speech, lang) {
+            (Some(speech), Some(lang)) => Some(heard.start(speech.as_ref(), lang, sample_rate)?),
+            _ => None,
+        };
         let report = Reporter {
             key,
             capture_id: capture_id.clone(),
@@ -154,6 +127,7 @@ impl Core {
             reason: Arc::clone(&reason),
             events: self.events().clone(),
             captures: Arc::downgrade(&self.audio.captures),
+            words: Mutex::new(words),
         };
         let capture = input
             .capture(&options, Box::new(move |event| report.on(event)))
@@ -295,12 +269,17 @@ struct Reporter {
     reason: Arc<Mutex<AudioEndReason>>,
     events: EventBus,
     captures: Weak<Mutex<Captures>>,
+    /// The recognition fed with the frames, for a capture that transcribes.
+    words: Mutex<Option<Box<dyn Recognition>>>,
 }
 
 impl Reporter {
     fn on(&self, event: Event) {
         match event {
             Event::Frame(frame) => {
+                if let Some(words) = lock(&self.words).as_mut() {
+                    words.feed(&frame.samples);
+                }
                 let pcm: Vec<u8> = frame.samples.iter().flat_map(|s| s.to_le_bytes()).collect();
                 let data = AudioFrameData {
                     capture_id: self.capture_id.clone(),
@@ -323,6 +302,10 @@ impl Reporter {
     }
 
     fn ended(&self, failure: Option<desk_sys::Error>) {
+        // The final words come before the end, and the recogniser ends with the capture.
+        if let Some(words) = lock(&self.words).take() {
+            words::finish(&self.capture_id, &self.caller, &self.events, words);
+        }
         let (reason, message) = match failure {
             Some(err) => (AudioEndReason::Device, Some(err.message)),
             None => (*lock(&self.reason), None),

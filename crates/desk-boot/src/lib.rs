@@ -6,6 +6,7 @@ pub mod boot;
 pub mod brains;
 pub mod core_files;
 pub mod crash;
+pub mod endue_eris;
 pub mod events;
 pub mod grants;
 pub mod mcp;

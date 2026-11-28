@@ -10,6 +10,18 @@ pub(super) fn is_run(seen: &Seen) -> bool {
 }
 
 pub(super) fn answer(state: &mut State, seen: &Seen, parts: &[&str]) -> Option<Answer> {
+    if seen.method == "GET" && *parts == ["api", "v1", "ai", "secretary"] {
+        let Some((agent, conversation)) = state.eris.clone() else {
+            return Some(data(json!({ "available": false })));
+        };
+        state
+            .chat_conversations
+            .insert(conversation.clone(), agent.clone());
+        return Some(data(json!({
+            "available": true, "enabled": true, "agent_id": agent,
+            "conversation_id": conversation, "name": "Eris"
+        })));
+    }
     if seen.method != "POST" {
         return None;
     }

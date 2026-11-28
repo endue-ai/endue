@@ -30,6 +30,9 @@ pub(super) fn answer(state: &mut State, seen: &Seen) -> Answer {
     if let Some((status, code, message)) = state.fail_at.get(&seen.path) {
         return error(*status, code, message);
     }
+    if let Some(answer) = super::connectors::api(state, seen) {
+        return answer;
+    }
     let public = seen.method == "GET" && seen.path == "/api/v1/agent-catalog/agents";
     let token = seen
         .headers
@@ -39,6 +42,9 @@ pub(super) fn answer(state: &mut State, seen: &Seen) -> Answer {
         return error(401, "UNAUTHORIZED", "Invalid or expired token");
     }
     let parts: Vec<&str> = seen.path.trim_start_matches('/').split('/').collect();
+    if let Some(answer) = super::connectors::keys(state, seen, &parts) {
+        return answer;
+    }
     if let Some(answer) = account::answer(state, seen, &parts) {
         return answer;
     }

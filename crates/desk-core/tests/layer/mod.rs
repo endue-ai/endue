@@ -100,7 +100,8 @@ impl Desk {
             codex: home.join(".codex"),
         };
         let seen = data.join("agent-sessions.json");
-        Self::build(home, data, Arc::new(FakeClock::new()), |core| {
+        let clock = Arc::new(FakeClock::new());
+        Self::open_with(home, data, clock, None, false, |core, _| {
             core.with_agent_session_roots(roots, seen)
         })
     }
@@ -111,6 +112,17 @@ impl Desk {
         let (home, data) = (root.join("home"), root.join("data"));
         fs::create_dir_all(&home).unwrap();
         Self::open(home, data, Arc::new(FakeClock::new()), None, true)
+    }
+
+    /// A desk whose person says yes, with `build` adding what the test needs (an account, a
+    /// platform) before the connectors start; `build` gets the data folder too.
+    pub fn built(tag: &str, build: impl FnOnce(Core, &std::path::Path) -> Core) -> Self {
+        let root = temp(tag);
+        let (home, data) = (root.join("home"), root.join("data"));
+        fs::create_dir_all(&home).unwrap();
+        fs::create_dir_all(&data).unwrap();
+        let clock = Arc::new(FakeClock::new());
+        Self::open_with(home, data, clock, None, true, build)
     }
 
     /// A second desk over the same home, clock and files (store, secrets, plugins, index), as after
@@ -135,23 +147,16 @@ impl Desk {
         calendar: Option<Arc<dyn CalendarSource>>,
         yes: bool,
     ) -> Self {
-        Self::build(home, data, clock, |mut core| {
-            if let Some(calendar) = calendar {
-                core = core.with_calendar(calendar);
-            }
-            if yes {
-                core = core.with_prompter(SayYes);
-            }
-            core
-        })
+        Self::open_with(home, data, clock, calendar, yes, |core, _| core)
     }
 
-    /// A desk as the app builds one, `extra` adding its sources.
-    fn build(
+    fn open_with(
         home: PathBuf,
         data: PathBuf,
         clock: Arc<FakeClock>,
-        extra: impl FnOnce(Core) -> Core,
+        calendar: Option<Arc<dyn CalendarSource>>,
+        yes: bool,
+        build: impl FnOnce(Core, &std::path::Path) -> Core,
     ) -> Self {
         let index = Arc::new(Index::open(data.join("index.sqlite")).unwrap());
         let shared: Arc<dyn ItemIndex> = index.clone();
@@ -161,8 +166,13 @@ impl Desk {
             .with_secrets_file(data.join("secrets.json"))
             .with_index(shared)
             .with_clock(clock.clone());
-        core = extra(core);
-        let core = Arc::new(core);
+        if let Some(calendar) = calendar {
+            core = core.with_calendar(calendar);
+        }
+        if yes {
+            core = core.with_prompter(SayYes);
+        }
+        let core = Arc::new(build(core, &data));
         let seen = core.events().subscribe_addressed();
         core.start_connectors();
         Self {

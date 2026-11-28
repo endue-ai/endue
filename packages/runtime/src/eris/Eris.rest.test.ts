@@ -49,7 +49,11 @@ function mount(options: { place?: Place; pill?: boolean; reduced?: boolean } = {
       },
     },
     bridge: {
-      audio: { levels: () => ({ user: [], eris: [] }) },
+      audio: {
+        levels: () => ({ user: [], eris: [] }),
+        // The core's microphone, which hears words (ADR 0406).
+        capture: async () => ({ captureId: "c1", stop: async () => {} }),
+      },
       perm: { request: async () => true },
       brain: { say: () => new Promise(() => {}) },
     },

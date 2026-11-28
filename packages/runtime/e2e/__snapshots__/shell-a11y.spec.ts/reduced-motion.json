@@ -993,6 +993,16 @@
      },
      "children": [
       {
+       "tag": "p",
+       "class": "eris-said-heard",
+       "aria-live": "polite",
+       "hidden": "",
+       "style": {
+        "display": "none",
+        "color": "rgb(179, 175, 165)"
+       }
+      },
+      {
        "tag": "div",
        "class": "soul",
        "box": [
@@ -1008,6 +1018,15 @@
       {
        "tag": "div",
        "class": "eris-said-text",
+       "hidden": "",
+       "style": {
+        "display": "none",
+        "color": "rgb(243, 241, 236)"
+       }
+      },
+      {
+       "tag": "div",
+       "class": "eris-said-fixes",
        "hidden": "",
        "style": {
         "display": "none",
@@ -1309,33 +1328,6 @@
          "text": "Hey Eris 라고 말하거나 바로 입력하세요"
         },
         {
-         "tag": "div",
-         "class": "composer-field",
-         "box": [
-          769,
-          865,
-          94,
-          2
-         ],
-         "style": {
-          "opacity": "0",
-          "height": "2px"
-         },
-         "children": [
-          {
-           "tag": "input",
-           "class": "composer-input",
-           "role": "combobox",
-           "aria-label": "Eris 에게 말하기",
-           "aria-expanded": "false",
-           "style": {
-            "color": "rgb(243, 241, 236)"
-           },
-           "value": ""
-          }
-         ]
-        },
-        {
          "tag": "button",
          "class": "talk-launch",
          "aria-label": "Eris 에게 말하기",
@@ -1366,6 +1358,118 @@
          "text": "⠿"
         },
         {
+         "tag": "span",
+         "class": "talk-chip",
+         "hidden": "",
+         "style": {
+          "display": "none"
+         },
+         "children": [
+          {
+           "tag": "button",
+           "class": "desk-chip talk-chip-pin",
+           "aria-label": "Eris 에게 말하기",
+           "style": {
+            "background": "rgb(107, 107, 107)",
+            "border": "outset rgb(255, 255, 255)"
+           },
+           "children": [
+            {
+             "tag": "span",
+             "class": "talk-chip-mark",
+             "style": {
+              "color": "rgb(243, 241, 236)"
+             }
+            },
+            {
+             "tag": "span",
+             "class": "talk-chip-text",
+             "style": {
+              "color": "rgb(243, 241, 236)"
+             }
+            },
+            {
+             "tag": "span",
+             "class": "talk-chip-where",
+             "style": {
+              "color": "rgb(243, 241, 236)"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "button",
+           "class": "icon-button talk-chip-clear",
+           "aria-label": "대신 Eris에게 말하기",
+           "box": [
+            0,
+            0,
+            0,
+            0
+           ],
+           "style": {
+            "border": "solid rgba(0, 0, 0, 0)"
+           },
+           "children": [
+            {
+             "tag": "svg",
+             "icon": "close"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "span",
+         "class": "talk-who",
+         "style": {
+          "display": "none",
+          "color": "rgb(179, 175, 165)"
+         },
+         "text": "답하는 곳: 로컬"
+        },
+        {
+         "tag": "span",
+         "class": "talk-field-orb",
+         "style": {
+          "display": "none"
+         },
+         "children": [
+          {
+           "tag": "svg",
+           "class": "talk-orb",
+           "icon": null
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": "composer-field",
+         "box": [
+          513,
+          860,
+          1,
+          1
+         ],
+         "style": {
+          "opacity": "0",
+          "height": "1px"
+         },
+         "children": [
+          {
+           "tag": "input",
+           "class": "composer-input",
+           "role": "combobox",
+           "aria-label": "Eris 에게 말하기",
+           "aria-expanded": "false",
+           "style": {
+            "color": "rgb(243, 241, 236)"
+           },
+           "value": ""
+          }
+         ]
+        },
+        {
          "tag": "button",
          "class": "talk-agent-button icon-button",
          "aria-label": "에이전트",
@@ -1389,14 +1493,26 @@
          ]
         },
         {
-         "tag": "span",
-         "class": "talk-preview",
+         "tag": "button",
+         "class": "talk-mic icon-button",
+         "aria-label": "Eris에게 말로 하기",
+         "hidden": "",
+         "box": [
+          0,
+          0,
+          0,
+          0
+         ],
          "style": {
-          "background": "rgb(35, 33, 30)",
-          "color": "rgb(179, 175, 165)",
-          "opacity": "0"
+          "display": "none",
+          "border": "solid rgba(0, 0, 0, 0)"
          },
-         "text": "Mira, Theo, Juno"
+         "children": [
+          {
+           "tag": "svg",
+           "icon": "mic"
+          }
+         ]
         },
         {
          "tag": "kbd",
@@ -1682,6 +1798,12 @@
      }
     }
    ]
+  },
+  {
+   "tag": "svg",
+   "class": "talk-link",
+   "hidden": "",
+   "icon": null
   }
  ]
 }

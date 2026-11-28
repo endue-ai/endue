@@ -1,0 +1,17 @@
+{
+  "target": "ConnectorToolCallEnvelope",
+  "description": "a tool's answer as JSON",
+  "instance": {
+    "success": true,
+    "data": {
+      "ok": true,
+      "content": "{\"items\":[]}",
+      "data": {
+        "items": []
+      },
+      "truncated": false,
+      "tool": "instagram__social_read",
+      "risk": "read"
+    }
+  }
+}

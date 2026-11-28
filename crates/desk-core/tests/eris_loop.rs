@@ -15,8 +15,8 @@ use std::time::Duration;
 use common::Echo;
 use desk_brain::{
     Brain, BrainFailure, CreateSessionRequest, Lease, LeaseAcquireRequest, LeaseRenewRequest,
-    Session, StopReason, TextDeltaEvent, ToolCall, ToolCallEvent, ToolDefinition,
-    ToolResultRequest, TurnCompletedEvent, TurnEvent, TurnRequest, TurnStartedEvent,
+    Session, StopReason, TextDeltaEvent, ToolCall, ToolCallEvent, ToolResultRequest,
+    TurnCompletedEvent, TurnEvent, TurnRequest, TurnStartedEvent,
 };
 use desk_brain_endue::HttpBrain;
 use desk_core::{BrainOptions, Core, Delivery, MAX_STEPS, TOO_MANY_LINE};
@@ -27,11 +27,11 @@ const MAIL: &str = "example.mail";
 const LATEST: &str = "example.mail.latest";
 
 /// brain-echo, except that a turn offering tools calls `example_mail_latest` (forever, when
-/// `endless`) and then says what the tool answered. It keeps the tools each turn offered.
+/// `endless`) and then says what the tool answered. It keeps each turn's request.
 struct Errands {
     inner: HttpBrain,
     endless: bool,
-    offered: Mutex<Vec<Vec<ToolDefinition>>>,
+    asked: Mutex<Vec<TurnRequest>>,
     results: Mutex<Vec<Value>>,
 }
 
@@ -86,8 +86,7 @@ impl Brain for Errands {
         request: &TurnRequest,
         on: &mut dyn FnMut(TurnEvent),
     ) -> Result<(), BrainFailure> {
-        let tools = request.tools.clone().unwrap_or_default();
-        self.offered.lock().unwrap().push(tools);
+        self.asked.lock().unwrap().push(request.clone());
         on(TurnEvent::TurnStarted(TurnStartedEvent {
             r#type: Default::default(),
             turn_id: "turn1".to_owned(),
@@ -171,7 +170,7 @@ fn errands(echo: &Echo, endless: bool) -> Arc<Errands> {
     Arc::new(Errands {
         inner: HttpBrain::new(echo.url()).unwrap(),
         endless,
-        offered: Mutex::default(),
+        asked: Mutex::default(),
         results: Mutex::default(),
     })
 }
@@ -218,7 +217,8 @@ fn a_turn_offers_the_commands_plugins_mark_as_tools() {
     let (core, deliveries) = core_on(brain.clone(), &home);
     let turn = say(&core, "Check my latest mail");
     play(&core, &deliveries, &turn);
-    let offered = brain.offered.lock().unwrap().remove(0);
+    let asked = brain.asked.lock().unwrap().remove(0);
+    let offered = asked.tools.unwrap_or_default();
     let names: Vec<&str> = offered.iter().map(|t| t.name.as_str()).collect();
     // The desk's two tools, then the agent command by name; the palette-only one is not offered.
     assert_eq!(names, ["desk-tools", "desk-run", "example_mail_latest"]);
@@ -229,6 +229,31 @@ fn a_turn_offers_the_commands_plugins_mark_as_tools() {
             .contains("The newest messages in the inbox.")
     );
     assert_eq!(latest.schema["properties"]["limit"]["type"], "integer");
+}
+
+#[test]
+fn about_names_the_window_in_what_the_brain_reads() {
+    let echo = Echo::start();
+    let home = home("eris-about");
+    let brain = errands(&echo, false);
+    let (core, deliveries) = core_on(brain.clone(), &home);
+    let window = |id: &str, plugin: &str| {
+        json!({ "id": id, "x": 0, "y": 0, "w": 400, "h": 300,
+        "panes": [{ "view": format!("plugin:{plugin}"), "plugin": plugin }] })
+    };
+    let desk = json!({ "screen": { "w": 1440, "h": 900 }, "about": { "windows": ["mail"] },
+        "windows": [window("git", "example.git"), window("mail", MAIL)] });
+    let params = json!({ "text": "what is new here?", "desk": desk,
+        "scope": { "permission": "brain:converse" } });
+    let said = call(&core, "desk", "brain.say", params).unwrap();
+    play(&core, &deliveries, said["turnId"].as_str().unwrap());
+    let asked = brain.asked.lock().unwrap().remove(0);
+    let words = asked.message.content[0].text.clone();
+    let about = "[The line is about mail: \"this\" and \"here\" mean it; use it first.]";
+    assert_eq!(words.lines().nth(1), Some(about), "{words}");
+    // An address grants nothing: the turn offers the same tools.
+    let tools = asked.tools.unwrap_or_default();
+    assert!(tools.iter().any(|t| t.name == "example_mail_latest"));
 }
 
 #[test]

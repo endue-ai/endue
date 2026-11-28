@@ -20,3 +20,11 @@ it("says the desk and the plugins you allow can hear the microphone, and promise
   expect(said).toMatch(/\bhear\b/);
   expect(said).not.toMatch(/stays|leaves|never|only|on this Mac/i);
 });
+
+// ADR 0406: recognition runs on the device, so the sentence may say where the words are made.
+it("says speech becomes words on this Mac, for Eris and the plugins you allow", () => {
+  const said = usage("NSSpeechRecognitionUsageDescription");
+  expect(said).toMatch(/^endue /);
+  expect(said).toMatch(/\bon this Mac\b/);
+  expect(said).toMatch(/\bplugins you allow\b/);
+});

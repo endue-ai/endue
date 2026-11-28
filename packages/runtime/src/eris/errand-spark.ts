@@ -2,10 +2,13 @@
  * One spark of Eris's errands (`errand.ts`, ADR 0271) and how it is drawn: where it is on its
  * flight and the thread under it. Both ends of a flight are read again on every frame, Eris's body
  * and the point of the window's border that faces her (`edgeOf`), so the spark and its thread stay
- * joined to her and to the window while either moves or the desk pans.
+ * joined to her and to the window while either moves or the desk pans. The spark is the head of a
+ * trail (`trail.ts`, FT-05, ADR 0408): three followers run behind it on the same arc, by their
+ * share of the leg, and are gone while it rests.
  */
 import { erisAt } from "./errand-targets";
 import { arc, type Point, shapeThread, threadOf } from "./errand-thread";
+import { FOLLOWERS } from "./trail";
 
 /** One spark of an errand, on its way to one place and back. */
 export interface Spark {
@@ -14,6 +17,8 @@ export interface Spark {
   host: HTMLElement;
   /** The thread it runs along now. */
   thread: SVGSVGElement | null;
+  /** The trail behind it, on the host. */
+  followers: HTMLElement[];
   /** Where the spark is, in the host's coordinates. */
   at: Point;
   /** Where it is going, or is, now: read on every frame, so it follows the window and the pan. */
@@ -49,10 +54,36 @@ function ends(spark: Spark): [Point, Point] {
     : [erisAt(spark.host), spark.aim()];
 }
 
+/** The trail behind a spark: `aria-hidden` dots on `host`, drawn by `render`. */
+export function followersOf(host: HTMLElement): HTMLElement[] {
+  return FOLLOWERS.map(() => {
+    const dot = host.ownerDocument.createElement("span");
+    dot.className = "errand-follower";
+    dot.setAttribute("aria-hidden", "true");
+    dot.style.opacity = "0";
+    host.append(dot);
+    return dot;
+  });
+}
+
 /** Draw the spark and its thread where their ends are this frame; with reduced motion, at its end. */
 export function render(spark: Spark, reduced: boolean): void {
-  place(spark, arc(spark.from(), spark.aim(), reduced ? 1 : spark.t), ...spark.look);
+  const from = spark.from();
+  const aim = spark.aim();
+  place(spark, arc(from, aim, reduced ? 1 : spark.t), ...spark.look);
   if (spark.thread) shapeThread(spark.thread, ...ends(spark));
+  const [scale, opacity] = spark.look;
+  const flying = !reduced && spark.t > 0 && spark.t < 1;
+  spark.followers.forEach((dot, i) => {
+    const f = FOLLOWERS[i];
+    if (!f) return;
+    dot.dataset.leg = spark.el.dataset.leg ?? "out";
+    if (spark.el.dataset.ok) dot.dataset.ok = spark.el.dataset.ok;
+    const p = arc(from, aim, Math.max(0, spark.t - f.lag));
+    const shown = flying && spark.t > f.lag ? f.opacity * opacity : 0;
+    dot.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) translate(-50%, -50%) scale(${(f.size * scale).toFixed(3)})`;
+    dot.style.opacity = shown.toFixed(3);
+  });
 }
 
 /** Lay the thread under the spark; with reduced motion there is none. */

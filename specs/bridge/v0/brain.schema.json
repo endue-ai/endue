@@ -50,9 +50,24 @@
           "items": { "$ref": "#/$defs/BrainDeskClosed" },
           "maxItems": 20
         },
-        "capabilities": { "$ref": "#/$defs/BrainDeskCapabilities" }
+        "capabilities": { "$ref": "#/$defs/BrainDeskCapabilities" },
+        "about": { "$ref": "#/$defs/BrainDeskAbout" }
       },
       "required": ["screen", "windows"],
+      "additionalProperties": false
+    },
+    "BrainDeskAbout": {
+      "description": "What the line is about (FT-04, ADR 0407): the windows the talk line names, by id, each one of this snapshot's windows. \"This\" in the line means them, and their plugins' tools come first. It grants nothing: a line about a window still asks every question it would ask without. Absent: the line is about nothing in particular.",
+      "type": "object",
+      "properties": {
+        "windows": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      },
+      "required": ["windows"],
       "additionalProperties": false
     },
     "BrainDeskDesktop": {
@@ -242,7 +257,7 @@
         "open": { "type": "boolean" },
         "views": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
           "maxItems": 16
         }
       },
@@ -501,9 +516,9 @@
       ]
     },
     "BrainName": {
-      "description": "A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo) or claude (the person's own Claude Code, asked without its tools, ADR 0109).",
+      "description": "A brain the desk can choose for Eris (ADR 0094): endue (endue AI), local (Ollama on this machine), echo (examples/brain-echo), claude (the person's own Claude Code, asked without its tools, ADR 0109) or codex (the person's own Codex CLI, asked the same way). A chosen brain that cannot answer hands the turn to the next of endue, codex, claude and local that can.",
       "type": "string",
-      "enum": ["endue", "local", "echo", "claude"]
+      "enum": ["endue", "local", "echo", "claude", "codex"]
     },
     "BrainStatusLocal": {
       "description": "A brain on this machine, named by the model it runs. fallback is true when it answers in place of the chosen brain, which cannot be reached now (ADR 0094).",
@@ -528,6 +543,10 @@
         "credits": { "description": "Credits left.", "type": "integer", "minimum": 0 },
         "brain": {
           "description": "The brain the desk chose. Absent from desks that cannot choose.",
+          "$ref": "#/$defs/BrainName"
+        },
+        "answering": {
+          "description": "The brain that answers in place of the chosen one, which cannot answer now. Absent while the chosen brain answers.",
           "$ref": "#/$defs/BrainName"
         }
       },
@@ -568,10 +587,16 @@
           "description": "brain.ask only, on completed: the arguments the brain called the tool with, checked against its schema. Absent when the brain answered in text instead.",
           "type": "object"
         },
-        "tool": { "$ref": "#/$defs/BrainTurnTool" }
+        "tool": { "$ref": "#/$defs/BrainTurnTool" },
+        "reason": { "$ref": "#/$defs/BrainTurnReason" }
       },
       "required": ["turnId", "kind"],
       "additionalProperties": false
+    },
+    "BrainTurnReason": {
+      "description": "error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people.",
+      "type": "string",
+      "enum": ["no_brain", "signed_out", "read_only", "too_many_steps", "failed"]
     },
     "BrainTurnKind": {
       "description": "started, delta (more text), completed; error (the turn failed, for example read-only after a takeover); offline (the brain is unreachable, the turn waits) and online (it resumed); tool (Eris hands work to a plugin command: the core runs the brain's call) and tool-result (the command answered and its answer went back to the brain).",

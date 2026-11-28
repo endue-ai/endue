@@ -6,8 +6,8 @@
 //! screen it is.
 
 use desk_bridge::{
-    BrainDesk, BrainDeskCapabilities, BrainDeskClosed, BrainDeskFill, BrainDeskWindow,
-    BrainDeskWindowState,
+    BrainDesk, BrainDeskCapabilities, BrainDeskClosed, BrainDeskFill, BrainDeskPane,
+    BrainDeskResponsiveness, BrainDeskWindow, BrainDeskWindowState,
 };
 
 use super::{current, line};
@@ -91,6 +91,35 @@ fn desktop_name(desk: &BrainDesk, id: &str) -> (String, Option<usize>) {
         Some(at) => (list[at].name.clone(), Some(at + 1)),
         None => (id.to_owned(), None),
     }
+}
+
+/// The most characters the line about what the person's line is about takes (ADR 0407).
+pub(super) const ABOUT: usize = 200;
+
+/// What the line is about (ADR 0407): the windows the talk line names, which "this" means. Ids that
+/// would pass ABOUT are left out; `desk.windows.list` names every window.
+pub(super) fn about(desk: &BrainDesk) -> String {
+    let Some(about) = desk.about.as_ref() else {
+        return String::new();
+    };
+    let mut ids: Vec<&str> = Vec::new();
+    let mut room = ABOUT - 120;
+    for id in &about.windows {
+        let take = id.chars().count() + 2;
+        if take > room {
+            break;
+        }
+        room -= take;
+        ids.push(id);
+    }
+    if ids.is_empty() {
+        return String::new();
+    }
+    let them = if ids.len() == 1 { "it" } else { "them" };
+    format!(
+        "[The line is about {}: \"this\" and \"here\" mean {them}; use {them} first.]\n",
+        ids.join(", ")
+    )
 }
 
 /// The windows on the other desktops, desktop by desktop in their order; one with none says so.
@@ -256,4 +285,30 @@ pub(super) fn place(window: &BrainDeskWindow, sw: u64, sh: u64) -> &'static str 
 
 fn to_i64(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
+}
+
+/// A pane: its title and plugin, or the view it shows; whether it is in use, and whether its
+/// plugin's frame stopped answering (#39), with the command that acts on it.
+pub(super) fn pane(pane: &BrainDeskPane) -> String {
+    let mut text = match (pane.title.as_deref(), pane.plugin.as_deref()) {
+        (title, Some(plugin)) => what(title, Some(plugin)).unwrap_or_default(),
+        (Some(title), None) if !title.is_empty() => format!("{title} [{}]", pane.view),
+        _ => pane.view.clone(),
+    };
+    if pane.focused == Some(true) {
+        text.push_str(" [in use]");
+    }
+    if pane.asleep == Some(true) {
+        text.push_str(" [asleep until shown]");
+    }
+    match pane.responsiveness {
+        Some(BrainDeskResponsiveness::Late) => {
+            text.push_str(" [not responding: desk.frames.wait or desk.frames.stop]");
+        }
+        Some(BrainDeskResponsiveness::Stopped) => {
+            text.push_str(" [stopped: desk.frames.reload]");
+        }
+        None => {}
+    }
+    text
 }

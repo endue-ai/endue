@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 
 use super::Seen;
 use super::account::FakeAccount;
+use super::connectors::FakeConnectors;
 use super::spaces::FakeSpace;
 
 /// One agent and its facets.
@@ -51,10 +52,15 @@ pub struct State {
     pub chat_conversations: BTreeMap<String, String>,
     /// What the next conversation run streams.
     pub chat_stream: String,
+    /// The person's Eris on endue AI (`GET /api/v1/ai/secretary`): her agent and conversation;
+    /// `None` answers that the account has none.
+    pub eris: Option<(String, String)>,
     /// The spaces, in the order the list answers them.
     pub spaces: Vec<FakeSpace>,
     /// The signed-in person's account, preferences and notification channels.
     pub account: FakeAccount,
+    /// The desk's keys and the account's connectors (ADR 0407).
+    pub connectors: FakeConnectors,
     /// The next answer, whatever is asked: status, code and message of an error envelope.
     pub fail_next: Option<(u16, String, String)>,
     /// Paths (without query) answered with an error envelope every time: status, code, message.
@@ -78,6 +84,7 @@ impl State {
             catalog: vec![catalog_agent()],
             conversations: Vec::new(),
             chat_conversations: BTreeMap::new(),
+            eris: None,
             chat_stream: concat!(
                 "event: delta\ndata: {\"run_id\":\"run_fixture\",\"content\":\"Partial\"}\n\n",
                 "event: done\ndata: {\"run_id\":\"run_fixture\",\"stop_reason\":\"final\",",
@@ -86,6 +93,7 @@ impl State {
             .to_owned(),
             spaces: Vec::new(),
             account: FakeAccount::default(),
+            connectors: FakeConnectors::default(),
             fail_next: None,
             fail_at: BTreeMap::new(),
             delay: None,

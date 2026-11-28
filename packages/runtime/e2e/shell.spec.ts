@@ -25,7 +25,7 @@ test.describe("the desk shell", () => {
     }
     // Eris rests in the talk line, its small orb hers, until she has something to do (ADR 0254).
     await expect(page.locator(".eris")).toBeHidden();
-    await expect(page.locator(".talk-pill .talk-orb")).toBeVisible();
+    await expect(page.locator(".talk-launch .talk-orb")).toBeVisible();
     await expect(page.locator(".rail-button")).toHaveCount(7);
     await expect(page.locator(".surface")).toHaveCount(0);
     expect(await primaryFills(page)).toBeLessThanOrEqual(1);
@@ -193,13 +193,13 @@ test.describe("the desk shell", () => {
     await expect(page.locator(".drawer-button .badge")).toHaveText("2");
   });
 
-  test("typing opens the line, commands run with Enter, a message rises and is absorbed", async ({
+  test("typing opens the line, commands run with Enter, a message fades and its trail flies", async ({
     page,
   }) => {
-    await expect(page.locator(".composer-field")).toHaveCSS("height", "2px");
+    await expect(page.locator(".composer-field")).toHaveCSS("height", "1px");
     await page.keyboard.type("calendar");
     await step(page, 220);
-    await expect(page.locator(".composer-field")).toHaveCSS("height", "48px");
+    await expect(page.locator(".composer-field")).toHaveCSS("height", "40px");
     await expect(page.locator(".composer-input")).toHaveValue("calendar");
     await expect(page.getByRole("option").first()).toHaveText("열기 · 캘린더");
     await page.keyboard.press("Enter");
@@ -211,13 +211,14 @@ test.describe("the desk shell", () => {
     await expect(page.getByRole("option").last()).toHaveText("Eris 에게 말하기 · hello there");
     await page.keyboard.press("Enter");
     await expect(page.locator(".absorb")).toHaveText("hello there");
-    await step(page, 700);
+    // It fades where it stands (200 ms) while its trail flies into her (ADR 0408).
+    await step(page, 100);
     const mid = await page
       .locator(".absorb")
       .evaluate((el) => Number(getComputedStyle(el).opacity));
     expect(mid).toBeGreaterThan(0);
     expect(mid).toBeLessThan(1);
-    await step(page, 720);
+    await step(page, 1320);
     await expect(page.locator(".absorb")).toHaveCount(0);
     // In her, she reads it (0.48 s) and then answers (ADR 0275).
     await step(page, 500);
@@ -228,7 +229,7 @@ test.describe("the desk shell", () => {
     await page.keyboard.type("x");
     await page.keyboard.press("Escape");
     await step(page, 220);
-    await expect(page.locator(".composer-field")).toHaveCSS("height", "2px");
+    await expect(page.locator(".composer-field")).toHaveCSS("height", "1px");
   });
 
   // Dragging and resizing are desk-wm's (e2e/specs/windows-plugins.spec.ts, ADR 0153): the page lays

@@ -42,6 +42,8 @@ pub(crate) struct Connectors {
     pub(crate) builtins: Mutex<BuiltIns>,
     /// The http connectors' instances (ADR 0106).
     pub(crate) http: Mutex<crate::core_http::HttpConnectors>,
+    /// The endue connectors' instances (ADR 0409).
+    pub(crate) endue: Mutex<crate::core_endue::EndueConnectors>,
     feed: Mutex<Feed>,
     scheduler: Mutex<Option<Scheduler>>,
 }
@@ -93,6 +95,7 @@ impl Core {
     pub fn tick_connectors(&self) -> Vec<(String, String)> {
         let mut ran = self.tick_builtins();
         ran.extend(self.tick_http());
+        ran.extend(self.tick_endue());
         if let Some(host) = self.connector_host() {
             ran.extend(host.tick());
         }
@@ -124,6 +127,9 @@ impl Core {
         if self.is_http(&params.connector) {
             return self.connect_http(params);
         }
+        if self.is_endue(&params.connector) {
+            return self.endue_not_connected_here(&params.connector);
+        }
         self.connect_wasm(params)
     }
 
@@ -140,6 +146,9 @@ impl Core {
         if self.is_http(id) {
             return self.disconnect_http(id, instance);
         }
+        if self.is_endue(id) {
+            return self.endue_not_connected_here(id);
+        }
         self.disconnect_wasm(id, instance)
     }
 
@@ -151,6 +160,9 @@ impl Core {
         }
         if self.is_http(id) {
             return self.sync_http_now(id, instance);
+        }
+        if self.is_endue(id) {
+            return self.sync_endue_now(id, instance);
         }
         self.sync_wasm(id, instance)
     }

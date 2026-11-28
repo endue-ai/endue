@@ -181,6 +181,17 @@ describe("the shell bridge over the core", () => {
     expect(refused.listening()).toBe(idle);
   });
 
+  test("an_error_carries_its_reason", async () => {
+    const { stub, bridge } = setup({ "brain.say": () => ({ turnId: "t9" }) });
+    const reply = bridge.brain.say("hello?");
+    await tick();
+    stub.emit({
+      event: "brain.turn",
+      data: { turnId: "t9", kind: "error", text: "No brain.", reason: "no_brain" },
+    });
+    await expect(reply).resolves.toEqual({ text: "No brain.", reason: "no_brain" });
+  });
+
   test("brain.say hands each of Eris's errands to onStep as it happens (ADR 0089)", async () => {
     const { stub, bridge } = setup({ "brain.say": () => ({ turnId: "t7" }) });
     const steps: unknown[] = [];

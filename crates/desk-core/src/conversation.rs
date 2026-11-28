@@ -7,12 +7,13 @@ use std::mem;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
 use std::thread;
+use std::time::Duration;
 
 use desk_brain::{
     Brain, BrainErrorCode, BrainFailure, ClientInfo, CreateSessionRequest, LeaseHolder,
     ToolResultRequest, TurnRequest,
 };
-use desk_bridge::{BrainDesk, BrainTurnKind, BrainTurnTool};
+use desk_bridge::{BrainDesk, BrainName, BrainTurnKind, BrainTurnReason, BrainTurnTool};
 
 use crate::agent_tools::echo;
 use crate::conversation_sink::Sink;
@@ -39,12 +40,29 @@ pub(crate) struct Conversation {
     tools: OnceLock<Weak<dyn Tools>>,
 }
 
-/// Where a turn goes when its brain cannot be reached (ADR 0094): the local brain, and whether
-/// Eris has said so since the chosen brain last answered.
+/// Where a turn goes when its brain cannot be reached (ADR 0094, amended for FT-01): the brains
+/// after it in the desk's order, each tried once, and whether Eris has said so since the chosen
+/// brain last answered.
 #[derive(Clone)]
 pub(crate) struct Fallback {
-    pub to: Arc<Conversation>,
+    pub chain: Vec<(BrainName, Arc<Conversation>)>,
     pub said: Arc<AtomicBool>,
+    /// The chain of a brain that stands in: its answers do not mean the chosen one is back.
+    pub standing_in: bool,
+}
+
+impl Fallback {
+    /// The first brain of the chain that can answer now, and the chain after it.
+    pub(crate) fn next(&self) -> Option<(BrainName, Arc<Conversation>, Fallback)> {
+        let at = self.chain.iter().position(|(_, to)| to.reachable())?;
+        let (name, to) = self.chain[at].clone();
+        let rest = Fallback {
+            chain: self.chain[at + 1..].to_vec(),
+            said: Arc::clone(&self.said),
+            standing_in: true,
+        };
+        Some((name, to, rest))
+    }
 }
 
 struct State {
@@ -52,6 +70,8 @@ struct State {
     lease: LeaseClient,
     /// Whether this run has opened its session yet: the first opening takes the lease over.
     opened: bool,
+    /// What the brain said when it last refused or failed, for the log (never the person's line).
+    why: Option<String>,
 }
 
 /// Why an attempt at a turn stopped.
@@ -94,6 +114,7 @@ impl Conversation {
                 store,
                 lease,
                 opened: false,
+                why: None,
             }),
             turns,
             asks,
@@ -194,6 +215,7 @@ impl Conversation {
         sink.prefix = prefix.map(str::to_owned);
         let mut held = Held::default();
         let (mut wait, mut again) = (self.options.retry, 0);
+        let mut waited = Duration::ZERO;
         loop {
             let attempt = self.attempt(&mut state, &mut sink, &mut held, line);
             if attempt.is_err() {
@@ -209,52 +231,71 @@ impl Conversation {
                     }
                     // Only now, with the episode kept, does the turn say completed (#575).
                     held.release(&sink);
-                    if let Some(fallback) = fallback {
+                    if let Some(fallback) = fallback.filter(|f| !f.standing_in) {
                         fallback.said.store(false, Ordering::SeqCst);
                     }
                     return;
                 }
                 Err(Stop::Again) if again < 3 => again += 1,
-                // The chosen brain is out of reach and the local brain is not (ADR 0094).
-                Err(Stop::Unreachable) if fallback.is_some_and(|f| f.to.reachable()) => {
+                // The chosen brain is out of reach and a brain after it is not (ADR 0094, 0405).
+                Err(Stop::Unreachable) if fallback.and_then(|f| f.next()).is_some() => {
+                    let (_, to, rest) = fallback.and_then(Fallback::next).expect("checked above");
                     sink.reached();
                     drop(state);
-                    let fallback = fallback.expect("checked above");
-                    let first = !fallback.said.swap(true, Ordering::SeqCst);
-                    fallback
-                        .to
-                        .run(turn, line, None, first.then_some(FALLBACK_LINE));
+                    let first = !rest.said.swap(true, Ordering::SeqCst);
+                    to.run(turn, line, Some(&rest), first.then_some(FALLBACK_LINE));
                     return;
                 }
                 Err(Stop::Unreachable) => {
                     if !sink.offline {
                         sink.offline = true;
-                        sink.publish(BrainTurnKind::Offline, Some(OFFLINE_LINE));
+                        let reason = Some(BrainTurnReason::NoBrain);
+                        sink.publish_why(BrainTurnKind::Offline, Some(OFFLINE_LINE), reason);
+                    }
+                    // No brain answers for this long: the turn ends and says so, once (FT-01).
+                    if waited >= self.options.give_up {
+                        self.failed(&mut state, &sink, BrainTurnReason::NoBrain, OFFLINE_LINE);
+                        return;
                     }
                     // Wait without the lock, so other calls are not held up by an absent brain.
                     drop(state);
                     thread::sleep(wait);
+                    waited += wait;
                     wait = (wait * 2).min(self.options.max_retry);
                     state = self.lock();
                 }
                 Err(Stop::ReadOnly) => {
-                    sink.publish(BrainTurnKind::Error, Some(READ_ONLY_LINE));
+                    self.failed(&mut state, &sink, BrainTurnReason::ReadOnly, READ_ONLY_LINE);
                     return;
                 }
                 Err(Stop::TooMany) => {
-                    sink.publish(BrainTurnKind::Error, Some(TOO_MANY_LINE));
+                    self.failed(
+                        &mut state,
+                        &sink,
+                        BrainTurnReason::TooManySteps,
+                        TOO_MANY_LINE,
+                    );
                     return;
                 }
                 Err(Stop::SignedOut) => {
-                    sink.publish(BrainTurnKind::Error, Some(SIGN_IN_LINE));
+                    self.failed(&mut state, &sink, BrainTurnReason::SignedOut, SIGN_IN_LINE);
                     return;
                 }
                 Err(Stop::Again | Stop::Failed) => {
-                    sink.publish(BrainTurnKind::Error, Some(FAILED_LINE));
+                    self.failed(&mut state, &sink, BrainTurnReason::Failed, FAILED_LINE);
                     return;
                 }
             }
         }
+    }
+
+    /// End the turn with `line` and why, and keep why in the desk's log (never the person's line).
+    /// Logged first, so whoever hears the end finds it in the log.
+    fn failed(&self, state: &mut State, sink: &Sink<'_>, reason: BrainTurnReason, line: &str) {
+        if let Some(tools) = self.tools.get().and_then(Weak::upgrade) {
+            tools.failed(sink.turn, &self.options.mode, reason, state.why.take());
+        }
+        sink.publish_why(BrainTurnKind::Error, Some(line), Some(reason));
     }
 
     fn attempt(
@@ -373,6 +414,7 @@ impl Conversation {
 
 /// Map a refused call onto what the turn does next.
 fn stop(state: &mut State, failure: BrainFailure) -> Stop {
+    state.why = Some(failure.to_string());
     match failure.code() {
         None if matches!(failure, BrainFailure::Unreachable(_)) => Stop::Unreachable,
         Some(BrainErrorCode::NotFound) => {

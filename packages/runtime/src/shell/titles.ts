@@ -3,6 +3,7 @@
  * place for the sample views, the launcher windows, the agent screens and the drawer's own items.
  */
 import { tabsOf } from "../surface/tree";
+import { ENDUE_AGENT_VIEW, ENDUE_SPACE_VIEW } from "../system/endue-ids";
 import { LOCAL_VIEW, localName } from "../system/local-ids";
 import { type CopyKey, t } from "./copy";
 import type { Store } from "./state";
@@ -12,6 +13,9 @@ export interface Titled {
   /** The shell's copy; without it (the plain actions' tests) ids stand for themselves. */
   tr?(key: CopyKey, vars?: Record<string, string | number>): string;
 }
+
+/** The brand, not a word: the same in every language. */
+const ENDUE = "endue";
 
 /** The title of the surface `id` holds by default: what the drawer shows when it is put away. */
 export function surfaceTitle(ctx: Titled, id: string): string {
@@ -25,6 +29,16 @@ export function surfaceTitle(ctx: Titled, id: string): string {
   if (id === "launcher" || /^window-\d+$/.test(id)) return tr("launcherTitle");
   if (id.startsWith(LOCAL_VIEW)) {
     return tr("agentScreen", { name: localName(s.localAgents, id.slice(LOCAL_VIEW.length)) });
+  }
+  // An endue agent's or space's window is named by it (ADR 0129), its handle before the name is
+  // read, and "endue" while nothing is: never its view id.
+  if (id.startsWith(ENDUE_AGENT_VIEW)) {
+    const agent = s.endue.agents.find((a) => a.id === id.slice(ENDUE_AGENT_VIEW.length));
+    return agent?.name.trim() || (agent?.slug ? `@${agent.slug}` : ENDUE);
+  }
+  if (id.startsWith(ENDUE_SPACE_VIEW)) {
+    const space = s.endue.spaces.find((p) => p.id === id.slice(ENDUE_SPACE_VIEW.length));
+    return space?.name.trim() || ENDUE;
   }
   if (id.startsWith("agent:")) {
     const agentId = id.slice("agent:".length);

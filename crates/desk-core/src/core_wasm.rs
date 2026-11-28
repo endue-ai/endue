@@ -40,6 +40,10 @@ impl Core {
             self.load_http(&info.id, connector);
             return;
         }
+        if listed(info).is_some_and(|c| c.binding == ConnectorBinding::Endue) {
+            self.load_endue(&info.id);
+            return;
+        }
         if wasm(info).is_none() {
             return;
         }
@@ -79,6 +83,10 @@ impl Core {
             self.http_toggled(id);
             return;
         }
+        if self.is_endue(id) {
+            self.endue_toggled(id);
+            return;
+        }
         let Some(host) = self.connector_host() else {
             return;
         };
@@ -101,6 +109,7 @@ impl Core {
                     host.instances(&info.id).unwrap_or_default()
                 }
                 (_, ConnectorBinding::Http) => self.http_instances(&info.id),
+                (_, ConnectorBinding::Endue) => self.endue_instances(&info.id),
                 _ => Vec::new(),
             };
             for instance in &mut instances {

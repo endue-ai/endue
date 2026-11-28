@@ -50,6 +50,13 @@ export interface CaptureFrame {
   atMs: number;
 }
 
+/** What a capture turns into words (ADR 0406). */
+export interface CaptureOptions {
+  transcribe?: { lang: "ko" | "en" };
+  /** The words so far (`final` false), then the final words once (`final` true). */
+  onHeard?(text: string, final: boolean): void;
+}
+
 /** A capture the runtime started. */
 export interface MicCapture {
   readonly captureId: string;
@@ -63,7 +70,7 @@ export interface CaptureInForce {
 }
 
 /** A brain the desk can choose for Eris (ADR 0094); claude is the person's Claude Code (ADR 0109). */
-export type BrainName = "endue" | "local" | "echo" | "claude";
+export type BrainName = "endue" | "local" | "echo" | "claude" | "codex";
 
 /**
  * Which brain answers. `brain` is the one the desk chose, where it can choose; `fallback` marks the
@@ -71,7 +78,7 @@ export type BrainName = "endue" | "local" | "echo" | "claude";
  */
 export type BrainStatus =
   | { mode: "local"; model: string; brain?: BrainName; fallback?: boolean }
-  | { mode: "cloud"; credits: number; brain?: BrainName }
+  | { mode: "cloud"; credits: number; brain?: BrainName; answering?: BrainName }
   | { mode: "offline"; brain?: BrainName };
 
 export interface WordTime {
@@ -80,8 +87,13 @@ export interface WordTime {
   at: number;
 }
 
+/** Why a turn failed (FT-01), for the desk to offer what fixes it; `text` is the sentence. */
+export type BrainTurnReason = "no_brain" | "signed_out" | "read_only" | "too_many_steps" | "failed";
+
 export interface BrainReply {
   text: string;
+  /** Set when the turn failed: `text` is then Eris's sentence about it. */
+  reason?: BrainTurnReason;
   /** TTS word timestamps when the voice has them. */
   words?: WordTime[];
 }
@@ -124,6 +136,8 @@ export interface AccountStatus {
     | "slow-down"
     | "unavailable"
     | "suspended"
+    | "pending-approval"
+    | "region-unavailable"
     | "rejected"
     | "session-expired"
     | "failed";
@@ -235,13 +249,17 @@ export interface ShellBridge {
     /**
      * Capture the microphone as the runtime (audio.capture, ADR 0245): `onFrame` hears every 20 ms
      * frame until `stop`, and `onEnded` once if the capture ends first (the person stopped it, the
-     * device went). Null when the person or the OS refuses, or there is no microphone. Hosts
-     * without a core leave it out.
+     * device went). With `transcribe`, the core's on-device recogniser turns it into words
+     * (ADR 0406): `onHeard` hears the words so far, then the final words once it stops. Null when
+     * the person or the OS refuses the microphone, or there is none; with `transcribe`, `unheard`
+     * when nothing here recognises the language and `speech-refused` when the OS refuses
+     * recognition (no microphone opens for either). Hosts without a core leave it out.
      */
     capture?(
       onFrame: (frame: CaptureFrame) => void,
       onEnded?: () => void,
-    ): Promise<MicCapture | null>;
+      options?: CaptureOptions,
+    ): Promise<MicCapture | "unheard" | "speech-refused" | null>;
     /**
      * Hear the captures in force, whoever started them: the list now, then on every change;
      * returns the unsubscribe.
