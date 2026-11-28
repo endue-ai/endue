@@ -66,6 +66,7 @@ describe("what is kept as text", () => {
 describe("her card", () => {
   function desk() {
     const commands = new Map<string, () => unknown>();
+    const ran: string[] = [];
     const ctx = {
       store: new Store(emptyState("en")),
       runtime: {
@@ -73,6 +74,10 @@ describe("her card", () => {
           define: (id: string, spec: { run: () => unknown }) => {
             commands.set(id, spec.run);
             return () => commands.delete(id);
+          },
+          run: (id: string) => {
+            ran.push(id);
+            return Promise.resolve();
           },
         },
       },
@@ -82,8 +87,36 @@ describe("her card", () => {
     const said = mountSaid(document.body, ctx, soul);
     const card = () => document.querySelector<HTMLElement>(".eris-said");
     const text = () => card()?.querySelector(".eris-said-text")?.textContent ?? "";
-    return { said, card, text, soul, commands };
+    return { said, card, text, soul, commands, ran };
   }
+
+  it("a_no_brain_line_offers_choose_a_brain", () => {
+    const d = desk();
+    d.said.fail("I can't reach endue right now.", "no_brain");
+    d.said.update(false);
+    expect(d.card()?.hidden).toBe(false);
+    expect(d.text()).toContain("I can't reach endue");
+    const fix = d.card()?.querySelector<HTMLButtonElement>("[data-fix=no_brain]");
+    expect(fix?.textContent).toBe("Choose a brain");
+    fix?.click();
+    expect(d.ran).toEqual(["desk.eris.model"]);
+    expect(d.card()?.querySelector("[data-fix]")).toBeNull();
+    d.said.dispose();
+  });
+
+  it("a_signed_out_line_offers_sign_in_and_other_failures_only_their_sentence", () => {
+    const d = desk();
+    d.said.fail("Sign in to endue so I can think with it.", "signed_out");
+    d.card()?.querySelector<HTMLButtonElement>("[data-fix=signed_out]")?.click();
+    expect(d.ran).toEqual(["desk.account.sign-in"]);
+    d.said.fail("Something went wrong on my side.", "failed");
+    expect(d.card()?.querySelector("[data-fix]")).toBeNull();
+    // The next line clears what the last failure offered.
+    d.said.fail("I can't reach endue right now.", "no_brain");
+    d.said.say("Hello.");
+    expect(d.card()?.querySelector("[data-fix]")).toBeNull();
+    d.said.dispose();
+  });
 
   it("keeps a long line until the person closes it, and brings her last lines back", () => {
     const d = desk();

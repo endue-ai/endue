@@ -136,12 +136,13 @@ function say(
       if (data.kind === "started") answer = "";
       else if (data.kind === "delta") answer += data.text ?? "";
       else if (data.kind === "completed") finish({ text: answer });
-      else if (data.kind === "error") finish({ text: data.text ?? "" });
+      else if (data.kind === "error")
+        finish({ text: data.text ?? "", ...(data.reason ? { reason: data.reason } : {}) });
       else {
         const step = stepOf(data);
         if (step) onStep?.(step);
       }
-      // offline and online: the core retries, so the reply keeps waiting.
+      // offline and online: the core retries, and ends the turn with no_brain when none answers.
     };
     const off = core.onEvent((event) => {
       if (event.event !== "brain.turn") return;

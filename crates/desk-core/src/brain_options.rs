@@ -24,6 +24,8 @@ pub struct BrainOptions {
     /// The first wait before retrying an unreachable brain. It doubles up to `max_retry`.
     pub retry: Duration,
     pub max_retry: Duration,
+    /// How long a turn waits for a brain none of which answers before it ends with `no_brain`.
+    pub give_up: Duration,
     /// What brain.status names while the brain answers.
     pub mode: BrainMode,
 }
@@ -36,6 +38,7 @@ impl Default for BrainOptions {
             ttl_seconds: 60,
             retry: Duration::from_secs(1),
             max_retry: Duration::from_secs(15),
+            give_up: Duration::from_secs(20),
             mode: BrainMode::Cloud,
         }
     }

@@ -16,7 +16,7 @@ pub const TOO_MANY_LINE: &str =
     "I went back and forth too many times on that one. Try asking another way.";
 /// The most tool calls one brain.say turn runs (ADR 0089); past it the turn ends.
 pub const MAX_STEPS: usize = 12;
-/// What Eris says first when the local brain answers in place of the chosen one, which cannot be
-/// reached (ADR 0094); once, until the chosen brain answers again.
+/// What Eris says first when another brain answers in place of the chosen one, which cannot be
+/// reached (ADR 0094, ADR 0405); once, until the chosen brain answers again.
 pub const FALLBACK_LINE: &str =
-    "I can't reach the brain you chose right now, so I'm answering on this computer.";
+    "I can't reach the brain you chose right now, so I'm answering with another one.";

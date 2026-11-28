@@ -57,6 +57,14 @@ after it in this order that can, and that brain's own chain is the rest of the l
 `FALLBACK_LINE` once, until the chosen brain answers again. `brain.status` adds `answering`, the
 brain that stands in. A local choice still never reaches out.
 
+A turn that fails says why. `brain.turn`'s `error` and `offline` carry `reason` (`no_brain`,
+`signed_out`, `read_only`, `too_many_steps`, `failed`), and `text` stays the sentence for people.
+A turn no brain answers says `offline` once and ends with `no_brain` after `give_up` (20 s), so Eris
+never thinks for ever. Her card offers the command that fixes the reason: "Choose a brain"
+(`desk.eris.model`) or "Sign in" (`desk.account.sign-in`). Every failed turn is in the desk's log,
+channel `brain`, at `warn`: the turn, the reason, the brain's mode and what the brain said, never
+the person's line.
+
 ### Consequences
 
 * Good, because a signed-in desk answers with the person's own Eris and her memory.
@@ -71,4 +79,5 @@ brain that stands in. A local choice still never reaches out.
 `with_none_of_them_a_model_this_computer_holds_answers`), `crates/desk-boot/src/endue_eris_tests.rs`,
 `crates/desk-brain-local/src/codex_tests.rs`, `crates/desk-brain-local/tests/failures.rs`
 (`a_model_the_server_does_not_hold_is_no_model_not_a_lost_session`) and
-`crates/desk-platform/tests/chat.rs`.
+`crates/desk-platform/tests/chat.rs`; for the reasons, `crates/desk-core/tests/turn_failures.rs`,
+`packages/runtime/src/eris/said.test.ts` and `apps/desk/src/shell-bridge.test.ts`.

@@ -206,7 +206,8 @@ export function mountComposer(root: HTMLElement, ctx: ShellCtx): () => void {
       return;
     }
     await errands.finish();
-    ctx.eris.say(reply.text, reply.words);
+    if (reply.reason && ctx.eris.fail) ctx.eris.fail(reply.text, reply.reason);
+    else ctx.eris.say(reply.text, reply.words);
   };
 
   const offs = [

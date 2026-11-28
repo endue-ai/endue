@@ -15,8 +15,8 @@ use std::time::{Duration, Instant};
 
 use desk_brain::{ToolCall, ToolDefinition, TurnContext};
 use desk_bridge::{
-    BrainDesk, BrainTurnTool, BridgeError, BridgeEvent, BridgeRequest, BridgeResponse, ErrorCode,
-    MemoryStep,
+    BrainDesk, BrainTurnReason, BrainTurnTool, BridgeError, BridgeEvent, BridgeRequest,
+    BridgeResponse, ErrorCode, LogLevel, MemoryStep,
 };
 use serde_json::{Map, Value, json};
 
@@ -206,6 +206,28 @@ impl Tools for Core {
 
     fn ended(&self, turn: &str) {
         self.end_task(turn);
+    }
+
+    /// Every failed turn is in the desk's log, channel `brain` (FT-01): the turn, the brain's mode,
+    /// the reason and what the brain said. Never the person's line, never a token.
+    fn failed(&self, turn: &str, mode: &BrainMode, reason: BrainTurnReason, why: Option<String>) {
+        let reason = serde_json::to_value(reason).unwrap_or(Value::Null);
+        let mut fields = Map::new();
+        fields.insert("turn".to_owned(), json!(turn));
+        fields.insert("reason".to_owned(), reason.clone());
+        let mode = match mode {
+            BrainMode::Cloud => json!({ "mode": "cloud" }),
+            BrainMode::Local { model } => json!({ "mode": "local", "model": model }),
+        };
+        fields.insert("brain".to_owned(), mode);
+        if let Some(why) = why {
+            fields.insert("why".to_owned(), json!(why));
+        }
+        let message = format!(
+            "a turn to Eris failed: {}",
+            reason.as_str().unwrap_or("failed")
+        );
+        self.append("brain", LogLevel::Warn, message, Some(fields));
     }
 
     fn session(&self, turn: &str, mode: &BrainMode, session: &str) {
