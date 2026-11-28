@@ -1,6 +1,7 @@
 //! Publishing to `endue.social` (plugins/social) with what can go wrong on the way: a picture from
-//! a file goes up once through the endue account, without where it was taken, and only when the
-//! caller may read it; an answer lost twice says the post may be up.
+//! a file goes up once through the endue account, only when the caller may read it and it is within
+//! its size, and without where it was taken unless a person keeps it; an answer lost twice says the
+//! post may be up.
 
 mod endue_fixture;
 mod layer;
@@ -125,6 +126,35 @@ fn a_picture_from_a_file_goes_up_once_without_where_it_was_taken() {
         "{answered}"
     );
     assert_eq!(fake.state().connectors.uploads.len(), 1);
+}
+
+#[test]
+fn a_picture_too_big_goes_nowhere_and_a_person_may_keep_where_one_was_taken() {
+    let (fake, desk, ig, _rd) = connected("endue-social-kept");
+    desk.grant("desk", json!({ "permission": "fs:read", "paths": ["~/*"] }));
+    fs::write(desk.home.join("poster.png"), vec![0u8; 10 * 1024 * 1024 + 1]).unwrap();
+    let big = json!({ "instance": ig, "media": [{ "path": "~/poster.png" }] });
+    let answered = invoke(&desk, PUBLISH, big);
+    assert!(
+        answered
+            .to_string()
+            .contains("poster.png is 10.1 MB; endue AI takes a picture up to 10.0 MB"),
+        "{answered}"
+    );
+    assert!(fake.state().connectors.uploads.is_empty(), "checked before");
+
+    fs::write(desk.home.join("jacket.jpg"), located_jpeg()).unwrap();
+    queue(
+        &fake,
+        &ig,
+        "instagram__social_publish",
+        vec![ok(json!({ "id": "18041", "status": "published" }))],
+    );
+    let kept = json!([{ "path": "~/jacket.jpg", "keepLocation": true }]);
+    let answered = invoke(&desk, PUBLISH, json!({ "instance": ig, "media": kept }));
+    assert_eq!(answered["ok"], true, "{answered}");
+    let uploads = fake.state().connectors.uploads.clone();
+    assert_eq!(uploads[0].bytes, located_jpeg(), "the person kept it as it was");
 }
 
 #[test]
