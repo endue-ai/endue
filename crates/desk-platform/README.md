@@ -2,8 +2,9 @@
 
 The client of endue AI's platform API subset that endue calls (`specs/platform/v0`, ADR 0122): the
 person's endue AI agents, what Studio shows of one, the agent catalog, the Home board's
-conversations, the spaces the person can open (ADR 0129) and the person's own account settings (ADR
-0130). desk-core serves it on the bridge as `studio.*` and `account.settings.*`.
+conversations, the spaces the person can open (ADR 0129), the person's own account settings (ADR
+0130) and the account's connectors through the desk's own key (ADR 0407). desk-core serves it on the
+bridge as `studio.*`, `account.settings.*` and `account.connectors.*`.
 
 ## Public API
 
@@ -21,11 +22,16 @@ conversations, the spaces the person can open (ADR 0129) and the person's own ac
 - Spaces, read only: `spaces(archived)` (with summaries), `space`, `space_overview`, `space_rooms`.
 - Account: `me`, `update_me`, `preferences`, `update_preferences`, `notifications`,
   `update_notifications` (`wire_account`).
+- The desk's key (ADR 0407, `wire_connectors`): `create_key(name, scopes)` and `revoke_key(id)` with
+  the session; `with_key(secret)` → `Connectors`: `list`, `tools(id)`, `call(id, tool, arguments,
+  idempotency_key)`, each with its `RateLimit`. They send the key, never the session, and never
+  refresh; a 401 is `SignedOut` with `KEY_REFUSED`. No `Debug` prints a secret.
 - `PlatformError { kind, status, code, message }` with `ErrorKind`: `SignedOut`, `Offline`,
-  `Forbidden`, `NotFound`, `Invalid`, `Conflict`, `Failed`.
+  `Forbidden`, `NotFound`, `Invalid`, `Conflict`, `RateLimited { wait_secs }`, `Failed`.
 - `wire`, `wire_catalog`, `wire_spaces`: the platform's bodies, snake_case, read tolerantly (unknown
   fields ignored, `null` read as absent; a room's members are never read).
-- `fake::FakePlatform` (feature `fake`, tests only): the platform on 127.0.0.1, in memory; `FakeSpace`.
+- `fake::FakePlatform` (feature `fake`, tests only): the platform on 127.0.0.1, in memory; `FakeSpace`,
+  `FakeConnectors` (keys, connectors, call answers, limits).
 
 Requests go over desk-sys's fetch: rustls, the system proxy, and a host allowlist of the base's
 host alone. No Origin header is sent.
@@ -36,5 +42,5 @@ host alone. No Origin header is sent.
 cargo test -p desk-platform
 ```
 
-`tests/agents.rs` and `tests/spaces.rs` run the client against the fake; `tests/contract.rs` judges the contract's vectors
+`tests/agents.rs`, `tests/spaces.rs` and `tests/connectors.rs` run the client against the fake; `tests/contract.rs` judges the contract's vectors
 and checks the bodies the client sends against it. No test leaves this machine.

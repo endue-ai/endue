@@ -13,6 +13,9 @@ use desk_platform::wire_account::{
     Channel, NotificationUpdate, Notifications, Preferences, PreferencesPatch, User, UserPatch,
 };
 use desk_platform::wire_catalog::{CatalogAgent, ConversationPage, Recommended, Used};
+use desk_platform::wire_connectors::{
+    ConnectorSummary, ConnectorTool, Items, KeyCreated, KeyScope, NewKey, ToolArguments, ToolCall,
+};
 use desk_platform::wire_spaces::{Room, Space, SpaceOverview};
 use desk_platform::{ChatDone, ErrorKind, PlatformError};
 use serde::Deserialize;
@@ -140,6 +143,13 @@ fn valid_answers_read_into_the_client_types() {
                     vector.instance["error"]["code"].as_str()
                 );
             }
+            // The desk's key and the connector API: `connector_vectors_read_into_the_clients_types`.
+            "ConnectorListEnvelope"
+            | "ConnectorToolListEnvelope"
+            | "ConnectorToolCallEnvelope"
+            | "ApiKeyCreated"
+            | "ApiKeyCreateRequest"
+            | "ConnectorToolCallRequest" => {}
             // Requests: the client's own bodies are checked below.
             "CreateAgentRequest"
             | "UpdateAgentRequest"
@@ -205,6 +215,48 @@ fn the_bodies_the_client_sends_are_the_contracts() {
                 channel: Channel::InApp,
                 enabled: true,
             }] }),
+        ),
+    ];
+    for (target, body) in bodies {
+        assert!(validator(target).is_valid(&body), "{target}: {body}");
+    }
+}
+
+#[test]
+fn connector_vectors_read_into_the_clients_types() {
+    let mut seen = Vec::new();
+    for vector in vectors().iter().filter(|v| v.valid) {
+        match vector.target.as_str() {
+            "ConnectorListEnvelope" => reads::<Envelope<Items<ConnectorSummary>>>(vector),
+            "ConnectorToolListEnvelope" => reads::<Envelope<Items<ConnectorTool>>>(vector),
+            "ConnectorToolCallEnvelope" => reads::<Envelope<ToolCall>>(vector),
+            "ApiKeyCreated" => reads::<KeyCreated>(vector),
+            _ => continue,
+        }
+        seen.push(vector.target.clone());
+    }
+    for target in [
+        "ConnectorListEnvelope",
+        "ConnectorToolListEnvelope",
+        "ConnectorToolCallEnvelope",
+        "ApiKeyCreated",
+    ] {
+        assert!(
+            seen.iter().any(|t| t == target),
+            "no valid vector of {target}"
+        );
+    }
+    let key = NewKey {
+        name: "endue Desk on ada-mac".to_owned(),
+        scopes: vec![KeyScope::Read, KeyScope::Send, KeyScope::Delete],
+    };
+    let mut arguments = serde_json::Map::new();
+    arguments.insert("operation".to_owned(), json!("posts"));
+    let bodies = [
+        ("ApiKeyCreateRequest", serde_json::to_value(key).unwrap()),
+        (
+            "ConnectorToolCallRequest",
+            serde_json::to_value(ToolArguments { arguments }).unwrap(),
         ),
     ];
     for (target, body) in bodies {

@@ -40,7 +40,7 @@ pub(crate) fn with_query(path: &str, pairs: &[(&str, Option<String>)]) -> String
 }
 
 /// The answer's data: the body itself, or what `{ data, meta }` and `{ success: true, data }` hold.
-fn unwrap(body: Value) -> Result<Value> {
+pub(crate) fn unwrap(body: Value) -> Result<Value> {
     let Value::Object(mut map) = body else {
         return Ok(body);
     };
@@ -138,6 +138,19 @@ impl Platform {
         timeout: Duration,
         accept: &str,
     ) -> Request {
+        Self::request_to(&self.base, &self.host, method, path, body, timeout, accept)
+    }
+
+    /// A request to `base` without its token, which `once` adds.
+    pub(crate) fn request_to(
+        base: &str,
+        host: &str,
+        method: Method,
+        path: &str,
+        body: Option<&Value>,
+        timeout: Duration,
+        accept: &str,
+    ) -> Request {
         let mut headers = BTreeMap::from([
             ("accept".to_owned(), accept.to_owned()),
             ("user-agent".to_owned(), USER_AGENT.to_owned()),
@@ -146,12 +159,12 @@ impl Platform {
             headers.insert("content-type".to_owned(), "application/json".to_owned());
         }
         Request {
-            url: format!("{}{path}", self.base),
+            url: format!("{base}{path}"),
             method,
             headers,
             body: body.map(|b| b.to_string().into_bytes()),
             timeout: Some(timeout),
-            allowed_hosts: vec![self.host.clone()],
+            allowed_hosts: vec![host.to_owned()],
         }
     }
 
@@ -170,7 +183,7 @@ impl Platform {
         }
     }
 
-    fn once(request: &mut Request, token: &str, max: u64) -> Result<Response> {
+    pub(crate) fn once(request: &mut Request, token: &str, max: u64) -> Result<Response> {
         request
             .headers
             .insert("authorization".to_owned(), format!("Bearer {token}"));

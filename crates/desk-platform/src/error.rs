@@ -20,6 +20,8 @@ pub enum ErrorKind {
     Invalid,
     /// 409: the state forbids it (already deleted, already that status).
     Conflict,
+    /// 429: endue AI asks the desk to wait `wait_secs` seconds before the next call.
+    RateLimited { wait_secs: u64 },
     /// Anything else: a 5xx, a body that is not the contract's, a URL that is not one.
     Failed,
 }
@@ -34,6 +36,9 @@ pub struct PlatformError {
     /// For people.
     pub message: String,
 }
+
+/// How long to wait after a 429 that names no wait.
+pub const DEFAULT_WAIT_SECS: u64 = 60;
 
 /// What people read when the desk is not signed in.
 pub const SIGN_IN: &str = "Sign in to endue to manage your agents.";
@@ -61,6 +66,9 @@ impl PlatformError {
             404 | 410 => ErrorKind::NotFound,
             400 | 422 => ErrorKind::Invalid,
             409 => ErrorKind::Conflict,
+            429 => ErrorKind::RateLimited {
+                wait_secs: DEFAULT_WAIT_SECS,
+            },
             _ => ErrorKind::Failed,
         };
         let envelope = serde_json::from_slice::<Value>(body).ok();

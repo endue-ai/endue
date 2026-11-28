@@ -16,11 +16,13 @@ use serde_json::Value;
 mod account;
 mod board;
 mod chat;
+mod connectors;
 mod routes;
 mod spaces;
 mod state;
 
 pub use account::FakeAccount;
+pub use connectors::{FakeConnector, FakeConnectors, FakeKey};
 pub use spaces::FakeSpace;
 pub use state::State;
 
@@ -91,7 +93,7 @@ fn serve(stream: TcpStream, state: &Mutex<State>) {
     let Some(seen) = read_request(&mut reader) else {
         return;
     };
-    let (delay, picture, (status, body)) = {
+    let (delay, picture, extra, (status, body)) = {
         let mut state = state.lock().unwrap_or_else(|p| p.into_inner());
         state.seen.push(seen.clone());
         let mut bytes = state.pictures.get(&seen.path).cloned();
@@ -105,7 +107,12 @@ fn serve(stream: TcpStream, state: &Mutex<State>) {
                 state.chat_stream.as_bytes().to_vec(),
             ));
         }
-        (state.delay, bytes, answer)
+        let extra = if seen.path.starts_with("/api/public/v1/connectors") {
+            state.connectors.headers.clone()
+        } else {
+            BTreeMap::new()
+        };
+        (state.delay, bytes, extra, answer)
     };
     if let Some(delay) = delay {
         thread::sleep(delay);
@@ -118,8 +125,12 @@ fn serve(stream: TcpStream, state: &Mutex<State>) {
             body.map(|b| b.to_string().into_bytes()).unwrap_or_default(),
         ),
     };
+    let extra: String = extra
+        .iter()
+        .map(|(name, value)| format!("{name}: {value}\r\n"))
+        .collect();
     let head = format!(
-        "HTTP/1.1 {status} {}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n\
+        "HTTP/1.1 {status} {}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n{extra}\
          Connection: close\r\n\r\n",
         reason(status),
         payload.len()
@@ -241,6 +252,8 @@ fn reason(status: u16) -> &'static str {
         404 => "Not Found",
         409 => "Conflict",
         410 => "Gone",
+        429 => "Too Many Requests",
+        503 => "Service Unavailable",
         _ => "Status",
     }
 }

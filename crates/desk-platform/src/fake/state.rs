@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 
 use super::Seen;
 use super::account::FakeAccount;
+use super::connectors::FakeConnectors;
 use super::spaces::FakeSpace;
 
 /// One agent and its facets.
@@ -58,6 +59,8 @@ pub struct State {
     pub spaces: Vec<FakeSpace>,
     /// The signed-in person's account, preferences and notification channels.
     pub account: FakeAccount,
+    /// The desk's keys and the account's connectors (ADR 0407).
+    pub connectors: FakeConnectors,
     /// The next answer, whatever is asked: status, code and message of an error envelope.
     pub fail_next: Option<(u16, String, String)>,
     /// Paths (without query) answered with an error envelope every time: status, code, message.
@@ -90,6 +93,7 @@ impl State {
             .to_owned(),
             spaces: Vec::new(),
             account: FakeAccount::default(),
+            connectors: FakeConnectors::default(),
             fail_next: None,
             fail_at: BTreeMap::new(),
             delay: None,

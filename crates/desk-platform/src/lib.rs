@@ -1,7 +1,8 @@
 //! endue AI's platform API (`/api/v1`), the subset specs/platform/v0 writes down: the person's endue
 //! AI agents, what Studio shows of them, the agent catalog, the conversations of the Home board
 //! (ADR 0122), the spaces the person can open (ADR 0129), the person's own account settings (ADR
-//! 0130), and an agent's face and the rest of what Studio's board shows (ADR 0232). Every call
+//! 0130), an agent's face and the rest of what Studio's board shows (ADR 0232), and the account's
+//! connectors through the desk's own key (ADR 0407, `Connectors`). Every other call
 //! carries the endue ID access token `Tokens` hands out, sends no Origin header, waits 15 s at most
 //! and, after a 401, refreshes the token once and tries once more. The error envelope
 //! `{ error: { code, message } }` becomes a typed `PlatformError`.
@@ -13,6 +14,7 @@ mod agents;
 mod board;
 mod catalog;
 mod chat;
+mod connectors;
 mod error;
 mod facets;
 #[cfg(feature = "fake")]
@@ -25,12 +27,14 @@ pub mod wire;
 pub mod wire_account;
 pub mod wire_board;
 pub mod wire_catalog;
+pub mod wire_connectors;
 pub mod wire_spaces;
 
 pub use agents::Switch;
 pub use board::MEMORIES;
 pub use chat::{ChatConversation, ChatDone, ChatState, ChatTurn};
-pub use error::{ErrorKind, PlatformError, Result, SIGN_IN};
+pub use connectors::{Answer, Connectors, KEY_REFUSED, RateLimit};
+pub use error::{DEFAULT_WAIT_SECS, ErrorKind, PlatformError, Result, SIGN_IN};
 pub use pictures::{DRAWN_URL, Face, MAX_PICTURE, Picture};
 
 pub const NAME: &str = env!("CARGO_PKG_NAME");
