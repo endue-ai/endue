@@ -17,12 +17,14 @@ mod account;
 mod board;
 mod chat;
 mod connectors;
+mod media;
 mod routes;
 mod spaces;
 mod state;
 
 pub use account::FakeAccount;
 pub use connectors::{FakeConnector, FakeConnectors, FakeKey};
+pub use media::{FakeUpload, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES};
 pub use spaces::FakeSpace;
 pub use state::State;
 
@@ -37,6 +39,8 @@ pub struct Seen {
     pub headers: BTreeMap<String, String>,
     /// The JSON body, `Null` when there was none.
     pub body: Value,
+    /// A body that is not JSON, as it came (an upload's bytes); empty for a JSON one.
+    pub raw: Vec<u8>,
 }
 
 /// The fake platform: its state behind a lock, served until it is dropped with the test process.
@@ -185,6 +189,7 @@ fn read_request(reader: &mut BufReader<TcpStream>) -> Option<Seen> {
         path: decode(path),
         query,
         headers,
+        raw: if body.is_null() { bytes } else { Vec::new() },
         body,
     })
 }

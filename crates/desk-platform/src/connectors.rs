@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::time::Duration;
 
-use desk_sys::net::{MAX_BODY_BYTES, Method, Response};
+use desk_sys::net::{MAX_BODY_BYTES, Method, Request, Response};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
@@ -14,7 +14,8 @@ use crate::Platform;
 use crate::error::{DEFAULT_WAIT_SECS, ErrorKind, PlatformError, Result};
 use crate::http::encode;
 use crate::wire_connectors::{
-    ConnectorSummary, ConnectorTool, Items, KeyCreated, KeyScope, NewKey, ToolArguments, ToolCall,
+    ConnectorSummary, ConnectorTool, Items, KeyCreated, KeyScope, MediaUploaded, NewKey,
+    ToolArguments, ToolCall,
 };
 
 /// What people read when endue AI no longer accepts the desk's key.
@@ -152,6 +153,36 @@ impl Connectors {
         )
     }
 
+    /// Upload a file's bytes of `content_type` for a publish: endue AI keeps them a day and answers
+    /// the `media_id` a tool's `media` takes. The bytes go as they are, with their length. An upload
+    /// is not idempotent, so a lost answer is not tried again here.
+    pub fn upload_media(
+        &self,
+        bytes: Vec<u8>,
+        content_type: &str,
+    ) -> Result<Answer<MediaUploaded>> {
+        let mut request = self.request(Method::Post, "/api/public/v1/connectors/media", None);
+        request
+            .headers
+            .insert("content-type".to_owned(), content_type.to_owned());
+        // A video takes longer than a call: a minute at least.
+        request.timeout = Some(self.timeout.max(Duration::from_secs(60)));
+        request.body = Some(bytes);
+        self.answer(request, "media upload")
+    }
+
+    fn request(&self, method: Method, path: &str, body: Option<&Value>) -> Request {
+        Platform::request_to(
+            &self.base,
+            &self.host,
+            method,
+            path,
+            body,
+            self.timeout,
+            "application/json",
+        )
+    }
+
     fn read<T: DeserializeOwned>(
         &self,
         method: Method,
@@ -160,20 +191,16 @@ impl Connectors {
         idempotency_key: Option<&str>,
         what: &str,
     ) -> Result<Answer<T>> {
-        let mut request = Platform::request_to(
-            &self.base,
-            &self.host,
-            method,
-            path,
-            body,
-            self.timeout,
-            "application/json",
-        );
+        let mut request = self.request(method, path, body);
         if let Some(key) = idempotency_key {
             request
                 .headers
                 .insert("idempotency-key".to_owned(), key.to_owned());
         }
+        self.answer(request, what)
+    }
+
+    fn answer<T: DeserializeOwned>(&self, mut request: Request, what: &str) -> Result<Answer<T>> {
         let reply = Platform::once(&mut request, &self.secret, MAX_BODY_BYTES)?;
         let limit = RateLimit::of(&reply.headers);
         if !(200..300).contains(&reply.status) {

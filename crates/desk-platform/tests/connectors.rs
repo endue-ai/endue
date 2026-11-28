@@ -183,3 +183,73 @@ fn rate_limits_and_refusals_are_typed() {
         "a refused key is not retried"
     );
 }
+
+#[test]
+fn a_file_is_uploaded_as_its_bytes_with_the_key_and_named_by_its_media_id() {
+    let fake = FakePlatform::start();
+    let id = fake
+        .state()
+        .connectors
+        .add("instagram", "@ada.studio", &["read", "send"]);
+    let platform = client(&fake);
+    let read = platform.create_key("desk", &[KeyScope::Read]).unwrap();
+    let refused = platform
+        .with_key(&read.secret)
+        .upload_media(vec![0xff, 0xd8, 0xff, 0xd9], "image/jpeg")
+        .unwrap_err();
+    assert_eq!(
+        refused.status,
+        Some(403),
+        "a key that may not publish may not upload"
+    );
+
+    let key = platform
+        .create_key("desk", &[KeyScope::Read, KeyScope::Send])
+        .unwrap();
+    let connectors = platform.with_key(&key.secret);
+    let picture = vec![0xff, 0xd8, 0xff, 0xd9];
+    let uploaded = connectors
+        .upload_media(picture.clone(), "image/jpeg")
+        .unwrap()
+        .value;
+    assert!(uploaded.media_id.starts_with("cm_") && uploaded.media_id.len() == 35);
+    assert_eq!((uploaded.mime.as_str(), uploaded.size), ("image/jpeg", 4));
+    let seen = fake.seen_at("POST", "/api/public/v1/connectors/media");
+    assert_eq!(
+        seen[1].headers["authorization"],
+        format!("Bearer {}", key.secret)
+    );
+    assert_eq!(seen[1].headers["content-type"], "image/jpeg");
+    assert_eq!(seen[1].headers["content-length"], "4");
+    assert_eq!(fake.state().connectors.uploads[0].bytes, picture);
+
+    let other = connectors
+        .upload_media(vec![1, 2, 3], "application/pdf")
+        .unwrap_err();
+    assert_eq!(other.status, Some(415));
+    let big = vec![0; desk_platform::fake::MAX_IMAGE_BYTES + 1];
+    assert_eq!(
+        connectors
+            .upload_media(big, "image/png")
+            .unwrap_err()
+            .status,
+        Some(413)
+    );
+
+    let media = json!([{ "media_id": uploaded.media_id, "alt": "A jacket" }]);
+    let mut arguments = no_arguments();
+    arguments.insert("media".to_owned(), media);
+    let call = connectors
+        .call(&id, "instagram__social_publish", arguments, "inv_2.0")
+        .unwrap()
+        .value;
+    assert!(call.ok, "a media_id the account uploaded is taken");
+    let mut arguments = no_arguments();
+    arguments.insert("media".to_owned(), json!([{ "media_id": "cm_0" }]));
+    let call = connectors
+        .call(&id, "instagram__social_publish", arguments, "inv_3.0")
+        .unwrap()
+        .value;
+    assert!(!call.ok);
+    assert_eq!(call.error.unwrap().reason, Refusal::Invalid);
+}
