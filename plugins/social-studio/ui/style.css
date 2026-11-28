@@ -11,7 +11,11 @@ body {
 }
 .desk-header {
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--desk-space-2);
+  margin: 0;
+  padding: var(--desk-space-2) var(--desk-space-3);
+  border-bottom: 1px solid var(--desk-border);
 }
 .badge {
   margin-inline-start: var(--desk-space-1);
@@ -125,6 +129,8 @@ body {
 .row {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 2px;
   box-sizing: border-box;
   width: 100%;
