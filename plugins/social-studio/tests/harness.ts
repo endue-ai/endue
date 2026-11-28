@@ -188,6 +188,7 @@ export async function mount(options: MountOptions = {}) {
         return {};
       },
     },
+    manifestCommands: manifest().contributes.commands,
     grants: GRANTS,
     language: options.language ?? "en",
     messages: { folder: "messages", catalogs: { en: catalog("en"), ko: catalog("ko") } },

@@ -17,7 +17,7 @@ describe("Social Studio for agents", () => {
       ["Studio on Instagram", "instagram", "connected", "studio", 1200],
       ["Studio on Reddit", "reddit", "connected", undefined, undefined],
     ]);
-    expect((answer.accounts[0]?.capabilities as { reply?: unknown }).reply).toBe(true);
+    expect(answer.accounts[0]?.capabilities).toMatchObject({ reply: true });
   });
 
   it("posts answer the accounts' own posts, newest first, narrowed as asked", async () => {
