@@ -89,6 +89,23 @@ impl Desk {
         Self::open(home, data, Arc::new(FakeClock::new()), calendar, false)
     }
 
+    /// A desk whose built-in desk.agent-sessions reads `<home>/.claude` and `<home>/.codex`.
+    pub fn with_sessions(tag: &str) -> Self {
+        let root = temp(tag);
+        let (home, data) = (root.join("home"), root.join("data"));
+        fs::create_dir_all(&home).unwrap();
+        let roots = desk_sessions::Roots {
+            home: home.clone(),
+            claude: home.join(".claude"),
+            codex: home.join(".codex"),
+        };
+        let seen = data.join("agent-sessions.json");
+        let clock = Arc::new(FakeClock::new());
+        Self::open_with(home, data, clock, None, false, |core, _| {
+            core.with_agent_session_roots(roots, seen)
+        })
+    }
+
     /// A desk without a calendar whose person says yes to every perm.request.
     pub fn saying_yes(tag: &str) -> Self {
         let root = temp(tag);
