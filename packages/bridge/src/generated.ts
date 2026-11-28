@@ -3169,7 +3169,11 @@ export interface BrainTurnData {
   /** brain.ask only, on completed: the arguments the brain called the tool with, checked against its schema. Absent when the brain answered in text instead. */
   structured?: Record<string, unknown>;
   tool?: BrainTurnTool;
+  reason?: BrainTurnReason;
 }
+
+/** error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people. */
+export type BrainTurnReason = "no_brain" | "signed_out" | "read_only" | "too_many_steps" | "failed";
 
 /** started, delta (more text), completed; error (the turn failed, for example read-only after a takeover); offline (the brain is unreachable, the turn waits) and online (it resumed); tool (Eris hands work to a plugin command: the core runs the brain's call) and tool-result (the command answered and its answer went back to the brain). */
 export type BrainTurnKind =

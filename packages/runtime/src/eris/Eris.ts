@@ -7,7 +7,7 @@
  * are present and she docks again once the last one leaves (rest.ts, ADR 0254).
  */
 import userHello from "../bridge/envelopes/user-hello.json";
-import type { Bands, WordTime } from "../bridge/types";
+import type { Bands, BrainTurnReason, WordTime } from "../bridge/types";
 import { moveEris } from "../shell/actions";
 import type { ShellCtx } from "../shell/context";
 import { h, listen } from "../shell/dom";
@@ -41,6 +41,8 @@ function louder(host: Bands, heard: Bands): number[] {
 
 export interface ErisHandle {
   say(text: string, words?: WordTime[]): void;
+  /** A failed turn (FT-01): her sentence, kept with what fixes it, and her oops. */
+  fail(text: string, reason: BrainTurnReason): void;
   setState(state: ErisState): void;
   /** Start a spoken turn (or, while she listens, stop listening and answer). */
   talk(): void;
@@ -324,6 +326,12 @@ export function mountEris(
   return {
     say(text, words) {
       speakLine(text, words);
+    },
+    fail(text, reason) {
+      said.fail(text, reason);
+      soul.stop(ctx.ticker.now());
+      soul.live.textContent = text;
+      setState("oops");
     },
     setState,
     talk() {

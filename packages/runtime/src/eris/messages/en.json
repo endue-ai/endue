@@ -3,6 +3,8 @@
   "eris.said.close": "Close",
   "eris.said.title": "Show what Eris said",
   "eris.said.none": "Eris has said nothing yet.",
+  "eris.said.chooseBrain": "Choose a brain",
+  "eris.said.signIn": "Sign in",
   "eris.talk.summon": "Talk to Eris",
   "eris.status.warning": "Warning",
   "eris.status.critical": "Critical",

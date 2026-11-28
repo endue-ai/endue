@@ -5132,6 +5132,23 @@ pub struct BrainTurnData {
     pub structured: Option<serde_json::Map<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool: Option<BrainTurnTool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<BrainTurnReason>,
+}
+
+/// error and offline only: why, for the desk to offer what fixes it (FT-01). no_brain: no brain the desk has can answer now; signed_out: the brain wants an endue ID the desk does not hold; read_only: another desk holds the conversation; too_many_steps: past the turn's tool calls; failed: anything else, kept in the desk's log. text stays the sentence for people.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BrainTurnReason {
+    #[serde(rename = "no_brain")]
+    NoBrain,
+    #[serde(rename = "signed_out")]
+    SignedOut,
+    #[serde(rename = "read_only")]
+    ReadOnly,
+    #[serde(rename = "too_many_steps")]
+    TooManySteps,
+    #[serde(rename = "failed")]
+    Failed,
 }
 
 /// started, delta (more text), completed; error (the turn failed, for example read-only after a takeover); offline (the brain is unreachable, the turn waits) and online (it resumed); tool (Eris hands work to a plugin command: the core runs the brain's call) and tool-result (the command answered and its answer went back to the brain).

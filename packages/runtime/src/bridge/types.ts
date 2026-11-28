@@ -80,8 +80,13 @@ export interface WordTime {
   at: number;
 }
 
+/** Why a turn failed (FT-01), for the desk to offer what fixes it; `text` is the sentence. */
+export type BrainTurnReason = "no_brain" | "signed_out" | "read_only" | "too_many_steps" | "failed";
+
 export interface BrainReply {
   text: string;
+  /** Set when the turn failed: `text` is then Eris's sentence about it. */
+  reason?: BrainTurnReason;
   /** TTS word timestamps when the voice has them. */
   words?: WordTime[];
 }

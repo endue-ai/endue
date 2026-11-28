@@ -196,6 +196,7 @@ fn turn_data(
         text: text.map(str::to_owned),
         structured,
         tool: None,
+        reason: None,
     }
 }
 

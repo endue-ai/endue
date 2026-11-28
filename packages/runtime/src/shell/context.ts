@@ -1,3 +1,4 @@
+import type { BrainTurnReason } from "../bridge/types";
 import type { ErisState } from "../eris/states";
 import type { Platform } from "../input";
 import type { PluginWindows } from "../surface/host";
@@ -29,6 +30,8 @@ export interface ShellCtx extends Ctx {
   /** Eris's controls for parts that make her react (the composer, the rail). */
   eris: {
     say(text: string, words?: { word: string; at: number }[]): void;
+    /** A turn that failed: her sentence, kept with what fixes it, and her oops (FT-01). */
+    fail?(text: string, reason: BrainTurnReason): void;
     setState(state: ErisState): void;
   };
 }

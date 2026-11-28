@@ -7,6 +7,7 @@
  * overlays (`popover`), so the compositor draws it above every window and it takes its own presses
  * (ADR 0160, ADR 0166).
  */
+import type { BrainTurnReason } from "../bridge/types";
 import type { ShellCtx } from "../shell/context";
 import { h, listen } from "../shell/dom";
 import { icon } from "../shell/icons";
@@ -64,6 +65,8 @@ export interface Said {
   readonly el: HTMLElement;
   /** Her new line; true when it is kept in the card as text (the soul text is for the others). */
   say(text: string): boolean;
+  /** A failed turn's sentence, kept as text with the command that fixes it (FT-01). */
+  fail(text: string, reason: BrainTurnReason): void;
   /** Show the card while it keeps text or `soul` (a soul line is on screen). */
   update(soul: boolean): void;
   place(eris: Box, size: { width: number; height: number }): void;
@@ -72,8 +75,16 @@ export interface Said {
   dispose(): void;
 }
 
+/** What a failed turn's card offers, by reason: a command that exists, and its words. */
+export const FIXES: Partial<
+  Record<BrainTurnReason, { command: string; label: "chooseBrain" | "signIn" }>
+> = {
+  no_brain: { command: "desk.eris.model", label: "chooseBrain" },
+  signed_out: { command: "desk.account.sign-in", label: "signIn" },
+};
+
 export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): Said {
-  const tr = (key: "label" | "close" | "title" | "none") =>
+  const tr = (key: "label" | "close" | "title" | "none" | "chooseBrain" | "signIn") =>
     erisText(ctx.store.get().lang, `said.${key}`);
   const text = h("div", { class: "eris-said-text", hidden: true });
   const close = h(
@@ -88,11 +99,13 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
     },
     icon("close", 16),
   );
+  const fixes = h("div", { class: "eris-said-fixes", hidden: true });
   const el = h(
     "section",
     { class: "popover eris-said", "aria-label": tr("label"), hidden: true },
     soul,
     text,
+    fixes,
     close,
   );
   root.append(el);
@@ -108,6 +121,8 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
   /** Keep `next` as text: an answer read from its start, her last lines from the newest. */
   const keep = (next: string[] | null, newest = false) => {
     kept = next;
+    fixes.hidden = true;
+    fixes.replaceChildren();
     text.hidden = !next;
     close.hidden = !next;
     text.replaceChildren(...(next ?? []).flatMap((line) => prose(document, line)));
@@ -145,6 +160,29 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
       const long = isLong(said);
       keep(long ? [said] : null);
       return long;
+    },
+    fail(line, reason) {
+      const said = line.trim();
+      if (said) lines = [...lines, said].slice(-RECALL_LINES);
+      keep([said]);
+      const fix = FIXES[reason];
+      if (!fix) return;
+      fixes.append(
+        h(
+          "button",
+          {
+            class: "btn btn-outline",
+            type: "button",
+            "data-fix": reason,
+            onClick: () => {
+              keep(null);
+              void ctx.runtime?.commands.run(fix.command);
+            },
+          },
+          tr(fix.label),
+        ),
+      );
+      fixes.hidden = false;
     },
     update,
     place(eris, size) {
