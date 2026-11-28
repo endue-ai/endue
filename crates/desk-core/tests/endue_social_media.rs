@@ -128,6 +128,28 @@ fn a_picture_from_a_file_goes_up_once_without_where_it_was_taken() {
     assert_eq!(fake.state().connectors.uploads.len(), 1);
 }
 
+/// A new key, as after signing in to another endue account, never names the old key's upload.
+#[test]
+fn a_new_key_uploads_the_picture_again() {
+    let (fake, desk, ig, _rd) = connected("endue-social-new-key");
+    desk.grant("desk", json!({ "permission": "fs:read", "paths": ["~/*"] }));
+    fs::write(desk.home.join("jacket.jpg"), located_jpeg()).unwrap();
+    let args = json!({ "instance": ig, "media": [{ "path": "~/jacket.jpg" }] });
+    let manage = json!({ "scope": { "permission": "account:manage" } });
+    for id in ["18050", "18051"] {
+        let done = ok(json!({ "id": id, "status": "published" }));
+        queue(&fake, &ig, "instagram__social_publish", vec![done]);
+        let answered = invoke(&desk, PUBLISH, args.clone());
+        assert_eq!(answered["ok"], true, "{answered}");
+        desk.ok("desk", "account.connectors.disable", manage.clone());
+        turn_on(&desk);
+        desk.tick();
+    }
+    let uploads = fake.state().connectors.uploads.clone();
+    assert_eq!(uploads.len(), 2, "each key uploads its own");
+    assert_ne!(uploads[0].media_id, uploads[1].media_id);
+}
+
 #[test]
 fn a_picture_too_big_goes_nowhere_and_a_person_may_keep_where_one_was_taken() {
     let (fake, desk, ig, _rd) = connected("endue-social-kept");

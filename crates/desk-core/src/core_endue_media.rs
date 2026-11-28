@@ -2,8 +2,8 @@
 //! `{ file }` argument holds a path, or objects with `path`: each file the caller may read is checked
 //! (a picture or a video endue AI takes, within its size), its location taken out unless a person's
 //! plugin keeps it, uploaded with the desk's key and named by the `media_id` endue AI answers. The
-//! same bytes are uploaded once while their id has an hour left, so one picture published to several
-//! accounts goes up once.
+//! same bytes are uploaded once per key while their id has an hour left, so one picture published to
+//! several accounts goes up once, and another endue account uploads its own.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -25,7 +25,8 @@ const REUSE: Duration = Duration::from_secs(23 * 60 * 60);
 /// One upload at a time, so the invocations of one publish to several accounts upload a file once.
 static UPLOADING: Mutex<()> = Mutex::new(());
 
-/// The desk's uploads by their type and SHA-256: the `media_id` and when it was made.
+/// The desk's uploads by the key that made them, their type and SHA-256: the `media_id` and when
+/// it was made. Those past reuse go at the next upload.
 #[derive(Default)]
 pub(crate) struct Uploaded(BTreeMap<String, (String, SystemTime)>);
 
@@ -141,7 +142,14 @@ impl Core {
             .iter()
             .map(|b| format!("{b:02x}"))
             .collect();
-        let key = format!("{mime} {digest}");
+        // An upload is its endue account's: named by the desk's key that made it, another account
+        // (always another key) uploads its own.
+        let owner = self
+            .account_connectors
+            .key()
+            .map(|k| k.id)
+            .unwrap_or_default();
+        let key = format!("{owner} {mime} {digest}");
         let _one = UPLOADING.lock().unwrap_or_else(PoisonError::into_inner);
         let now = self.clock.now();
         let lately = |at: &SystemTime| now.duration_since(*at).is_ok_and(|age| age < REUSE);
@@ -152,10 +160,9 @@ impl Core {
             .upload_media(bytes, mime)
             .map_err(|e| format!("{name} was not uploaded: {}", self.endue_call_failed(e)))?
             .value;
-        self.endue()
-            .1
-            .0
-            .insert(key, (uploaded.media_id.clone(), now));
+        let mut endue = self.endue();
+        endue.1.0.retain(|_, (_, at)| lately(at));
+        endue.1.0.insert(key, (uploaded.media_id.clone(), now));
         Ok(uploaded.media_id)
     }
 }
