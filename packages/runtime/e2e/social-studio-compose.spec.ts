@@ -52,7 +52,7 @@ for (const scheme of ["dark", "light"] as const)
     test(`${name} (${size.width}px, ${scheme}): write once, review, publish to each account`, async ({
       page,
     }, info) => {
-      const { frame, window } = await open(page, size, scheme);
+      const { frame, window: surface } = await open(page, size, scheme);
       await frame.getByRole("tab", { name: "Drafts" }).click();
       await frame.getByRole("button", { name: "New draft" }).first().click();
       await frame
@@ -76,7 +76,7 @@ for (const scheme of ["dark", "light"] as const)
         "83 of 500 characters",
       );
       expect(await fits(frame)).toBe(true);
-      await window.screenshot({ path: info.outputPath(`composer-${name}-${scheme}.png`) });
+      await surface.screenshot({ path: info.outputPath(`composer-${name}-${scheme}.png`) });
 
       await frame.getByRole("button", { name: "Publish…" }).click();
       const dialog = frame.getByRole("dialog");
@@ -87,7 +87,7 @@ for (const scheme of ["dark", "light"] as const)
         "Image · jacket.jpg · described as “Three fabric swatches on a table”",
       );
       await expect(dialog.getByRole("button", { name: "Publish to 2 accounts" })).toBeFocused();
-      await window.screenshot({ path: info.outputPath(`review-${name}-${scheme}.png`) });
+      await surface.screenshot({ path: info.outputPath(`review-${name}-${scheme}.png`) });
 
       await dialog.getByRole("button", { name: "Publish to 2 accounts" }).click();
       await expect(preview(frame, "conn_ig").locator(".outcome")).toHaveAttribute(
@@ -100,7 +100,7 @@ for (const scheme of ["dark", "light"] as const)
       await expect(frame.getByRole("button", { name: "Open on Instagram" })).toBeVisible();
       await preview(frame, "conn_th").scrollIntoViewIfNeeded();
       expect(await fits(frame)).toBe(true);
-      await window.screenshot({ path: info.outputPath(`outcome-${name}-${scheme}.png`) });
+      await surface.screenshot({ path: info.outputPath(`outcome-${name}-${scheme}.png`) });
 
       await preview(frame, "conn_th").getByRole("button", { name: "Try again" }).click();
       await expect(preview(frame, "conn_th").locator(".outcome")).toHaveAttribute(
@@ -110,7 +110,7 @@ for (const scheme of ["dark", "light"] as const)
       const published = await page.evaluate(
         () =>
           window.__desk.stub.log.filter(
-            (l) =>
+            (l: { request: { method: string; params?: unknown } }) =>
               l.request.method === "cmd.invoke" &&
               (l.request.params as { id?: string }).id === "endue.social.post.publish",
           ).length,

@@ -5,12 +5,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  type AccountConnectorPower,
   type ConnectorInfo,
   type ConnectorInstance,
   type Item,
   type MessageCatalog,
   type Permission,
   StubError,
+  type StubHandlers,
 } from "../../../packages/bridge/src/index";
 import { defineUiPlugin } from "../../../packages/plugin-sdk/src/index";
 import { createTestHost, type TestHost } from "../../../packages/plugin-sdk/src/testing/index";
@@ -169,8 +171,8 @@ type MountOptions = {
   /** What dialog.open answers: the files the person picks. */
   picked?: string[];
   /** What the key may do, and what it may after account.connectors.enable (null: refused). */
-  may?: string[];
-  enabled?: string[] | null;
+  may?: AccountConnectorPower[];
+  enabled?: AccountConnectorPower[] | null;
   /** The social commands' answers by command id; a throw is the network's refusal. */
   answers?: Record<string, (args: Record<string, unknown>) => unknown>;
   /** The brain's answer to writing help. */
@@ -236,7 +238,7 @@ export async function mount(options: MountOptions = {}) {
   const invoked: { id: string; args: Record<string, unknown> }[] = [];
   const enabled: unknown[] = [];
   const asked: string[] = [];
-  let may = options.may ?? ["read", "publish", "delete"];
+  let may: AccountConnectorPower[] = options.may ?? ["read", "publish", "delete"];
   const socialCommand = (id: string) => (args: unknown) => {
     const a = args as Record<string, unknown>;
     invoked.push({ id, args: a });
@@ -259,7 +261,7 @@ export async function mount(options: MountOptions = {}) {
         opened.push(target);
         return { opened: true };
       },
-      ...memoryFiles(files, trashed),
+      ...(memoryFiles(files, trashed) as unknown as StubHandlers),
       "dialog.open": () =>
         options.picked
           ? { cancelled: false, paths: options.picked }
@@ -269,7 +271,7 @@ export async function mount(options: MountOptions = {}) {
         enabled.push(allow);
         if (options.enabled === null)
           return { enabled: true, may, connectors: [], problem: "Not now." };
-        may = options.enabled ?? [...may, ...allow];
+        may = options.enabled ?? [...may, ...(allow ?? [])];
         return { enabled: true, may, connectors: [] };
       },
       "brain.ask": ({ prompt }) => {
