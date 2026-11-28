@@ -7,7 +7,7 @@
 mod endue_fixture;
 mod layer;
 
-use desk_platform::fake::{FakePlatform, Seen};
+use desk_platform::fake::FakePlatform;
 use endue_fixture::*;
 use layer::fixtures::state;
 use layer::{ids, source};
@@ -171,6 +171,41 @@ fn a_truncated_or_refused_answer_fails_the_sync_whole() {
 }
 
 #[test]
+fn a_refusal_reason_is_read_quota_waits_and_reauth_asks_to_reconnect() {
+    let fake = FakePlatform::start();
+    let a = gadget(&fake, "Studio A", &BOTH);
+    let error =
+        |reason: &str| json!({ "reason": reason, "message": "Not now.", "retry_after": 3600 });
+    let quota = json!({ "ok": false, "content": "", "error": error("quota") });
+    let reauth = json!({ "ok": false, "content": "", "error": error("reauth") });
+    let first = page(json!([thing("t1", "Kept")]), Some("c2"));
+    pages(&fake, &a, vec![first, quota, reauth]);
+    let desk = desk("endue-reasons", &fake);
+    turn_on(&desk);
+    desk.tick();
+    let listed = desk.instances(GADGET);
+    assert_eq!(
+        state(&listed[0]),
+        "connected",
+        "a quota is a wait, not an error"
+    );
+    assert_eq!(ids(&entries(&desk, &a)), ["t1"], "what was read is written");
+    desk.clock.advance(1800);
+    desk.tick();
+    assert_eq!(
+        calls(&fake, &a, "thing_read").len(),
+        2,
+        "no call before retry_after"
+    );
+
+    sync_now(&desk, &a);
+    let listed = desk.instances(GADGET);
+    assert_eq!(state(&listed[0]), "error");
+    assert_eq!(listed[0]["status"]["error"]["reauth"], true);
+    assert_eq!(listed[0]["status"]["error"]["message"], "Not now.");
+}
+
+#[test]
 fn a_sync_spends_its_budget_and_waits_as_the_limit_asks() {
     let fake = FakePlatform::start();
     let a = gadget(&fake, "Studio A", &BOTH);
@@ -243,63 +278,6 @@ fn a_sync_spends_its_budget_and_waits_as_the_limit_asks() {
     desk.clock.advance(900);
     desk.tick();
     assert_eq!(calls(&fake, &a, "thing_read").len(), 8);
-}
-
-#[test]
-fn a_command_runs_its_tool_with_one_idempotency_key_per_invocation() {
-    let fake = FakePlatform::start();
-    let a = gadget(&fake, "Studio A", &BOTH);
-    let sent = json!({ "ok": true, "content": "sent", "data": { "id": "p1", "url": "https://gadget.example/p1" } });
-    fake.state()
-        .connectors
-        .answers
-        .insert(format!("{a}/gadget__thing_send"), sent);
-    let desk = desk("endue-command", &fake);
-    turn_on(&desk);
-    desk.tick();
-    let listed = commands(&desk);
-    assert_eq!(listed["commands"][0]["provider"], GADGET);
-    assert_eq!(listed["commands"][0]["irreversible"], true);
-
-    fake.state().connectors.failing = Some(503);
-    let answered = send(&desk, &a, "Hello");
-    assert_eq!(answered["ok"], true, "{answered}");
-    assert_eq!(
-        answered["result"],
-        json!({ "id": "p1", "url": "https://gadget.example/p1" })
-    );
-    let seen = calls(&fake, &a, "thing_send");
-    assert_eq!(seen.len(), 2, "the lost answer was retried");
-    assert_eq!(
-        seen[1].body["arguments"],
-        json!({ "operation": "send", "text": "Hello" })
-    );
-    let key = |s: &Seen| s.headers["idempotency-key"].clone();
-    assert_eq!(key(&seen[0]), key(&seen[1]), "a retry carries the same key");
-    send(&desk, &a, "Again");
-    let seen = calls(&fake, &a, "thing_send");
-    assert_ne!(key(&seen[2]), key(&seen[1]), "a new invocation, a new key");
-}
-
-#[test]
-fn a_refusal_is_the_commands_error_in_the_tools_words() {
-    let fake = FakePlatform::start();
-    let a = gadget(&fake, "Studio A", &BOTH);
-    let refused = json!({ "ok": false, "content": "Things longer than 10 characters are refused.",
-        "error": { "reason": "invalid", "message": "too long" } });
-    fake.state()
-        .connectors
-        .answers
-        .insert(format!("{a}/gadget__thing_send"), refused);
-    let desk = desk("endue-refusal", &fake);
-    turn_on(&desk);
-    desk.tick();
-    let answered = send(&desk, &a, "A thing that is too long");
-    assert_eq!(answered["ok"], false);
-    assert_eq!(
-        answered["error"]["message"],
-        "Things longer than 10 characters are refused."
-    );
 }
 
 #[test]

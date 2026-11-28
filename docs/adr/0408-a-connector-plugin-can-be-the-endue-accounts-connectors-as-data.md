@@ -48,8 +48,9 @@ the binding can list the account's connectors, which an http block cannot.
   `connector.connect` and `connector.disconnect` are `unsupported`: that happens on endue.ai.
 * **A sync** calls each request's tool with constants, `page` (the cursor the previous page's
   `next` pointed to) and `since` (the last good sync's time), maps the records at `items` and
-  writes what changed. `ok: false` is `error` with the tool's own words; `truncated: true` fails it
-  too, writing nothing. A record that is no item is skipped and counted (`settings.skipped`). A
+  writes what changed. `ok: false` is `error` with the tool's own words (with `reauth` when
+  `error.reason` is `reauth`); `truncated: true` fails it too, writing nothing. A refusal `quota`
+  stops the sync as the limit does, until `retry_after`. A record that is no item is skipped and counted (`settings.skipped`). A
   sync that spends its budget, or reaches `X-RateLimit-Remaining: 0`, writes what it read and
   removes nothing, and a 429 or the limit moves the next sync past the wait. A request with
   `since` only adds and changes.
@@ -82,7 +83,7 @@ the binding can list the account's connectors, which an http block cannot.
 
 ### Confirmation
 
-`crates/desk-core/tests/endue_binding.rs` runs a fixture plugin with made-up tools against the
+`crates/desk-core/tests/endue_binding.rs` and `endue_actions.rs` run a fixture plugin with made-up tools against the
 in-process fake platform: instances from the account, pages, since, skipped records, truncated and
 refused answers, budget and limits, one idempotency key per invocation, the tool's words as the
 command's error, expired, the key off, and removal. `crates/desk-bridge/src/names.rs` checks the

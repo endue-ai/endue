@@ -83,12 +83,18 @@ pub(crate) fn sync(
             };
             let answered = answer.value;
             if !answered.ok {
-                let unsupported =
-                    answered.error.as_ref().map(|e| e.reason) == Some(Refusal::Unsupported);
-                if request.optional == Some(true) && unsupported {
+                let reason = answered.error.as_ref().map(|e| e.reason);
+                if request.optional == Some(true) && reason == Some(Refusal::Unsupported) {
                     break;
                 }
-                return Err(Failure::new(words(&answered)));
+                if reason == Some(Refusal::Quota) {
+                    let wait = answered.error.as_ref().and_then(|e| e.retry_after);
+                    read.wait = Some(wait.unwrap_or(0));
+                    return Ok(read);
+                }
+                let reauth = reason == Some(Refusal::Reauth);
+                let message = words(&answered);
+                return Err(Failure { message, reauth });
             }
             if answered.truncated {
                 let why =

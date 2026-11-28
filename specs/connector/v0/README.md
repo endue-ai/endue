@@ -62,8 +62,9 @@ core runs it with the desk's own key (ADR 0407); nothing of the plugin's runs, a
   takes its instance and items. The instance id is the account connector's id in lowercase, its title
   the connector's display name; `settings` say which connector it is (`connector`) and how many records
   the last sync skipped (`skipped`). `connector.connect` and `connector.disconnect` are `unsupported`.
-- A tool answer with `ok: false` is `error` in the tool's own words, and `truncated: true` too; neither
-  writes anything. A sync that spends its budget or reaches the limit writes what it read and removes
+- A tool answer with `ok: false` is `error` in the tool's own words (with `reauth` when its
+  `error.reason` is `reauth`), and `truncated: true` too; neither writes anything. A refusal `quota`
+  stops the sync like the limit, the next one after `retry_after`. A sync that spends its budget or reaches the limit writes what it read and removes
   nothing; a request with `since` only adds and changes. A 429 or `X-RateLimit-Remaining: 0` holds the
   next call until the wait. An expired account connector is `error` with `reauth`; with the desk's key
   off, instances are `paused` with a sentence that says where to turn it on.
