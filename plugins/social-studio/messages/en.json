@@ -1,0 +1,63 @@
+{
+  "title": "Social Studio",
+  "open": "Open Social Studio",
+  "view": "Switch the Social Studio view",
+  "accounts": "Accounts",
+  "views.feed": "Feed",
+  "views.replies": "Replies",
+  "views.numbers": "Numbers",
+  "views.label": "Views",
+  "search": "Search posts",
+  "allNetworks": "All networks",
+  "allAccounts": "All accounts",
+  "reading": "Reading…",
+  "failed": "Could not read the index: {why}",
+  "notAllowed": "Not allowed to read social posts.",
+  "none": "No social account is connected yet. Connect one on endue.ai, then turn on the endue account's connectors in Settings, Connections.",
+  "connect": "Open Connections",
+  "empty.feed": "No posts yet.",
+  "empty.replies": "No replies or mentions yet.",
+  "empty.numbers": "No numbers yet: a network that does not give them shows none.",
+  "noMatch": "Nothing matches.",
+  "count.likes": {
+    "one": "{count} like",
+    "other": "{count} likes"
+  },
+  "count.replies": {
+    "one": "{count} reply",
+    "other": "{count} replies"
+  },
+  "count.reposts": {
+    "one": "{count} repost",
+    "other": "{count} reposts"
+  },
+  "count.views": {
+    "one": "{count} view",
+    "other": "{count} views"
+  },
+  "media.image": "Image",
+  "media.video": "Video",
+  "media.link": "Link",
+  "media.other": "Media",
+  "media.alt": "{kind}: {alt}",
+  "openOn": "Open on {network}",
+  "replyingTo": "Replying to: {text}",
+  "mention": "Mentioned the account",
+  "unseen": "New",
+  "truncated": "Cut short here; the network has the whole text.",
+  "close": "Close",
+  "best": "Best posts",
+  "latest": "{value}, {at}",
+  "series.followers": "Followers",
+  "series.reach": "Reach",
+  "series.engagement": "Engagement",
+  "state.connected": "Connected",
+  "state.syncing": "Syncing",
+  "state.stale": "Not synced lately",
+  "state.error": "Not syncing",
+  "state.paused": "Paused",
+  "reconnect": "Reconnect on endue.ai",
+  "post": "Post by {author}",
+  "grant.read": "To show the posts, replies and numbers of your social accounts.",
+  "grant.accounts": "To show which social accounts are connected and whether they sync."
+}

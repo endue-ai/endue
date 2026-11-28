@@ -49,6 +49,7 @@ const plugins: Record<string, string> = {
   "endue.database": join(repo, "plugins/database"),
   "endue.git-studio": join(repo, "plugins/git-studio"),
   "endue.mail": join(repo, "plugins/mail"),
+  "endue.social-studio": join(repo, "plugins/social-studio"),
   "endue.projects": join(repo, "plugins/projects"),
   "endue.docs": join(repo, "plugins/docs"),
 };

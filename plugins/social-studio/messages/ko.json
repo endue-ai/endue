@@ -1,0 +1,59 @@
+{
+  "title": "SNS 스튜디오",
+  "open": "SNS 스튜디오 열기",
+  "view": "SNS 스튜디오 보기 바꾸기",
+  "accounts": "계정",
+  "views.feed": "피드",
+  "views.replies": "답글",
+  "views.numbers": "숫자",
+  "views.label": "보기",
+  "search": "글 찾기",
+  "allNetworks": "모든 네트워크",
+  "allAccounts": "모든 계정",
+  "reading": "읽는 중…",
+  "failed": "색인을 읽지 못했습니다: {why}",
+  "notAllowed": "SNS 글을 읽을 권한이 없습니다.",
+  "none": "연결된 SNS 계정이 아직 없습니다. endue.ai 에서 연결하고, 설정의 연결에서 endue 계정의 커넥터를 켜세요.",
+  "connect": "연결 열기",
+  "empty.feed": "아직 글이 없습니다.",
+  "empty.replies": "아직 답글이나 멘션이 없습니다.",
+  "empty.numbers": "아직 숫자가 없습니다. 숫자를 주지 않는 네트워크는 비어 있습니다.",
+  "noMatch": "맞는 것이 없습니다.",
+  "count.likes": {
+    "other": "좋아요 {count}"
+  },
+  "count.replies": {
+    "other": "답글 {count}"
+  },
+  "count.reposts": {
+    "other": "공유 {count}"
+  },
+  "count.views": {
+    "other": "조회 {count}"
+  },
+  "media.image": "이미지",
+  "media.video": "동영상",
+  "media.link": "링크",
+  "media.other": "미디어",
+  "media.alt": "{kind}: {alt}",
+  "openOn": "{network}에서 열기",
+  "replyingTo": "답한 글: {text}",
+  "mention": "계정을 불렀습니다",
+  "unseen": "새 글",
+  "truncated": "여기까지입니다. 전체는 네트워크에 있습니다.",
+  "close": "닫기",
+  "best": "반응이 좋았던 글",
+  "latest": "{value}, {at}",
+  "series.followers": "팔로워",
+  "series.reach": "도달",
+  "series.engagement": "참여",
+  "state.connected": "연결됨",
+  "state.syncing": "동기화 중",
+  "state.stale": "최근에 동기화하지 못함",
+  "state.error": "동기화 안 됨",
+  "state.paused": "멈춤",
+  "reconnect": "endue.ai 에서 다시 연결",
+  "post": "{author}의 글",
+  "grant.read": "연결한 SNS 계정의 게시물, 답글, 지표를 보여 주려고 합니다.",
+  "grant.accounts": "어떤 SNS 계정이 연결돼 있고 동기화되는지 보여 주려고 합니다."
+}
