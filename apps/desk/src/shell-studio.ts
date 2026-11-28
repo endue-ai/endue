@@ -10,6 +10,8 @@ const OPEN: ShellOpenPermission = { permission: "shell:open", schemes: ["https"]
 const CONVERSATIONS = 50;
 /** The messages read at a time in an agent's window. */
 const MESSAGES = 30;
+/** The threads, and the routines, read at a time in an agent's side. */
+const SIDE = 50;
 /** The only pages the shell opens: endue.ai's. */
 const WEB = "https://endue.ai/";
 
@@ -46,6 +48,14 @@ export function studioShell(core: BridgeClient): StudioShellBridge {
         core.onEvent((event) => {
           if (event.event === "studio.chat.event") listener(event.data);
         }),
+    },
+    side: {
+      topics: async (agentId) =>
+        (await core.call("studio.topics.list", { agentId, ...STUDIO })).topics,
+      threads: async (agentId, topicId) =>
+        (await core.call("studio.conversations.list", { agentId, topicId, limit: SIDE, ...STUDIO }))
+          .conversations,
+      routines: (agentId) => core.call("studio.routines.list", { agentId, limit: SIDE, ...STUDIO }),
     },
     async open(url) {
       if (!url.startsWith(WEB)) throw new Error(`only endue.ai's pages open here: ${url}`);

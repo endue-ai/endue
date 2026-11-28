@@ -1,0 +1,14 @@
+{
+  "target": "BridgeRequest",
+  "description": "an agent's topics are asked by agent",
+  "instance": {
+    "id": 1,
+    "method": "studio.topics.list",
+    "params": {
+      "agentId": "ag_1",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

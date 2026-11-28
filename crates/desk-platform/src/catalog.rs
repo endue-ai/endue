@@ -46,6 +46,7 @@ impl Platform {
             "/api/v1/ai/conversations",
             &[
                 ("agent_id", query.agent_id.clone()),
+                ("topic_id", query.topic_id.clone()),
                 ("awaiting_input", flag(query.awaiting_input)),
                 ("running", flag(query.running)),
                 ("page", query.page.map(|p| p.to_string())),

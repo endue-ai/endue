@@ -50,6 +50,9 @@ pub(super) fn answer(state: &mut State, seen: &Seen, parts: &[&str]) -> Option<A
             {
                 return Some(error(404, "NOT_FOUND", "Agent not found"));
             }
+            if let Some(topic) = seen.body["topic_id"].as_str() {
+                return Some(super::side::new_thread(state, agent, topic));
+            }
             let id = format!("cnv_desk_{}", state.chat_conversations.len() + 1);
             state
                 .chat_conversations

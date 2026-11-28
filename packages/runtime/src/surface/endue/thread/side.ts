@@ -8,6 +8,7 @@ import type { ShellCtx } from "../../../shell/context";
 import { type Child, h } from "../../../shell/dom";
 import { text } from "../parts";
 import { when } from "./model";
+import { homeBox, type SideViewOptions, sideTabs, topicsSection } from "./side-view";
 
 export interface SideOptions {
   selected: string | undefined;
@@ -20,7 +21,7 @@ export function agentConversations(
   agentId: string,
 ): { pinned: StudioConversation[]; recent: StudioConversation[] } {
   const mine = all
-    .filter((c) => c.agentId === agentId && !c.spaceId && c.status !== "deleted")
+    .filter((c) => c.agentId === agentId && !c.spaceId && !c.topicId && c.status !== "deleted")
     .sort((a, b) => (b.lastMessageAt ?? b.updatedAt).localeCompare(a.lastMessageAt ?? a.updatedAt));
   return {
     pinned: mine.filter((c) => c.pinnedAt),
@@ -28,7 +29,7 @@ export function agentConversations(
   };
 }
 
-function row(ctx: ShellCtx, c: StudioConversation, o: SideOptions): HTMLElement {
+export function row(ctx: ShellCtx, c: StudioConversation, o: SideOptions): HTMLElement {
   const running = c.lastRunStatus === "running";
   const at = c.lastMessageAt ?? c.updatedAt;
   return h(
@@ -88,7 +89,21 @@ function section(
   );
 }
 
-export function sideRows(ctx: ShellCtx, agentId: string, o: SideOptions): Child[] {
+/** The side: its tabs when the host reads topics and routines, then Home's box or Chat's lists. */
+export function sideRows(
+  ctx: ShellCtx,
+  agentId: string,
+  o: SideOptions,
+  more?: Omit<SideViewOptions, "row">,
+): Child[] {
+  if (!more) return chatRows(ctx, agentId, o);
+  const view: SideViewOptions = { ...more, row: (c) => row(ctx, c, o) };
+  if (more.lists.state().tab === "home") return [sideTabs(ctx, more.lists), homeBox(ctx, view)];
+  const [newChat, ...lists] = chatRows(ctx, agentId, o);
+  return [sideTabs(ctx, more.lists), newChat, topicsSection(ctx, view), ...lists];
+}
+
+function chatRows(ctx: ShellCtx, agentId: string, o: SideOptions): Child[] {
   const { pinned, recent } = agentConversations(ctx.store.get().endue.conversations, agentId);
   return [
     h(

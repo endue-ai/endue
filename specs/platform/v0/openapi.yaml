@@ -35,6 +35,10 @@ tags:
       the rooms answer an envelope.
   - name: memories
     description: ai-agent-service, under /api/v1/ai. Every answer is a success envelope.
+  - name: topics
+    description: ai-agent-service, under /api/v1/ai. Every answer is a success envelope.
+  - name: routines
+    description: ai-agent-service, under /api/v1/ai. Every answer is a success envelope.
   - name: artifacts
     description: artifact-service. A list answers its rows in data, with meta.pagination.
   - name: users
@@ -408,6 +412,62 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MemoryListEnvelope" }
         default: { $ref: "#/components/responses/Error" }
+  /api/v1/ai/agents/{agent_id}/topics:
+    parameters:
+      - $ref: "#/components/parameters/AgentId"
+    get:
+      operationId: listAgentTopics
+      tags: [topics]
+      summary: The agent's topics, the latest activity first
+      description: >-
+        The agent's topics, the latest activity first. endue asks for the active ones, one page of
+        100 (the most a page holds), and reads each one's name, thread count, last activity and main
+        conversation; no topic's instructions, goal or files are read. Another person's agent answers
+        an empty list.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, archived] }
+        - $ref: "#/components/parameters/Page"
+        - name: limit
+          in: query
+          description: 50 unless given.
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: The page, in a success envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TopicListEnvelope" }
+        default: { $ref: "#/components/responses/Error" }
+  /api/v1/ai/routines:
+    get:
+      operationId: listRoutines
+      tags: [routines]
+      summary: One page of the person's routines, of one agent or all of them
+      description: >-
+        One page of the person's routines; agent_id narrows it to one agent's, and cancelled ones are
+        left out unless status asks for them. endue reads each one's name, status, trigger, schedule
+        and last run; no routine's prompt, webhook address or secret, config or runs are read.
+      parameters:
+        - name: agent_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/RoutineStatus" }
+        - $ref: "#/components/parameters/Page"
+        - name: limit
+          in: query
+          description: 20 unless given.
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: The page, in a success envelope.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoutineListEnvelope" }
+        default: { $ref: "#/components/responses/Error" }
   /api/v1/me/api-keys:
     get:
       operationId: listApiKeys
@@ -556,11 +616,15 @@ paths:
       tags: [conversations]
       summary: One page of the person's conversations, the most recently active first
       description: >-
-        One page of the person's conversations, the most recently active first.
+        One page of the person's conversations, the most recently active first. With topic_id, that
+        topic's conversations alone: its main conversation and its threads.
       parameters:
         - name: agent_id
           in: query
           schema: { type: string }
+        - name: topic_id
+          in: query
+          schema: { $ref: "#/components/schemas/ConversationIdentifier" }
         - name: awaiting_input
           in: query
           schema: { type: boolean }
@@ -587,6 +651,8 @@ paths:
         Opens an agent conversation for the signed-in account. A reviewed question (ADR 0395) names it
         "From Desk" at the ask approval level; a conversation the person starts in an agent's window
         sends the agent alone, as endue.ai's "New chat" does, and endue AI names it from its first turn.
+        A new thread of a topic sends the agent and the topic; 404 unless it is the agent's active
+        topic.
       requestBody:
         required: true
         content:
@@ -1063,6 +1129,7 @@ components:
         agent_id: { $ref: "#/components/schemas/ConversationIdentifier" }
         title: { type: string, maxLength: 60 }
         approval_level: { const: ask }
+        topic_id: { $ref: "#/components/schemas/ConversationIdentifier" }
       required: [agent_id]
       additionalProperties: false
     AgentConversationEnvelope:
@@ -1869,6 +1936,76 @@ components:
         success: { const: true }
         data: { $ref: "#/components/schemas/MemoryList" }
       required: [success, data]
+    Topic:
+      description: >-
+        One of the agent's topics, as far as endue reads it: its name, how many threads it holds
+        besides its main conversation, when it was last active, and its main conversation (null once
+        that one is gone).
+      type: object
+      properties:
+        id: { type: string, minLength: 1 }
+        agent_id: { type: string }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        status: { type: string, enum: [active, archived] }
+        thread_count: { type: integer, minimum: 0 }
+        last_activity_at: { type: [string, "null"] }
+        main_conversation_id: { type: [string, "null"] }
+      required: [id, name, thread_count]
+    TopicList:
+      description: One page of topics, and how many there are in all.
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Topic" }
+        total: { type: integer, minimum: 0 }
+      required: [items, total]
+    TopicListEnvelope:
+      description: The page in ai-agent-service's success envelope.
+      type: object
+      properties:
+        success: { const: true }
+        data: { $ref: "#/components/schemas/TopicList" }
+      required: [success, data]
+    RoutineStatus:
+      description: active, paused, cancelled, or done (a one-time routine that ran).
+      type: string
+      enum: [active, paused, cancelled, done]
+    Routine:
+      description: >-
+        One routine, as far as endue reads it: its name, status, what starts it (a schedule, five
+        cron fields or a one-time time in its time zone, or a webhook), when it last ran and how many
+        runs failed in a row up to then (0: the last one did not fail).
+      type: object
+      properties:
+        id: { type: string, minLength: 1 }
+        agent_id: { type: string }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/RoutineStatus" }
+        trigger: { type: string, enum: [schedule, webhook] }
+        schedule: { type: [string, "null"], enum: [recurring, one_time, webhook, null] }
+        cron_expr: { type: [string, "null"] }
+        fire_at: { type: [string, "null"] }
+        timezone: { type: string }
+        last_fired_at: { type: [string, "null"] }
+        consecutive_failures: { type: integer, minimum: 0 }
+      required: [id, name, status]
+    RoutineList:
+      description: One page of routines, and how many match in all.
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Routine" }
+        total: { type: integer, minimum: 0 }
+      required: [items, total]
+    RoutineListEnvelope:
+      description: The page in ai-agent-service's success envelope.
+      type: object
+      properties:
+        success: { const: true }
+        data: { $ref: "#/components/schemas/RoutineList" }
+      required: [success, data]
     ApiKey:
       description: >-
         An API key of the person's: its name, the agent it is for (null: all of them), when it stops
@@ -2138,6 +2275,9 @@ components:
         agent_id: { type: string, minLength: 1 }
         owner_id: { type: string }
         space_id: { type: [string, "null"] }
+        topic_id:
+          description: The topic it is a thread or the main conversation of; absent outside a topic.
+          type: [string, "null"]
         title: { type: [string, "null"] }
         status:
           type: string

@@ -185,6 +185,8 @@ impl Core {
                 (r.id, self.studio_conversations_list(caller, r.params))
             }
             R::StudioChatAsk(r) => (r.id, self.studio_chat_ask(caller, r.params)),
+            R::StudioTopicsList(r) => (r.id, self.studio_topics_list(caller, r.params)),
+            R::StudioRoutinesList(r) => (r.id, self.studio_routines_list(caller, r.params)),
             R::StudioMessagesList(r) => (r.id, self.studio_messages_list(caller, r.params)),
             R::StudioChatSend(r) => (r.id, self.studio_chat_send(caller, r.params)),
             R::StudioChatAttach(r) => (r.id, self.studio_chat_attach(caller, r.params)),

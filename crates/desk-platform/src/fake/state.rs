@@ -1,5 +1,5 @@
 //! What the fake platform keeps: tokens it accepts, agents with their facets, the catalog,
-//! conversations, a failure to answer next, a delay, and the requests it saw.
+//! conversations, topics and routines, a failure to answer next, a delay, and the requests it saw.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
@@ -69,6 +69,11 @@ pub struct State {
     /// The person's Eris on endue AI (`GET /api/v1/ai/secretary`): her agent and conversation;
     /// `None` answers that the account has none.
     pub eris: Option<(String, String)>,
+    /// Agents' topics, as endue AI answers them (`agent_id` names each one's agent), the latest
+    /// activity first (`fake/side.rs`).
+    pub topics: Vec<Value>,
+    /// The person's routines, whole: prompt, webhook address and all, as endue AI keeps them.
+    pub routines: Vec<Value>,
     /// The spaces, in the order the list answers them.
     pub spaces: Vec<FakeSpace>,
     /// The signed-in person's account, preferences and notification channels.
@@ -112,6 +117,8 @@ impl State {
             read_at: BTreeMap::new(),
             streaming: BTreeSet::new(),
             cancelled: BTreeSet::new(),
+            topics: Vec::new(),
+            routines: Vec::new(),
             spaces: Vec::new(),
             account: FakeAccount::default(),
             connectors: FakeConnectors::default(),

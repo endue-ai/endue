@@ -1,0 +1,8 @@
+{
+  "target": "Topic",
+  "description": "a topic row must say how many threads it holds",
+  "instance": {
+    "id": "top_1",
+    "name": "launch"
+  }
+}

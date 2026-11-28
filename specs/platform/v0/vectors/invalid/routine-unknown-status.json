@@ -1,0 +1,9 @@
+{
+  "target": "Routine",
+  "description": "a routine's status is active, paused, cancelled or done",
+  "instance": {
+    "id": "rtn_1",
+    "name": "Morning report",
+    "status": "running"
+  }
+}

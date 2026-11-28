@@ -1,0 +1,8 @@
+{
+  "target": "AgentConversationInput",
+  "description": "a new thread names its topic: an empty topic id is refused",
+  "instance": {
+    "agent_id": "ag_01JC0Q4MR00000000000000001",
+    "topic_id": ""
+  }
+}

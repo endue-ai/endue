@@ -9,6 +9,7 @@
           "id": "cnv_1",
           "agent_id": "ag_01JC0Q4MR00000000000000001",
           "owner_id": "usr_1",
+          "topic_id": "top_1",
           "title": "Refund for order 42",
           "status": "active",
           "message_count": 6,

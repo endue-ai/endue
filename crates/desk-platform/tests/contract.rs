@@ -20,6 +20,7 @@ use desk_platform::wire_chat::{
 use desk_platform::wire_connectors::{
     ConnectorSummary, ConnectorTool, Items, KeyCreated, KeyScope, NewKey, ToolArguments, ToolCall,
 };
+use desk_platform::wire_side::{RoutineRow, Rows, TopicRow};
 use desk_platform::wire_spaces::{Room, Space, SpaceOverview};
 use desk_platform::{ChatDone, ErrorKind, PlatformError};
 use serde::Deserialize;
@@ -116,6 +117,18 @@ fn reads<T: DeserializeOwned>(vector: &Vector) {
     }
 }
 
+/// Every row of a page reads into the client's row type (a page's rows are read one at a time).
+fn every_row<T: DeserializeOwned>(vector: &Vector) {
+    let page: Envelope<Rows> = serde_json::from_value(vector.instance.clone()).unwrap();
+    let read = page.data.read::<T>().len();
+    assert_eq!(
+        read,
+        page.data.items.len(),
+        "{}: a row does not read",
+        vector.file
+    );
+}
+
 #[test]
 fn valid_answers_read_into_the_client_types() {
     for vector in vectors().iter().filter(|v| v.valid) {
@@ -131,6 +144,8 @@ fn valid_answers_read_into_the_client_types() {
             "RecommendEnvelope" => reads::<Envelope<Recommended>>(vector),
             "UseCatalogEnvelope" => reads::<Envelope<Used>>(vector),
             "ConversationListEnvelope" => reads::<Envelope<ConversationPage>>(vector),
+            "TopicListEnvelope" => every_row::<TopicRow>(vector),
+            "RoutineListEnvelope" => every_row::<RoutineRow>(vector),
             "AgentConversationDone" => reads::<ChatDone>(vector),
             "SpaceListResponse" => reads::<Vec<Space>>(vector),
             "SpaceOverviewEnvelope" => reads::<Envelope<SpaceOverview>>(vector),
@@ -326,6 +341,10 @@ fn chat_vectors_read_into_the_clients_types() {
     // a read, a cancel (crates/desk-platform/src/{chat.rs,messages.rs}).
     let bodies = [
         ("AgentConversationInput", json!({ "agent_id": "ag_1" })),
+        (
+            "AgentConversationInput",
+            json!({ "agent_id": "ag_1", "topic_id": "top_1" }),
+        ),
         (
             "AgentConversationInput",
             json!({ "agent_id": "ag_1", "title": "From Desk", "approval_level": "ask" }),

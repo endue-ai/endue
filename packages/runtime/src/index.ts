@@ -21,6 +21,7 @@ export type {
   ShellBridge,
   StudioLine,
   StudioShellBridge,
+  StudioSideBridge,
   StudioThreadBridge,
 } from "./bridge/types";
 export { type Clock, ManualClock, realClock, type Tween, tween } from "./clock";

@@ -85,20 +85,49 @@ person; a failed run with Try again, which sends the same line again.
 The pieces a plugin page can take too are in `packages/ui/src/patterns.css`: `.desk-thread`,
 `.desk-bubble`, `.desk-work`, `.desk-composer`.
 
+**The side's topics, routines and outputs** (FT-07, #837). The side has two tabs at its head,
+Home and Chat. Chat is the list above with a Topics section before the pinned and recent
+conversations: each topic is a row `# name` with its last activity, and unfolded it reads its
+threads (not before) and ends with "New thread", which opens an empty thread whose first line
+`studio.chat.send` makes in that topic (`topicId`). A topic's threads stay out of the recent list.
+Home is one box of two rows with their counts, Routines and Outputs; a press shows the list in the
+thread's place. A routine says its name, what starts it in a sentence, on or off, and when it last
+ran with how that ended. Outputs show how many the agent made and when the newest changed, from
+`studio.agents.facets` (ADR 0232), with a way to them on endue.ai: the facets carry no list of
+outputs yet, so no output's name or content crosses. Each list says when it is reading, has none,
+or could not be read, with Read again; the lists are read again when the window gets the focus
+five minutes after the last read. The side holds at 200 px.
+
+| Method | Does |
+| --- | --- |
+| `studio.topics.list` | An agent's topics: id, name, thread count, last activity, main conversation |
+| `studio.routines.list` | A page of an agent's routines: name, on or off, trigger kind and its words, last run and how it ended; and the total |
+| `studio.conversations.list` | Gains `topicId`, one topic's threads |
+| `studio.chat.send` | Gains `topicId`, the topic a new conversation is made in |
+
+A topic's instructions, goal and files, and a routine's prompt, webhook address, secret,
+configuration and run history are never read into a type (`crates/desk-platform/src/wire_side.rs`).
+endue AI gives a schedule as cron fields and a time zone, so the client words it
+(`src/schedule.rs`: "Every weekday at 9:00"). Its routine list has no status of the last run, so
+"failed" is read from its count of consecutive failures. Making, editing, turning on or off and
+deleting a routine, and adding, renaming or deleting a topic, stay with the Agents plugin and
+endue.ai; "New thread" is the one thing the side makes.
+
 ### Consequences
 
 * Good, because one conversation goes on, and the answer shows as it is written.
 * Good, because a run can be stopped, and the work of each turn can be read.
 * Bad, because the shell reads a run on a thread of the core's for as long as it runs.
 * Bad, because the stream transport sits in desk-platform until desk-sys can read a POST stream.
-* Neutral: topics, routines and outputs in the side are FT-07's.
+* Neutral: topics, routines and outputs in the side came with FT-07 (below).
 
 ### Confirmation
 
-`crates/desk-platform/tests/{chat,messages}.rs`, `crates/desk-core/tests/studio/thread.rs`,
+`crates/desk-platform/tests/{chat,messages,topics,routines}.rs`,
+`crates/desk-core/tests/studio/{thread,side}.rs`, `packages/runtime/src/surface/endue/side.test.ts`,
 `packages/runtime/src/surface/endue/thread/model.test.ts`,
 `packages/runtime/src/surface/endue/windows.test.ts`, the spec vectors, and
-`e2e/endue-thread.spec.ts` with `e2e/endue-windows.spec.ts`.
+`e2e/endue-thread.spec.ts` with `e2e/endue-side.spec.ts` and `e2e/endue-windows.spec.ts`.
 
 ## Pros and Cons of the Options
 

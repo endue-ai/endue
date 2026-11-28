@@ -13,7 +13,8 @@ served as `account.settings.*` (`specs/bridge/v0/account.schema.json`) under `ac
 | Studio facets | `getAgentIdentity`, `getAgentSettings`, `updateAgentSettings`, `getAgentPrompt`, `saveAgentPrompt`, `listPromptRevisions`, `restorePromptRevision`, `listAgentSkills`, `listAgentConnectors`, `listAgentTraits` |
 | Studio's board (ADR 0232) | `listChannelPairings`, `listAgentOsDevices`, `listAgentWorkspaces`, `getAgentTheme`, `listAgentMemories` (counted), `listApiKeys` (the agent's own), `listArtifacts` (counted) |
 | Catalog | `listCatalogAgents`, `recommendCatalogAgents`, `useCatalogAgent` |
-| Conversations | `listConversations` (the Home board), `createAgentConversation`, `runAgentConversation`, `getConversation`, `listConversationMessages`, `markConversationRead`, `cancelConversationRun`, `attachConversationRun` |
+| Conversations | `listConversations` (the Home board, or a topic's threads), `createAgentConversation`, `runAgentConversation`, `getConversation`, `listConversationMessages`, `markConversationRead`, `cancelConversationRun`, `attachConversationRun` |
+| An agent's side | `listAgentTopics`, `listRoutines` (of one agent) |
 | Spaces | `listSpaces` (with summaries), `getSpace`, `getSpaceOverview`, `listSpaceRooms`, `ensureSpaceConversation` |
 | Account | `getMe`, `updateMe`, `getMyPreferences`, `updateMyPreferences` (language, time zone), `getNotificationPreferences`, `updateNotificationPreferences` |
 | The desk's own key | `createApiKey`, `revokeApiKey` (with the session) |
@@ -69,6 +70,18 @@ calls and failures. Tool rows, an assistant row's tool calls and system notes fo
 no tool argument, tool result, reasoning, memory, file or person's id is read. Where the thread
 draws its new-messages line is the conversation's `last_read_at`, read before `markConversationRead`.
 The desk's field names for these were taken from endue.ai's own clients.
+
+## An agent's side
+
+The side of an agent's window lists its topics and routines. A topic is read as its name, its thread
+count (its conversations other than the main one), its last activity and its main conversation;
+`listConversations` with `topic_id` reads its threads, and a new thread is `createAgentConversation`
+with the agent and the topic. A routine is read as its name, its status (on while `active`), its
+trigger and schedule (five cron fields or a one-time time, and a time zone, which endue words
+itself), when it last ran and how many runs failed in a row (the last run failed when that is above
+0). A topic's instructions, goal and files, and a routine's prompt, webhook address and secret,
+config, conversation and runs are never read. The field names were taken from endue.ai's own clients
+(its Android app's `TopicsApi` and `RoutinesApi`) and ai-agent-service's mappers.
 
 ## Vectors
 

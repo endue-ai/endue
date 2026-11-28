@@ -1,0 +1,15 @@
+{
+  "target": "BridgeRequest",
+  "description": "one topic's threads",
+  "instance": {
+    "id": 3,
+    "method": "studio.conversations.list",
+    "params": {
+      "agentId": "ag_1",
+      "topicId": "tp_launch",
+      "scope": {
+        "permission": "studio:manage"
+      }
+    }
+  }
+}

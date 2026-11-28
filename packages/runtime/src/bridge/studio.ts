@@ -26,6 +26,7 @@ import {
   sampleStudio,
   slugOf,
 } from "./studio-fixtures";
+import { type StudioSide, sampleSide, sideHandlers, topicThreads } from "./studio-side";
 import { type StudioSpaceRecord, sampleSpaces, spaceHandlers } from "./studio-spaces";
 
 export { DEFAULT_PERSONALITY, type StudioRecord } from "./studio-fixtures";
@@ -51,6 +52,8 @@ export interface StudioStub {
   pictures: Record<string, string>;
   /** The spaces studio.spaces.* answers (ADR 0129); tests edit them in place. */
   spaces: StudioSpaceRecord[];
+  /** The agents' topics, their threads and routines (ADR 0411); tests edit them in place. */
+  side: StudioSide;
   /** Sign the stub in or out, as account.signIn and account.signOut would. */
   setSignedIn(signedIn: boolean): void;
 }
@@ -68,6 +71,10 @@ export function studioHandlers(options: StudioStubOptions = {}): StudioStub {
   const conversations = options.agents === false ? [] : sampleConversations(epoch);
   const catalog = sampleCatalog(epoch);
   const spaces = options.agents === false ? [] : sampleSpaces(epoch);
+  const side: StudioSide =
+    options.agents === false
+      ? { topics: {}, routines: {}, threads: [], failing: {}, reads: [] }
+      : sampleSide(epoch);
   const pictures: Record<string, string> = Object.fromEntries(
     records.map((r) => [r.agent.id, sampleFace(r.agent.personalColor ?? "#B6A3F5")]),
   );
@@ -291,9 +298,12 @@ export function studioHandlers(options: StudioStubOptions = {}): StudioStub {
         recommended: { connectors: copy(from.connectors), channels: [...from.channels] },
       };
     },
-    "studio.conversations.list": ({ agentId, awaitingInput, running, page, limit }, caller) => {
+    "studio.conversations.list": (
+      { agentId, awaitingInput, running, page, limit, topicId },
+      caller,
+    ) => {
       gate(caller);
-      const matching = conversations
+      const matching = (topicId ? topicThreads(side, conversations, topicId) : conversations)
         .filter((c) => !agentId || c.agentId === agentId)
         .filter((c) => !awaitingInput || c.awaitingInput === true)
         .filter((c) => !running || c.lastRunStatus === "running");
@@ -307,6 +317,7 @@ export function studioHandlers(options: StudioStubOptions = {}): StudioStub {
     },
     "studio.chat.ask": chatHandler(records, spaces, gate),
     ...spaceHandlers(spaces, gate),
+    ...sideHandlers(side, gate),
   };
 
   return {
@@ -316,6 +327,7 @@ export function studioHandlers(options: StudioStubOptions = {}): StudioStub {
     catalog,
     pictures,
     spaces,
+    side,
     setSignedIn: (next) => {
       signedIn = next;
     },

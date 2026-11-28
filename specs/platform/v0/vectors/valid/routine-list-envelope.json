@@ -1,0 +1,50 @@
+{
+  "target": "RoutineListEnvelope",
+  "description": "an agent's routines: a weekday schedule whose last run failed, a paused webhook and a one-time one that ran",
+  "instance": {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": "rtn_1",
+          "agent_id": "ag_01JC0Q4MR00000000000000001",
+          "name": "Morning report",
+          "status": "active",
+          "trigger": "schedule",
+          "schedule": "recurring",
+          "cron_expr": "0 9 * * 1-5",
+          "fire_at": null,
+          "timezone": "Asia/Seoul",
+          "last_fired_at": "2026-11-28T00:00:05.000Z",
+          "consecutive_failures": 1
+        },
+        {
+          "id": "rtn_2",
+          "agent_id": "ag_01JC0Q4MR00000000000000001",
+          "name": "On deploy",
+          "status": "paused",
+          "trigger": "webhook",
+          "schedule": "webhook",
+          "cron_expr": null,
+          "timezone": "UTC",
+          "last_fired_at": null,
+          "consecutive_failures": 0
+        },
+        {
+          "id": "rtn_3",
+          "agent_id": "ag_01JC0Q4MR00000000000000001",
+          "name": "Remind me",
+          "status": "done",
+          "trigger": "schedule",
+          "schedule": "one_time",
+          "cron_expr": null,
+          "fire_at": "2026-11-20T09:00:00.000Z",
+          "timezone": "UTC",
+          "last_fired_at": "2026-11-20T09:00:01.000Z",
+          "consecutive_failures": 0
+        }
+      ],
+      "total": 3
+    }
+  }
+}

@@ -245,7 +245,7 @@
       "additionalProperties": false
     },
     "StudioChatSendParams": {
-      "description": "Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window.",
+      "description": "Parameters of studio.chat.send: the person's line to the agent, into the conversation it names or a new one. messageId makes a repeated send safe. Only the shell may send: the person's own act in the agent's window. topicId makes a new conversation a thread of that topic.",
       "type": "object",
       "properties": {
         "agentId": {
@@ -256,6 +256,9 @@
         },
         "spaceId": {
           "$ref": "studio-spaces.schema.json#/$defs/StudioSpaceId"
+        },
+        "topicId": {
+          "$ref": "studio.schema.json#/$defs/StudioTopicId"
         },
         "text": {
           "type": "string",

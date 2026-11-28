@@ -15,6 +15,7 @@ pub(crate) mod map_catalog;
 mod picture;
 mod rows;
 mod serve;
+mod side;
 mod spaces;
 mod thread;
 

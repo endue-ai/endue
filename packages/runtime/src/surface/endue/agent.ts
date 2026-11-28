@@ -1,8 +1,8 @@
 /**
  * An endue agent's window (ADR 0411, amending ADR 0129 and ADR 0232): the agent's conversation as
  * endue.ai composes it. A header with the agent and its Home and Studio tabs; at the side "New
- * chat" and its conversations (a drawer under 720 px); on Home the thread with each turn's work
- * and the composer; on Studio the board the card's back showed (ADR 0232), unchanged. The frame
+ * chat", its topics and conversations, and its routines and outputs (a drawer under 720 px); on
+ * Home the thread with each turn's work and the composer; on Studio the board the card's back showed (ADR 0232), unchanged. The frame
  * is built once and its parts redrawn on their own, so the draft, the caret and the reading place
  * survive every change.
  */
@@ -11,6 +11,7 @@ import { h, render } from "../../shell/dom";
 import { icon } from "../../shell/icons";
 import {
   agentConversationPage,
+  agentHome,
   ENDUE_AGENT_VIEW,
   flipCard,
   openOnWeb,
@@ -26,8 +27,11 @@ import { actions, avatar, notice, type Page, readLine, text } from "./parts";
 import { composer } from "./thread/composer";
 import { threadControl } from "./thread/controller";
 import { agentConversations, sideRows } from "./thread/side";
+import { sideControl } from "./thread/side-lists";
+import { sidePanel } from "./thread/side-view";
 import { messageRows, runRow } from "./thread/view";
 import "./thread/thread.css";
+import "./thread/side.css";
 
 export { dotOf } from "./model";
 
@@ -58,9 +62,15 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
   const foot = h("div", { class: "thread-foot" });
   const home = h("div", { class: "thread-home", role: "tabpanel" }, scroll, foot);
   const studio = h("div", { class: "thread-studio", role: "tabpanel" });
+  const panel = h("div", { class: "thread-panel", "data-side-panel": "" });
   const frame = [
     head,
-    h("div", { class: "thread-body" }, side, h("section", { class: "thread-main" }, home, studio)),
+    h(
+      "div",
+      { class: "thread-body" },
+      side,
+      h("section", { class: "thread-main" }, home, panel, studio),
+    ),
   ];
 
   const agentOf = () => ctx.store.get().endue.agents.find((a) => a.id === id);
@@ -68,9 +78,15 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
     const conversation = control?.thread().conversationId;
     return conversation ? agentConversationPage(id, conversation) : undefined;
   };
+  const openAgent = () => void openOnWeb(ctx, agentHome(id)).catch(() => undefined);
   const input = composer(ctx, {
     send: (line) => {
-      void control?.send(line).then(() => pin());
+      const t = control?.thread();
+      const topic = t && !t.conversationId ? t.topicId : undefined;
+      void control?.send(line).then(() => {
+        pin();
+        if (topic) lists?.made(topic);
+      });
       pin();
     },
     stop: () => void control?.stop(),
@@ -83,6 +99,17 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
       if (page) void navigator.clipboard?.writeText(page).catch(() => undefined);
     },
   });
+  const lists = ctx.bridge.studio?.side
+    ? sideControl(
+        ctx.bridge.studio.side,
+        id,
+        () => ctx.wall(),
+        () => {
+          drawSide();
+          drawPanel();
+        },
+      )
+    : undefined;
   const control = thread
     ? threadControl(ctx, id, thread, (what) => {
         drawThread(what === "messages");
@@ -101,10 +128,11 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
     if (scroll.scrollTop < STICK) void control?.older();
   });
 
-  const choose = (conversationId: string | undefined) => {
+  const choose = (conversationId: string | undefined, topicId?: string) => {
     chosen = true;
     drawer = false;
-    control?.select(conversationId);
+    lists?.show(undefined);
+    control?.select(conversationId, topicId);
     drawSide();
     drawHead();
     input.focus();
@@ -168,8 +196,24 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
     el.dataset.drawer = drawer ? "open" : "closed";
   }
 
+  /** The side's lists and the outputs the facets read, for the side and the panel. */
+  const sideMore = () => {
+    const f = ctx.store.get().endue.facets[id];
+    const outputs = f?.state === "ready" ? (f.value.outputs ?? { count: 0 }) : undefined;
+    return (
+      lists && {
+        lists,
+        outputs,
+        newThread: (topicId: string) => choose(undefined, topicId),
+        openWeb: openAgent,
+      }
+    );
+  };
+
   function drawSide() {
-    render(side, () => sideRows(ctx, id, { selected: control?.thread().conversationId, choose }));
+    const more = sideMore();
+    const selected = control?.thread().conversationId;
+    render(side, () => sideRows(ctx, id, { selected, choose }, more));
     side.setAttribute("aria-label", text(ctx, "threadSide"));
   }
 
@@ -270,6 +314,16 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
     });
   }
 
+  /** A Home row's list, in the thread's place. */
+  function drawPanel() {
+    const shown = lists?.state().panel;
+    const onStudio = ctx.store.get().endue.flipped.includes(view);
+    home.hidden = onStudio || !!shown;
+    panel.hidden = onStudio || !shown;
+    const more = sideMore();
+    render(panel, () => (shown && more ? sidePanel(ctx, more) : []));
+  }
+
   function drawStudio() {
     const s = ctx.store.get();
     const agent = agentOf();
@@ -308,7 +362,6 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
     if (!el.contains(head)) el.replaceChildren(...frame);
     const onStudio = s.endue.flipped.includes(view);
     el.dataset.tab = onStudio ? "studio" : "home";
-    home.hidden = onStudio;
     studio.hidden = !onStudio;
     if (!chosen && control && !control.thread().conversationId) {
       const { pinned, recent } = agentConversations(s.endue.conversations, id);
@@ -321,6 +374,7 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
     drawSide();
     drawThread(true);
     drawFoot();
+    drawPanel();
     if (onStudio) drawStudio();
     else lines.dispose();
   };
@@ -338,8 +392,13 @@ export function endueAgentBody(ctx: ShellCtx, id: string): Mounted {
     ],
     draw,
   );
+  const focused = () => lists?.focused();
+  el.addEventListener("focusin", focused);
+  window.addEventListener("focus", focused);
   const off = () => {
     unwatch();
+    window.removeEventListener("focus", focused);
+    lists?.dispose();
     lines.dispose();
     control?.dispose();
     input.dispose();

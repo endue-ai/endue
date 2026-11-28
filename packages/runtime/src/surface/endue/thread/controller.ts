@@ -12,8 +12,8 @@ import { applyEvent, emptyThread, sent, type Thread, tryAgain, withPage } from "
 
 export interface ThreadControl {
   thread(): Thread;
-  /** The conversation shown; `undefined` is a new chat. */
-  select(conversationId: string | undefined): void;
+  /** The conversation shown; `undefined` is a new chat, in `topicId` when given (a new thread). */
+  select(conversationId: string | undefined, topicId?: string): void;
   send(text: string): Promise<void>;
   stop(): Promise<void>;
   retry(): Promise<void>;
@@ -102,6 +102,7 @@ export function threadControl(
       const result = await bridge.send({
         agentId,
         ...(t.conversationId ? { conversationId: t.conversationId } : {}),
+        ...(fresh && t.topicId ? { topicId: t.topicId } : {}),
         text: line,
         messageId: id,
       });
@@ -122,11 +123,11 @@ export function threadControl(
 
   return {
     thread: () => t,
-    select(conversationId) {
+    select(conversationId, topicId) {
       failure = "";
       if (conversationId === undefined) {
         generation++;
-        set(emptyThread(), "messages");
+        set(emptyThread(undefined, topicId), "messages");
       } else if (conversationId !== t.conversationId || t.messages.length === 0)
         void open(conversationId);
     },

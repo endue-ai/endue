@@ -1,0 +1,18 @@
+{
+  "target": "StudioRoutinesListResult",
+  "description": "a routine's prompt never crosses",
+  "instance": {
+    "routines": [
+      {
+        "id": "rt_1",
+        "name": "Brief",
+        "enabled": true,
+        "trigger": {
+          "kind": "schedule"
+        },
+        "prompt": "Summarise my inbox"
+      }
+    ],
+    "total": 1
+  }
+}
