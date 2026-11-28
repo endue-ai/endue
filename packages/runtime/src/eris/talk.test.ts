@@ -1,28 +1,31 @@
 import { describe, expect, test } from "vitest";
-import { sampleEnvelope } from "../bridge/browser";
-import userHello from "../bridge/envelopes/user-hello.json";
-import type { Bands, WordTime } from "../bridge/types";
-import { sampleEar } from "./ear";
+import type { Bands, BrainTurnReason, WordTime } from "../bridge/types";
 import type { ErisState } from "./states";
 import {
   type Ear,
   END_SILENCE_MS,
+  FAILED_LINES,
   MIN_THINK_MS,
   NO_SPEECH_MS,
+  NOTHING_LINES,
   type Opened,
   REFUSED_LINES,
   type Reply,
-  SAMPLE_DELAY_MS,
-  SAMPLE_LINES,
   Talk,
   type TalkDeps,
+  UNHEARD_LINES,
 } from "./talk";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 /** A turn with a fake ear and brain; records her states, lines and voice. */
-function turn(options: { ear?: Opened | Promise<Opened>; heard?: string; reply?: Reply } = {}) {
+function turn(
+  options: { ear?: Opened | Promise<Opened> | (() => Opened); reply?: Reply; fails?: boolean } = {},
+) {
   const states: ErisState[] = [];
+  const hearing: string[] = [];
+  const typed: Array<string | null> = [];
+  const failed: Array<[string, BrainTurnReason]> = [];
   const lines: { text: string; words: WordTime[]; pulses: number[] }[] = [];
   const said: string[] = [];
   const asked: string[] = [];
@@ -33,13 +36,19 @@ function turn(options: { ear?: Opened | Promise<Opened>; heard?: string; reply?:
     lang: () => "en",
     openEar: async () => {
       asks++;
-      return options.ear ?? "none";
+      const ear = options.ear;
+      return typeof ear === "function" ? ear() : (ear ?? "none");
     },
-    sampleEar: (at) => sampleEar(userHello, at),
     answer: async (text) => {
       asked.push(text);
+      if (options.fails) throw new Error("the bridge went away");
       return options.reply ?? { text: `You said ${text}.` };
     },
+    hearing: (words) => {
+      if (hearing.at(-1) !== words) hearing.push(words);
+    },
+    typeInstead: (line) => typed.push(line),
+    failed: (text, reason) => failed.push([text, reason]),
     line: (text, words, pulses) => {
       lines.push({ text, words, pulses });
       return now;
@@ -66,6 +75,9 @@ function turn(options: { ear?: Opened | Promise<Opened>; heard?: string; reply?:
     lines,
     said,
     asked,
+    hearing,
+    typed,
+    failed,
     run,
     hushed: () => hushed,
     asks: () => asks,
@@ -73,12 +85,21 @@ function turn(options: { ear?: Opened | Promise<Opened>; heard?: string; reply?:
   };
 }
 
-/** A microphone that hears `envelope`-like speech from `from` to `to`, and recognises `words`. */
+/**
+ * A microphone that hears speech from `from` to `to`, and recognises `words`: half of them as the
+ * words so far while it hears, all of them once it closes.
+ */
 function mic(from: number, to: number, words = ""): Ear {
   const loud: Bands = [0.3, 0.4, 0.4, 0.5, 0.5, 0.4, 0.3, 0.2, 0.1];
+  let now = 0;
   return {
     live: true,
-    bands: (now) => (now >= from && now < to ? loud : [0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    words: true,
+    bands: (at) => {
+      now = at;
+      return at >= from && at < to ? loud : [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    },
+    interim: () => (now >= from ? words.split(" ").slice(0, 1).join(" ") : ""),
     close: async () => words,
   };
 }
@@ -114,32 +135,69 @@ describe("a spoken turn with Eris", () => {
     expect(t.talk.phase).toBe("speaking");
   });
 
-  test("allowed but without a microphone she listens to the sample voice and says the sample line", async () => {
-    const t = turn({ ear: "none" });
+  test("heard_words_go_to_the_brain_as_a_typed_line", async () => {
+    const t = turn({ ear: mic(0, 400, "what time is it") });
     t.talk.toggle(0);
-    await t.run(SAMPLE_DELAY_MS + 3000 + END_SILENCE_MS + MIN_THINK_MS + 200);
-    expect(t.asked).toEqual([]);
-    expect(t.lines[0]?.text).toBe(SAMPLE_LINES.sample.en);
+    await t.run(400 + END_SILENCE_MS + MIN_THINK_MS + 100);
+    expect(t.asked).toEqual(["what time is it"]);
+    // The words so far stood under her while she listened; the final words stay.
+    expect(t.hearing).toContain("what");
+    expect(t.hearing.at(-1)).toBe("what time is it");
+    expect(t.lines[0]?.text).toBe("You said what time is it.");
   });
 
-  test("the sample voice drives the user's rings while she listens", async () => {
-    const t = turn({ ear: "none" });
-    t.talk.toggle(0);
-    await t.run(40);
-    const bands = t.talk.update(SAMPLE_DELAY_MS + 200);
-    expect(bands).toEqual(sampleEnvelope(userHello, 200));
-    expect(Math.max(...bands)).toBeGreaterThan(0.1);
-  });
-
-  test("heard but not recognised: the 'heard' sample line; nothing heard: the 'nothing' line", async () => {
+  test("a_voice_without_words_is_not_answered_with_a_sample", async () => {
     const heard = turn({ ear: mic(0, 400) });
     heard.talk.toggle(0);
     await heard.run(400 + END_SILENCE_MS + MIN_THINK_MS + 100);
-    expect(heard.lines[0]?.text).toBe(SAMPLE_LINES.heard.en);
+    expect(heard.asked).toEqual([]);
+    expect(heard.lines.map((l) => l.text)).toEqual([NOTHING_LINES.en]);
     const quiet = turn({ ear: mic(0, 0) });
     quiet.talk.toggle(0);
     await quiet.run(NO_SPEECH_MS + MIN_THINK_MS + 100, 50);
-    expect(quiet.lines[0]?.text).toBe(SAMPLE_LINES.nothing.en);
+    expect(quiet.lines.map((l) => l.text)).toEqual([NOTHING_LINES.en]);
+  });
+
+  test("a_failed_answer_says_the_turns_own_line", async () => {
+    const own = turn({
+      ear: mic(0, 200, "hello"),
+      reply: { text: "I can't reach a brain right now.", reason: "no_brain" },
+    });
+    own.talk.toggle(0);
+    await own.run(200 + END_SILENCE_MS + MIN_THINK_MS + 80);
+    expect(own.failed).toEqual([["I can't reach a brain right now.", "no_brain"]]);
+    expect(own.lines).toEqual([]);
+    expect(own.talk.phase).toBe("off");
+
+    const thrown = turn({ ear: mic(0, 200, "hello"), fails: true });
+    thrown.talk.toggle(0);
+    await thrown.run(200 + END_SILENCE_MS + MIN_THINK_MS + 80);
+    expect(thrown.failed).toEqual([[FAILED_LINES.en, "failed"]]);
+    expect(thrown.lines).toEqual([]);
+  });
+
+  test("without_a_recogniser_no_microphone_is_opened", async () => {
+    const t = turn({ ear: "unheard" });
+    t.talk.toggle(0);
+    await flush();
+    expect(t.states).not.toContain("listening");
+    expect(t.talk.phase).toBe("off");
+    // Once a session she says why; the talk line opens every time.
+    expect(t.typed).toEqual([UNHEARD_LINES.en]);
+    t.talk.toggle(t.at());
+    await flush();
+    expect(t.typed).toEqual([UNHEARD_LINES.en, null]);
+    expect(t.asked).toEqual([]);
+    expect(t.lines).toEqual([]);
+  });
+
+  test("an OS that refuses recognition is told every time, and the talk line opens", async () => {
+    const t = turn({ ear: "speech-refused" });
+    t.talk.toggle(0);
+    await flush();
+    t.talk.toggle(t.at());
+    await flush();
+    expect(t.typed).toEqual([UNHEARD_LINES.en, UNHEARD_LINES.en]);
   });
 
   test("a click while she listens stops listening and answers", async () => {
@@ -172,8 +230,10 @@ describe("a spoken turn with Eris", () => {
     const talk = new Talk({
       lang: () => "en",
       openEar: async () => mic(0, 200, "slow"),
-      sampleEar: (at) => sampleEar(userHello, at),
       answer: () => new Promise<Reply>((r) => (answer = r)),
+      hearing: () => {},
+      typeInstead: () => {},
+      failed: () => {},
       line: (text, words, pulses) => {
         t.lines.push({ text, words, pulses });
         return 0;

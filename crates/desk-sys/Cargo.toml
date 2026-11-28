@@ -1,6 +1,6 @@
 [package]
 name = "desk-sys"
-description = "Primitives: fs (notify, trash), proc (portable-pty), net (fetch, WebSocket and server-sent events through the system proxy and PAC), shell, calendar (EventKit), notification (UserNotifications, toasts, freedesktop), login (LaunchAgent, Run key, XDG autostart), clipboard (NSPasteboard, user32) and audio (cpal, wake word), each behind a cargo feature."
+description = "Primitives: fs (notify, trash), proc (portable-pty), net (fetch, WebSocket and server-sent events through the system proxy and PAC), shell, calendar (EventKit), notification (UserNotifications, toasts, freedesktop), login (LaunchAgent, Run key, XDG autostart), clipboard (NSPasteboard, user32) and audio (cpal, wake word), speech (on-device recognition), each behind a cargo feature."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -65,6 +65,16 @@ clipboard = ["dep:objc2", "dep:objc2-app-kit", "dep:objc2-foundation"]
 audio = ["audio-api", "dep:cpal", "dep:block2", "dep:objc2", "dep:objc2-av-foundation"]
 ## Audio types, processing and the in-memory input used by the core.
 audio-api = []
+## Speech into words on this computer (ADR 0406): the Speech framework's recogniser with on-device
+## recognition required on macOS, none elsewhere yet; the trait and its fake come with `audio-api`.
+speech = [
+  "audio-api",
+  "dep:block2",
+  "dep:objc2",
+  "dep:objc2-foundation",
+  "dep:objc2-speech",
+  "dep:objc2-avf-audio",
+]
 ## Secrets in the OS keychain: get, set and delete one string under a service and an account.
 ## keyring-core over the Keychain on macOS, Credential Manager on Windows, the Secret Service on
 ## Linux (zbus, pure Rust crypto), and a fake (ADR 0239).
@@ -135,6 +145,7 @@ objc2-foundation = { version = "0.3.2", optional = true, default-features = fals
   "NSEnumerator",
   "NSError",
   "NSLocale",
+  "NSOperation",
   "NSSet",
   "NSString",
   "NSTimeZone",
@@ -145,6 +156,23 @@ objc2-av-foundation = { version = "0.3.2", optional = true, default-features = f
   "block2",
   "AVCaptureDevice",
   "AVMediaFormat",
+] }
+# Speech and AVFAudio's PCM buffers, for `speech` on macOS.
+objc2-speech = { version = "0.3.2", optional = true, default-features = false, features = [
+  "std",
+  "block2",
+  "objc2-avf-audio",
+  "SFSpeechRecognitionRequest",
+  "SFSpeechRecognitionResult",
+  "SFSpeechRecognitionTask",
+  "SFSpeechRecognizer",
+  "SFTranscription",
+] }
+objc2-avf-audio = { version = "0.3.2", optional = true, default-features = false, features = [
+  "std",
+  "AVAudioBuffer",
+  "AVAudioFormat",
+  "AVAudioTypes",
 ] }
 # The login Keychain, for `keychain` on macOS.
 apple-native-keyring-store = { version = "1", optional = true, features = ["keychain"] }

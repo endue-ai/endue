@@ -276,6 +276,7 @@
         { "$ref": "db.schema.json#/$defs/DbParameterEvent" },
         { "$ref": "db.schema.json#/$defs/DbClosedEvent" },
         { "$ref": "audio.schema.json#/$defs/AudioFrameEvent" },
+        { "$ref": "audio.schema.json#/$defs/AudioHeardEvent" },
         { "$ref": "audio.schema.json#/$defs/AudioEndedEvent" },
         { "$ref": "audio.schema.json#/$defs/AudioCapturingEvent" },
         { "$ref": "audio.schema.json#/$defs/AudioWakeEvent" },

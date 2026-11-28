@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { arrangeText, spreadCopy } from "../arrange/copy";
 import { dt } from "../desktops/copy";
 import { erisText } from "../eris/copy";
-import { REFUSED_LINES, SAMPLE_LINES } from "../eris/talk";
+import { NOTHING_LINES, REFUSED_LINES, UNHEARD_LINES } from "../eris/talk";
 import { barWord } from "../shell/bar-new";
 import { t } from "../shell/copy";
 
@@ -42,8 +42,10 @@ describe("the shell's words in catalogs", () => {
   it("the talk line, the new-agent bar and Eris's said and heard lines follow the language", () => {
     expect(barWord("ko", "more", 3)).toBe("+3명 더");
     expect(barWord("en", "moreEndue", 3)).toBe("+3 more");
-    expect(SAMPLE_LINES.heard.ko).toBe("잘 들었어요. 지금은 샘플 답이에요.");
-    expect(SAMPLE_LINES.nothing.en).toBe("I didn't catch that. Tap and try again.");
+    expect(UNHEARD_LINES.ko).toBe(
+      "이 컴퓨터에서는 아직 말을 글로 바꿀 수 없어요. 대신 입력해 주세요.",
+    );
+    expect(NOTHING_LINES.en).toBe("I didn't catch that. Tap and try again.");
     expect(REFUSED_LINES.en).toBe("I need the microphone to hear you. You can type instead.");
     const shell = { en: catalog("shell", "en"), ko: catalog("shell", "ko") };
     expect(shell.ko["shell.talkPlaceholder"]).toBe("Eris에게 계속 말해 보세요");

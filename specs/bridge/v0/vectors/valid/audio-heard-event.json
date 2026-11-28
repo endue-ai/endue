@@ -1,0 +1,8 @@
+{
+  "target": "BridgeEvent",
+  "description": "the final words a capture heard",
+  "instance": {
+    "event": "audio.heard",
+    "data": { "captureId": "c1", "text": "what time is it", "final": true }
+  }
+}

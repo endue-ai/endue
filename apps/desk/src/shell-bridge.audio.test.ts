@@ -1,6 +1,6 @@
 // The shell bridge's microphone over the core (#311): audio.capture.start and stop as the runtime,
 // audio.frame decoded for the listener, and audio.capturing for the chrome's indicator.
-import { type BridgeAdapter, BridgeClient, browserStub } from "@endue-ai/bridge";
+import { type BridgeAdapter, BridgeClient, browserStub, StubError } from "@endue-ai/bridge";
 import type { ShellBridge } from "@endue-ai/runtime";
 import { describe, expect, test } from "vitest";
 import { shellBridge } from "./shell-bridge";
@@ -10,6 +10,11 @@ const SCOPE = { permission: "audio:capture" };
 type Audio = Required<ShellBridge["audio"]>;
 type CaptureFrame = Parameters<Parameters<Audio["capture"]>[0]>[0];
 type CaptureInForce = Parameters<Parameters<Audio["captures"]>[0]>[0][number];
+type MicCapture = Exclude<Awaited<ReturnType<Audio["capture"]>>, string | null>;
+
+/** A capture asked for without words: the microphone, or null. */
+const plain = (got: Awaited<ReturnType<Audio["capture"]>> | undefined) =>
+  typeof got === "string" ? null : (got ?? null);
 
 function setup() {
   const stub = browserStub({
@@ -32,7 +37,7 @@ describe("the shell bridge's microphone", () => {
   test("capture goes over the core", async () => {
     const { bridge, calls, stub } = setup();
     const frames: CaptureFrame[] = [];
-    const capture = await bridge.audio.capture?.((frame) => frames.push(frame));
+    const capture = plain(await bridge.audio.capture?.((frame) => frames.push(frame)));
     expect(capture?.captureId).toBe("c1");
     const [start] = calls();
     expect(start?.request).toMatchObject({
@@ -129,9 +134,54 @@ describe("the shell bridge's microphone", () => {
 
   test("the microphone is started and stopped as the runtime", async () => {
     const { bridge, calls } = setup();
-    const capture = await bridge.audio.capture?.(() => {});
+    const capture = plain(await bridge.audio.capture?.(() => {}));
     await capture?.stop();
     // No caller named: the adapter's own, the runtime (`desk`), not onboarding's or a plugin's.
     expect(calls().map((c) => c.caller)).toEqual([undefined, undefined]);
+  });
+
+  test("a capture that transcribes hears its own words, then the final ones", async () => {
+    const { bridge, calls, stub } = setup();
+    const heard: Array<[string, boolean]> = [];
+    const capture = await bridge.audio.capture?.(() => {}, undefined, {
+      transcribe: { lang: "en" },
+      onHeard: (text, final) => heard.push([text, final]),
+    });
+    expect((capture as MicCapture).captureId).toBe("c1");
+    expect(calls()[0]?.request).toMatchObject({
+      method: "audio.capture.start",
+      params: { scope: SCOPE, transcribe: { lang: "en" } },
+    });
+    stub.emit({ event: "audio.heard", data: { captureId: "c1", text: "what", final: false } });
+    stub.emit({ event: "audio.heard", data: { captureId: "other", text: "no", final: false } });
+    stub.emit({ event: "audio.heard", data: { captureId: "c1", text: "what time", final: true } });
+    expect(heard).toEqual([
+      ["what", false],
+      ["what time", true],
+    ]);
+  });
+
+  test("no recogniser is unheard and an OS refusal is speech-refused", async () => {
+    for (const [code, answer] of [
+      ["unsupported", "unheard"],
+      ["forbidden", "speech-refused"],
+      ["permission_denied", null],
+    ] as const) {
+      const stub = browserStub({
+        "audio.capture.start": () => {
+          throw new StubError(code, "no words here");
+        },
+      });
+      const adapter: BridgeAdapter = {
+        name: "test",
+        call: (request, caller) => stub.call(request, caller),
+        onEvent: (listener) => stub.onEvent(listener),
+      };
+      const bridge = shellBridge(new BridgeClient(adapter));
+      const words = { transcribe: { lang: "ko" } } as const;
+      await expect(bridge.audio.capture?.(() => {}, undefined, words)).resolves.toBe(answer);
+      // Without words asked for, any refusal is null, as before.
+      await expect(bridge.audio.capture?.(() => {})).resolves.toBeNull();
+    }
   });
 });

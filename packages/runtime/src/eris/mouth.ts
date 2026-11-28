@@ -1,6 +1,7 @@
 /**
  * Eris's mouth: one pulse per syllable (the mesh's rule for her voice) and the platform's speech
- * synthesis. Without timestamps per syllable, each word's time is shared evenly by its syllables.
+ * synthesis, only where the profile lets her speak aloud (`eris.manner.voice`). Without timestamps
+ * per syllable, each word's time is shared evenly by its syllables.
  */
 import type { WordTime } from "../bridge/types";
 import type { Speech, TalkLang } from "./talk";
@@ -31,6 +32,17 @@ export function syllablePulses(words: readonly WordTime[], msPerChar: number): n
 }
 
 const LOCALE: Record<TalkLang, string> = { ko: "ko-KR", en: "en-US" };
+
+/**
+ * Her voice as the profile allows it: `speak` while `allowed()` (the profile's `eris.manner.voice`),
+ * else none, so her line is soul text only.
+ */
+export function voiceIf(
+  allowed: () => boolean,
+  speak: (text: string, lang: TalkLang) => Speech | null = speakAloud,
+): (text: string, lang: TalkLang) => Speech | null {
+  return (text, lang) => (allowed() ? speak(text, lang) : null);
+}
 
 /** Say `text` with the platform's speech synthesis; null when the page has none. */
 export function speakAloud(text: string, lang: TalkLang): Speech | null {

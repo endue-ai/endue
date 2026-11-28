@@ -1,12 +1,11 @@
 /**
- * Eris's ear for a spoken turn: the microphone through Web Audio (an AnalyserNode, fftSize 256, into
- * the nine sound bands) plus the platform's speech recognition when the page has it; the bridge's
- * microphone (`ear-capture.ts`) when the page has no speech recognition; or a recorded sample voice
- * replayed on the shell's clock when there is no microphone.
+ * Eris's ear for a spoken turn: the bridge's microphone with the core's on-device recognition
+ * (`ear-capture.ts`, ADR 0406) wherever the desk has a core; else, in a plain page, the microphone
+ * through Web Audio (an AnalyserNode, fftSize 256, into the nine sound bands) with the page's own
+ * speech recognition. A page without recognition opens no microphone: it would hear no words.
  */
-import { type Envelope, sampleEnvelope } from "../bridge/browser";
-import type { Bands, ShellBridge } from "../bridge/types";
-import { captureEar, MAX_DB, MIN_DB } from "./ear-capture";
+import type { ShellBridge } from "../bridge/types";
+import { captureEar, MAX_DB, MIN_DB, type NoEar } from "./ear-capture";
 import type { Ear, TalkLang } from "./talk";
 import { bandsFromSpectrum } from "./voice";
 
@@ -46,7 +45,7 @@ function recognition(): (new () => Recognition) | undefined {
 }
 
 /** The platform's speech recognition, listening in `lang`; null when the page has none. */
-function recognise(lang: TalkLang): { stop(): Promise<string> } | null {
+function recognise(lang: TalkLang): { stop(): Promise<string>; interim(): string } | null {
   const Make = recognition();
   if (!Make) return null;
   let text = "";
@@ -67,6 +66,7 @@ function recognise(lang: TalkLang): { stop(): Promise<string> } | null {
     };
     r.start();
     return {
+      interim: () => text.trim(),
       stop: () =>
         new Promise<string>((resolve) => {
           finish = () => resolve(text.trim());
@@ -85,25 +85,27 @@ function recognise(lang: TalkLang): { stop(): Promise<string> } | null {
 }
 
 /**
- * The microphone; null when there is none, it was refused, or Web Audio is missing. Without speech
- * recognition the page's microphone would hear no words either, so `bridge`'s capture listens; and
- * where the page has recognition but no microphone of its own (CEF may name Web Speech without
- * serving it), the capture listens too, for the level.
+ * The microphone and its words; null when there is none or it was refused; `unheard` when nothing
+ * here turns speech into words (no microphone is opened); `speech-refused` when the OS refused
+ * recognition. CEF may name Web Speech without serving it, so the bridge's capture comes first.
  */
 export async function openMic(
   lang: TalkLang,
   audio: AudioContext | undefined,
   bridge?: ShellBridge["audio"],
-): Promise<Ear | null> {
-  if (!recognition() && bridge?.capture) {
+): Promise<Ear | NoEar | null> {
+  if (bridge?.capture) {
     void audio?.close();
-    return captureEar(bridge.capture);
+    return captureEar(bridge.capture, lang);
   }
-  const fallback = () => (bridge?.capture ? captureEar(bridge.capture) : Promise.resolve(null));
+  if (!recognition()) {
+    void audio?.close();
+    return "unheard";
+  }
   const devices = typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
   if (!audio || !devices?.getUserMedia) {
     void audio?.close();
-    return fallback();
+    return null;
   }
   let stream: MediaStream;
   try {
@@ -112,7 +114,7 @@ export async function openMic(
     });
   } catch {
     void audio.close();
-    return fallback();
+    return null;
   }
   void audio.resume().catch(() => {});
   const analyser = audio.createAnalyser();
@@ -126,6 +128,8 @@ export async function openMic(
   let closed = false;
   return {
     live: true,
+    words: words !== null,
+    interim: () => words?.interim() ?? "",
     bands() {
       if (closed) return [0, 0, 0, 0, 0, 0, 0, 0, 0];
       analyser.getByteFrequencyData(bins);
@@ -138,14 +142,5 @@ export async function openMic(
       void audio.close().catch(() => {});
       return (await words?.stop()) ?? "";
     },
-  };
-}
-
-/** The recorded sample voice, replayed from `at` on the shell's clock; nothing is recognised. */
-export function sampleEar(envelope: Envelope, at: number): Ear {
-  return {
-    live: false,
-    bands: (now: number): Bands => sampleEnvelope(envelope, now - at),
-    close: async () => "",
   };
 }

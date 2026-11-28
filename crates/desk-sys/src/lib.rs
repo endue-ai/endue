@@ -1,7 +1,7 @@
 //! Primitives: fs (notify), proc (portable-pty), net, shell (links and files handed to the system),
 //! calendar (EventKit), notification (UserNotifications, toasts, freedesktop), login (start at
-//! login), clipboard (text, NSPasteboard and user32), audio (cpal, wake word) and keychain (secrets in
-//! the OS keychain), each behind a cargo feature.
+//! login), clipboard (text, NSPasteboard and user32), audio (cpal, wake word), speech (on-device
+//! recognition) and keychain (secrets in the OS keychain), each behind a cargo feature.
 //! No permission checks happen here: desk-core authorizes every call first.
 pub const NAME: &str = env!("CARGO_PKG_NAME");
 
@@ -30,3 +30,5 @@ pub mod proc;
 pub mod search;
 #[cfg(feature = "shell")]
 pub mod shell;
+#[cfg(feature = "audio-api")]
+pub mod speech;

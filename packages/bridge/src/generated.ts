@@ -2744,7 +2744,7 @@ export interface AgentsChangedEvent {
   data: AgentsChangedData;
 }
 
-/** Start capturing the microphone. With wakeWord, audio.wake events arrive when the wake word is heard. */
+/** Start capturing the microphone. With transcribe, audio.heard events carry the words heard on this computer: unsupported when no on-device recogniser serves the language, forbidden when the OS refuses speech recognition; nothing opens for either. With wakeWord, audio.wake events arrive when the wake word is heard. */
 export interface AudioCaptureStartRequest {
   id: RequestId;
   method: "audio.capture.start";
@@ -2757,8 +2757,17 @@ export interface AudioCaptureStartParams {
   wakeWord?: boolean;
   /** Samples per second. */
   sampleRate?: number;
+  transcribe?: AudioTranscribe;
   scope: AudioCapturePermission;
 }
+
+/** Turn the capture into words on this computer, in the desk's language. No audio leaves the computer for recognition. */
+export interface AudioTranscribe {
+  lang: AudioLang;
+}
+
+/** A language a capture is transcribed in. */
+export type AudioLang = "ko" | "en";
 
 /** Result of audio.capture.start. */
 export interface AudioCaptureStartResult {
@@ -2797,6 +2806,21 @@ export interface AudioFrameData {
   pcm: string;
   rmsDb: number;
   peakDb: number;
+}
+
+/** The words heard so far in a capture that transcribes, for the caller that started it, then the final words once, before audio.ended. */
+export interface AudioHeardEvent {
+  event: "audio.heard";
+  data: AudioHeardData;
+}
+
+/** Payload of audio.heard. */
+export interface AudioHeardData {
+  captureId: string;
+  /** Every word heard since the capture started; empty when none were. */
+  text: string;
+  /** True once, for the final words, after the capture stopped. */
+  final: boolean;
 }
 
 /** A capture ended; no audio.frame for it follows. Comes once per capture. */
@@ -3444,6 +3468,7 @@ export type BridgeEvent =
   | DbParameterEvent
   | DbClosedEvent
   | AudioFrameEvent
+  | AudioHeardEvent
   | AudioEndedEvent
   | AudioCapturingEvent
   | AudioWakeEvent

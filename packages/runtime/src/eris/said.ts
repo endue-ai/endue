@@ -67,6 +67,8 @@ export interface Said {
   say(text: string): boolean;
   /** A failed turn's sentence, kept as text with the command that fixes it (FT-01). */
   fail(text: string, reason: BrainTurnReason): void;
+  /** The person's words she heard so far, muted under her (FT-02); "" hides them. */
+  hearing(words: string): void;
   /** Show the card while it keeps text or `soul` (a soul line is on screen). */
   update(soul: boolean): void;
   place(eris: Box, size: { width: number; height: number }): void;
@@ -100,9 +102,11 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
     icon("close", 16),
   );
   const fixes = h("div", { class: "eris-said-fixes", hidden: true });
+  const heard = h("p", { class: "eris-said-heard", "aria-live": "polite", hidden: true });
   const el = h(
     "section",
     { class: "popover eris-said", "aria-label": tr("label"), hidden: true },
+    heard,
     soul,
     text,
     fixes,
@@ -116,7 +120,7 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
 
   const update = (soulShown: boolean) => {
     showing = soulShown;
-    el.hidden = !kept && !soulShown;
+    el.hidden = !kept && !soulShown && heard.hidden;
   };
   /** Keep `next` as text: an answer read from its start, her last lines from the newest. */
   const keep = (next: string[] | null, newest = false) => {
@@ -183,6 +187,13 @@ export function mountSaid(root: HTMLElement, ctx: ShellCtx, soul: HTMLElement): 
         ),
       );
       fixes.hidden = false;
+    },
+    hearing(words) {
+      const line = words.trim();
+      if (heard.textContent === line) return;
+      heard.textContent = line;
+      heard.hidden = !line;
+      update(showing);
     },
     update,
     place(eris, size) {

@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://endue.ai/specs/bridge/v0/audio.schema.json",
   "title": "endue bridge v0: audio",
-  "description": "Microphone capture: audio.frame events carry the captured audio, audio.ended says a capture ended, audio.capturing tells the runtime who captures, and audio.wake the wake word. Scoped by audio:capture.",
+  "description": "Microphone capture: audio.frame events carry the captured audio, audio.heard the words an on-device recogniser heard in it, audio.ended says a capture ended, audio.capturing tells the runtime who captures, and audio.wake the wake word. Scoped by audio:capture.",
   "$defs": {
     "AudioCaptureStartRequest": {
-      "description": "Start capturing the microphone. With wakeWord, audio.wake events arrive when the wake word is heard.",
+      "description": "Start capturing the microphone. With transcribe, audio.heard events carry the words heard on this computer: unsupported when no on-device recogniser serves the language, forbidden when the OS refuses speech recognition; nothing opens for either. With wakeWord, audio.wake events arrive when the wake word is heard.",
       "type": "object",
       "properties": {
         "id": { "$ref": "bridge.schema.json#/$defs/RequestId" },
@@ -26,10 +26,25 @@
           "minimum": 8000,
           "maximum": 48000
         },
+        "transcribe": { "$ref": "#/$defs/AudioTranscribe" },
         "scope": { "$ref": "../../plugin/v0/permission.schema.json#/$defs/AudioCapturePermission" }
       },
       "required": ["scope"],
       "additionalProperties": false
+    },
+    "AudioTranscribe": {
+      "description": "Turn the capture into words on this computer, in the desk's language. No audio leaves the computer for recognition.",
+      "type": "object",
+      "properties": {
+        "lang": { "$ref": "#/$defs/AudioLang" }
+      },
+      "required": ["lang"],
+      "additionalProperties": false
+    },
+    "AudioLang": {
+      "description": "A language a capture is transcribed in.",
+      "type": "string",
+      "enum": ["ko", "en"]
     },
     "AudioCaptureStartResult": {
       "description": "Result of audio.capture.start.",
@@ -98,6 +113,34 @@
         "peakDb": { "type": "number", "minimum": -100, "maximum": 0 }
       },
       "required": ["captureId", "atMs", "sampleRate", "pcm", "rmsDb", "peakDb"],
+      "additionalProperties": false
+    },
+    "AudioHeardEvent": {
+      "description": "The words heard so far in a capture that transcribes, for the caller that started it, then the final words once, before audio.ended.",
+      "type": "object",
+      "properties": {
+        "event": { "const": "audio.heard" },
+        "data": { "$ref": "#/$defs/AudioHeardData" }
+      },
+      "required": ["event", "data"],
+      "additionalProperties": false
+    },
+    "AudioHeardData": {
+      "description": "Payload of audio.heard.",
+      "type": "object",
+      "properties": {
+        "captureId": { "type": "string", "minLength": 1 },
+        "text": {
+          "description": "Every word heard since the capture started; empty when none were.",
+          "type": "string",
+          "maxLength": 8000
+        },
+        "final": {
+          "description": "True once, for the final words, after the capture stopped.",
+          "type": "boolean"
+        }
+      },
+      "required": ["captureId", "text", "final"],
       "additionalProperties": false
     },
     "AudioEndedEvent": {

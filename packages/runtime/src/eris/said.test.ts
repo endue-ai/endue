@@ -104,6 +104,26 @@ describe("her card", () => {
     d.said.dispose();
   });
 
+  it("the_words_so_far_show_while_she_listens", () => {
+    const d = desk();
+    const heard = () => d.card()?.querySelector<HTMLElement>(".eris-said-heard");
+    d.said.update(false);
+    expect(d.card()?.hidden).toBe(true);
+    d.said.hearing("what time");
+    expect(d.card()?.hidden).toBe(false);
+    expect(heard()?.hidden).toBe(false);
+    expect(heard()?.textContent).toBe("what time");
+    expect(heard()?.getAttribute("aria-live")).toBe("polite");
+    d.said.hearing("what time is it");
+    expect(heard()?.textContent).toBe("what time is it");
+    // Her answer comes under the person's words, which stay as the turn's first line.
+    d.said.say("It's ten past three, and the meeting with the design team starts at four.");
+    expect(heard()?.textContent).toBe("what time is it");
+    d.said.hearing("");
+    expect(heard()?.hidden).toBe(true);
+    d.said.dispose();
+  });
+
   it("a_signed_out_line_offers_sign_in_and_other_failures_only_their_sentence", () => {
     const d = desk();
     d.said.fail("Sign in to endue so I can think with it.", "signed_out");

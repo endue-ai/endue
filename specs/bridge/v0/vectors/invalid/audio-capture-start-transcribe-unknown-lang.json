@@ -1,0 +1,9 @@
+{
+  "target": "BridgeRequest",
+  "description": "transcribe names a language the desk does not speak",
+  "instance": {
+    "id": 9,
+    "method": "audio.capture.start",
+    "params": { "transcribe": { "lang": "xx" }, "scope": { "permission": "audio:capture" } }
+  }
+}
